@@ -45,6 +45,9 @@ def main():
         raise SystemExit('REFUSED: the server must not host the project Git mirror')
     # Do not borrow or terminate an unrelated service on the shared server.
     with socket.socket() as probe:
+        # Match HTTPServer reuse semantics: TIME_WAIT is not an active listener.
+        # This does not enable SO_REUSEPORT or allow sharing a listening socket.
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind(('127.0.0.1', 8765))
     started = datetime.now(timezone.utc).isoformat()
     run_id = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + release.name[:12]
