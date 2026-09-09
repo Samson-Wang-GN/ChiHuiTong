@@ -245,7 +245,7 @@ window.PrototypeImport = (() => {
         alert(d.mode === 'uniform' ? '当前统一数量：每人 ' + (d.uniform ?? '未填写') + ' 张；不会叠加Excel中的数量。' : '按Excel明细数量开卡；空白、0、负数、小数均不自动补1。'),
         invalid.length > 0 && alert('请修正原Excel后重新上传；异常行不自动删除或合并，整单不能提交。', 'error'),
         h('div', {className: 'flow-actions'}, button('下载错误清单', () => PrototypeExcel.download('记名销售错误清单', [{name: '全部异常明细', rows: [['工作表', '原始行号', '客户姓名', '原手机号', '原开卡数量', '错误原因'], ...invalid.map(r => [r.sheetName, r.sourceRow, r.rawName, r.rawPhone, String(raw.find(x => x.id === r.id)?.quantity ?? ''), r.error])]}]), {disabled: !invalid.length})),
-        h(W.RecordList, {key: d.file + d.sheet + d.header + JSON.stringify(d.mapping) + d.mode + d.uniform, items: checked.map(r => ({...r, match: r.status, status: r.error ? '异常' : '校验通过'})), states: ['校验通过', '异常'], tableWidth: 950, columns: [['sourceRow', 'Excel行号'], ['name', '客户姓名'], ['phone', '规范手机号'], ['quantity', '开卡张数'], ['status', '状态'], ['match', '客户匹配'], ['error', '错误原因']]})));
+        h(W.RecordList, {key: d.file + d.sheet + d.header + JSON.stringify(d.mapping) + d.mode + d.uniform, items: checked.map(r => ({...r, match: r.status, status: r.error ? '异常' : '校验通过'})), states: ['校验通过', '异常'], tableWidth: 820, columns: [['sourceRow', 'Excel行号'], ['name', '客户姓名'], ['phone', '规范手机号'], ['quantity', '开卡张数'], ['status', '状态'], ['error', '错误原因']]})));
   }
   function Receipt({value}) {
     if (!value) return alert('历史订单未记录列对应关系，不补造导入依据。');
