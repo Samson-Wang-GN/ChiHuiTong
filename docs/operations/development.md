@@ -25,7 +25,7 @@ SSH使用已有专用私钥 `C:\Users\Admin1\.ssh\genius_server.pem`；只记录
 1. `git status --short`，保留其他人修改；新需求先写需求/任务/必要ADR。
 2. 静态检查待提交文件、差异、秘密与大文件。`.env`、密钥、日志、缓存及临时包忽略；Arco/React许可证和原型基线截图保留。
 3. 正常提交，不使用`push --mirror`或强推。首次工具提交采用仓库局部作者`Codex <codex@openai.com>`，不修改本机全局Git配置。
-4. 本地执行 `powershell -File scripts/sync-development.ps1`，只打包已提交且工作区干净的HEAD，经过SSH传输和SHA-256核对；服务器不携带Git对象和GitHub凭据。该步骤只同步文件，不宣称测试已通过。
+4. 本地执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-development.ps1`，只打包已提交且工作区干净的HEAD，经过SSH传输和SHA-256核对；服务器不携带Git对象和GitHub凭据。Bypass仅作用于本次进程运行已审查脚本，不更改全局执行策略。该步骤只同步文件，不宣称测试已通过。
 5. 在服务器执行测试，成功后本地推送 `git -c http.sslBackend=openssl push -u origin main`，并用`git ls-remote`核对HEAD。首次空仓库初始化使用main；后续采用短分支评审，不覆盖远端更新。Windows当前schannel无法获取凭据时，命令级使用OpenSSL后端，不能关闭TLS校验。
 6. 测试修复先落回本地，再提交、重新同步并在服务器重测；不把测试服务器临时改动作为未入Git的交付。文档证据补充产生新提交时重新同步，记录业务代码是否变化。
 

@@ -61,6 +61,6 @@ printf 'SYNCED %s\n' "$revision"
 test ! -e "$root/current/.git"
 '@
 $remoteScript = $remoteScript.Replace('__REVISION__', $revision).Replace('__CHECKSUM__', $checksum)
-$remoteScript | ssh @sshOptions $targetHost 'tr -d "\r" | bash -s'
+$remoteScript | ssh @sshOptions $targetHost "tr -d '\015' | bash -s"
 Assert-Exit 'Verify archive and activate source snapshot'
 Write-Output "Synced commit $revision; no GitHub access or Git metadata on server. Tests must run remotely."
