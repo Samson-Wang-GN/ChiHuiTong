@@ -35,7 +35,7 @@ def verify():
             page.get_by_text(label + '.xlsx', exact=True).wait_for()
 
         def top():
-            page.locator('.arco-drawer-body').evaluate('(e)=>e.scrollTop=0')
+            page.locator('.arco-drawer-content').evaluate('(e)=>e.scrollTop=0')
 
         def upload(data, filename='虚构导入.xlsx'):
             page.locator('input[type=file]').set_input_files({'name': filename, 'mimeType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'buffer': data})
@@ -161,7 +161,7 @@ def verify():
             assert page.get_by_text('请先确认列对应关系。', exact=True).count()
 
         # Latest upload wins, even if the earlier file finishes late.
-        page.evaluate("""() => {const I=PrototypeImport,read=I.readWorkbook;I.readWorkbook=read;window.__slowRead=File.prototype.arrayBuffer;File.prototype.arrayBuffer=async function(){if(this.name==='slow.xlsx')await new Promise(r=>setTimeout(r,500));return window.__slowRead.call(this);};}""")
+        page.evaluate("""() => {window.__slowRead=File.prototype.arrayBuffer;File.prototype.arrayBuffer=async function(){if(this.name==='slow.xlsx')await new Promise(r=>setTimeout(r,500));return window.__slowRead.call(this);};}""")
         upload(template, 'slow.xlsx')
         upload(b'broken', 'newest.xlsx')
         page.wait_for_timeout(900)
