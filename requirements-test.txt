@@ -1,0 +1,2 @@
+# Dedicated environment on the public development server only.
+playwright==1.58.0

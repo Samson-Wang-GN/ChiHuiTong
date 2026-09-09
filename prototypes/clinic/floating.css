@@ -1,0 +1,11 @@
+.floating-launcher{background:var(--color-bg-2);border:1px solid var(--color-border-2);padding:16px;margin:16px 0;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;border-radius:4px}
+.floating-launcher>div:first-child{display:flex;flex-direction:column;gap:4px}.floating-launcher>.arco-alert{flex-basis:100%}
+.floating-launch-actions,.floating-demo-actions{display:flex;flex-wrap:wrap;gap:8px}.floating-muted{font-size:12px;color:var(--color-text-3);margin:8px 0}
+.floating-document{margin:0;background:var(--color-fill-1);font:14px/1.5715 Inter,-apple-system,BlinkMacSystemFont,'Microsoft YaHei',sans-serif;color:var(--color-text-1)}
+.floating-content{padding:16px;min-width:0;overflow-wrap:anywhere}.floating-content header{display:flex;justify-content:space-between;align-items:center;gap:8px}.floating-content header strong{font-size:16px}
+.floating-count{background:rgb(var(--primary-1));padding:12px 16px;border-radius:4px;margin:12px 0;border-left:4px solid rgb(var(--primary-6));animation:arrival .4s ease-out}.floating-count strong{font-size:56px;font-weight:600;line-height:1.2;color:rgb(var(--primary-6));margin-right:12px;font-variant-numeric:tabular-nums}.floating-count p{margin:8px 0 0;color:var(--color-text-2)}
+.floating-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--color-border-1)}.floating-row>div{min-width:0}.floating-row strong{font-size:12px}.floating-row p{margin:4px 0 0;color:var(--color-text-2);font-size:12px}.floating-row button{flex-shrink:0}.floating-empty{padding:16px 0;color:var(--color-text-2)}
+.floating-content>.arco-btn{margin-top:12px;height:36px}.floating-content footer{margin-top:16px;padding-top:12px;border-top:1px solid var(--color-border-2)}.floating-content .arco-tabs-content{padding-top:0}.floating-content .arco-alert{margin:8px 0}
+@keyframes arrival{from{background:rgb(var(--warning-2));transform:translateY(6px)}to{background:rgb(var(--primary-1));transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.floating-count{animation:none}}
+@media(max-width:380px){.floating-content{padding:12px}.floating-count strong{font-size:48px}}

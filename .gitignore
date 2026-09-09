@@ -1,0 +1,31 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+.secrets/
+
+# Local tooling and generated artifacts
+.codex/
+.codex-temp/
+.agents/
+.tmp/
+debug.log
+*.log
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+test-results/
+playwright-report/
+dist/
+*.tar
+*.tar.gz
+*.zip
+.DS_Store
+Thumbs.db
