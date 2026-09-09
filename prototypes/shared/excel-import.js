@@ -11,7 +11,7 @@ window.PrototypeImport = (() => {
   };
   const norm = v => String(v ?? '').normalize('NFKC').replace(/\s/g, '').toLowerCase();
   const col = i => i < 26 ? String.fromCharCode(65 + i) : 'A' + String.fromCharCode(65 + i - 26);
-  const initial = () => ({book: null, file: '', sheet: 0, header: 1, mapping: {}, mode: 'column', uniform: undefined, confirmed: false, saveFormat: false, error: '', notice: '', reading: false});
+  const initial = () => ({book: null, file: '', sheet: 0, header: 1, mapping: {}, mode: 'column', uniform: undefined, confirmed: false, confirmedAt: null, saveFormat: false, error: '', notice: '', reading: false});
   const alert = (text, type = 'info') => h(Alert, {content: text, type, style: {marginBottom: 12}});
   const button = (text, onClick, props = {}) => h(Button, {onClick, ...props}, text);
 
@@ -165,7 +165,7 @@ window.PrototypeImport = (() => {
   }
   function snapshot(d) {
     const values = headers(d.book.sheets[d.sheet], d.header);
-    return {version: 1, file: d.file, sha256: d.book.sha256, sheet: d.book.sheets[d.sheet].name, header: d.header, mode: d.mode === 'uniform' ? '全部客户统一数量' : '按Excel列读取', uniform: d.mode === 'uniform' ? Number(d.uniform) : null, fields: fields.filter(([key]) => !(key === 'quantity' && d.mode === 'uniform')).map(([key, field]) => ({field, column: d.mapping[key] === undefined || d.mapping[key] === '' ? '未选择' : col(Number(d.mapping[key])) + ' · ' + values[Number(d.mapping[key])]})), confirmedAt: new Date().toISOString()};
+    return {version: 1, file: d.file, sha256: d.book.sha256, sheet: d.book.sheets[d.sheet].name, header: d.header, mode: d.mode === 'uniform' ? '全部客户统一数量' : '按Excel列读取', uniform: d.mode === 'uniform' ? Number(d.uniform) : null, fields: fields.filter(([key]) => !(key === 'quantity' && d.mode === 'uniform')).map(([key, field]) => ({field, column: d.mapping[key] === undefined || d.mapping[key] === '' ? '未选择' : col(Number(d.mapping[key])) + ' · ' + values[Number(d.mapping[key])]})), confirmedAt: d.confirmedAt};
   }
   function saveFormat(d, org) {
     const values = headers(d.book.sheets[d.sheet], d.header), labels = {};
@@ -184,7 +184,7 @@ window.PrototypeImport = (() => {
   function Editor({value: d, onChange, pages}) {
     const generation = React.useRef(0);
     React.useEffect(() => () => { generation.current++; }, []);
-    const update = change => onChange(old => ({...old, ...change, confirmed: false, error: ''}));
+    const update = change => onChange(old => ({...old, ...change, confirmed: false, confirmedAt: null, error: ''}));
     const load = async file => {
       const token = ++generation.current;
       onChange({...initial(), reading: true});
@@ -207,7 +207,7 @@ window.PrototypeImport = (() => {
       if (error) { onChange(old => ({...old, error})); return; }
       try { if (d.saveFormat) saveFormat(d, PROTOTYPE.org); }
       catch (e) { onChange(old => ({...old, error: '保存格式失败：' + e.message})); return; }
-      onChange(old => ({...old, confirmed: true, error: '', notice: old.saveFormat ? '本机构格式已保存；只保存列结构，不保存客户样例。' : old.notice}));
+      onChange(old => ({...old, confirmed: true, confirmedAt: new Date().toISOString(), error: '', notice: old.saveFormat ? '本机构格式已保存；只保存列结构，不保存客户样例。' : old.notice}));
     };
     const options = Array.from(values, (v, i) => ({value: String(i), label: col(i) + ' · ' + (v || '空列名'), disabled: !norm(v)}));
     const phoneCandidates = options.filter(o => {
@@ -235,7 +235,7 @@ window.PrototypeImport = (() => {
         d.mode === 'uniform' && W.field('每人统一开卡数量（张）', h(InputNumber, {value: d.uniform, min: 1, max: 500, precision: 0, placeholder: '请填写，不自动默认为1', onChange: uniform => update({uniform})})),
         h('div', {className: 'import-mappings'}, ...fields.filter(([key]) => !(key === 'quantity' && d.mode === 'uniform')).map(([key, label]) => h('div', {className: 'import-mapping', key},
           W.field(label + (key === 'customerNo' ? '' : ' *'), h(Select, {value: d.mapping[key], allowClear: key === 'customerNo', placeholder: '请选择Excel列', options, onChange: v => update({mapping: {...d.mapping, [key]: v}})})),
-          h('div', {className: 'import-example'}, h(Tag, {color: d.mapping[key] === undefined || d.mapping[key] === '' ? 'orange' : 'arcoblue'}, d.mapping[key] === undefined || d.mapping[key] === '' ? '待选择' : '待核对'), h('span', null, '样例：' + examples(key)))))),
+          h('div', {className: 'import-example'}, h(Tag, {color: d.confirmed ? 'green' : d.mapping[key] === undefined || d.mapping[key] === '' ? 'orange' : 'arcoblue'}, d.confirmed ? '已确认' : d.mapping[key] === undefined || d.mapping[key] === '' ? '待选择' : '待核对'), h('span', null, '样例：' + examples(key)))))),
         values.filter(v => /手机|电话|mobile|phone/i.test(norm(v))).length > 1 && alert('存在多个电话相关列，请核对客户手机号，勿选择业务员或联系人电话。', 'warning'),
         h(Checkbox, {checked: d.saveFormat, onChange: saveFormat => update({saveFormat})}, '保存为本机构导入格式'),
         h('div', {className: 'flow-actions'}, button(d.confirmed ? '列对应关系已确认' : '确认列对应关系', confirm, {type: 'primary', disabled: d.confirmed}), d.confirmed && h(Tag, {color: 'green'}, '已确认；修改后需重新确认')),

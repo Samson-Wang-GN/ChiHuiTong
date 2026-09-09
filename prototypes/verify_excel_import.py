@@ -35,7 +35,9 @@ def verify():
             page.get_by_text(label + '.xlsx', exact=True).wait_for()
 
         def top():
+            page.keyboard.press('Escape')
             page.locator('.arco-drawer-content').evaluate('(e)=>e.scrollTop=0')
+            page.wait_for_timeout(250)
 
         def upload(data, filename='虚构导入.xlsx'):
             page.locator('input[type=file]').set_input_files({'name': filename, 'mimeType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'buffer': data})
@@ -60,6 +62,8 @@ def verify():
         btn('确认列对应关系').click()
         assert initial_customers == page.evaluate("PROTOTYPE.pages.find(p=>p.id==='salesCustomers').rows.length")
         top()
+        page.screenshot(path=str(ROOT / 'resource' / 'excel-upload.png'), full_page=True)
+        page.get_by_role('heading', name='2. 确认列对应关系').evaluate('(e)=>e.scrollIntoView({block:"start"})')
         page.screenshot(path=str(ROOT / 'resource' / 'excel-mapping.png'), full_page=True)
         btn('下一步').click()
         select('推广产品', '舒适洁牙权益')
@@ -173,7 +177,7 @@ def verify():
         # Explicit fixture handoff only; platform never receives data automatically.
         page.goto(BASE + '/platform/#sales')
         page.wait_for_selector('.workspace h1')
-        page.evaluate("""order=>{const key='chihuitong-prototype-v1-platform',p=JSON.parse(localStorage.getItem(key));p.find(x=>x.id==='sales').rows.unshift(order);localStorage.setItem(key,JSON.stringify(p));}""", order)
+        page.evaluate("""order=>{const key='chihuitong-prototype-v1-platform',p=JSON.parse(localStorage.getItem(key))||structuredClone(PROTOTYPE.pages);p.find(x=>x.id==='sales').rows.unshift(order);localStorage.setItem(key,JSON.stringify(p));}""", order)
         page.reload()
         page.locator('.status-tabs').first.get_by_placeholder('搜索编号、名称或关键字').fill(order['id'])
         page.locator('tr').filter(has_text=order['id']).get_by_role('button', name='详情', exact=True).click()
