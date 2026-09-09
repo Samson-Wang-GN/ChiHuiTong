@@ -35,7 +35,6 @@ def verify():
             page.get_by_text(label + '.xlsx', exact=True).wait_for()
 
         def top():
-            page.keyboard.press('Escape')
             page.locator('.arco-drawer-content').evaluate('(e)=>e.scrollTop=0')
             page.wait_for_timeout(250)
 
