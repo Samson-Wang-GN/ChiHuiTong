@@ -60,6 +60,10 @@ window.PrototypeImport = (() => {
       if (doc.getElementsByTagName('f').length) throw Error('文件包含公式，请转换为纯文本或数值后上传。');
       cache.set(path, doc); return doc;
     }
+    for (const path of entries.keys()) if (path.endsWith('.rels')) {
+      const relationships = await xml(path);
+      if ([...relationships.getElementsByTagName('Relationship')].some(r => r.getAttribute('TargetMode') === 'External')) throw Error('工作簿不允许外部链接。');
+    }
     const workbook = await xml('xl/workbook.xml'), rels = await xml('xl/_rels/workbook.xml.rels');
     const relationships = [...rels.getElementsByTagName('Relationship')];
     if (relationships.some(r => r.getAttribute('TargetMode') === 'External')) throw Error('工作簿不允许外部链接。');
@@ -206,6 +210,10 @@ window.PrototypeImport = (() => {
       onChange(old => ({...old, confirmed: true, error: '', notice: old.saveFormat ? '本机构格式已保存；只保存列结构，不保存客户样例。' : old.notice}));
     };
     const options = Array.from(values, (v, i) => ({value: String(i), label: col(i) + ' · ' + (v || '空列名'), disabled: !norm(v)}));
+    const phoneCandidates = options.filter(o => {
+      const samples = sheet?.rows.filter(r => r.number > d.header && String(r.cells[Number(o.value)] ?? '').trim()).slice(0, 10) || [];
+      return samples.length && samples.every(r => /^1[3-9]\d{9}$/.test(String(r.cells[Number(o.value)]).normalize('NFKC').replace(/[\s()-]/g, '').replace(/^(\+86|0086)/, '')));
+    });
     const examples = key => raw.slice(0, 3).map(r => String(r[key] ?? '') || '（空）').join(' / ') || '—';
     return h('div', {className: 'import-editor'},
       alert('仅使用虚构客户资料。支持.xlsx、1MB、最多5个工作表；每次导入一个工作表，最多200条客户、500张卡。'),
@@ -222,6 +230,7 @@ window.PrototypeImport = (() => {
           W.field('工作表', h(Select, {value: d.sheet, options: d.book.sheets.map((s, i) => ({value: i, label: s.name})), onChange: i => onChange(configure(d.book, d.file, i, bestHeader(d.book.sheets[i]).number, PROTOTYPE.org))})),
           W.field('表头所在行', h(Select, {value: d.header, options: sheet.rows.map(r => ({value: r.number, label: '第 ' + r.number + ' 行 · ' + r.cells.filter(Boolean).join(' / ').slice(0, 80)})), onChange: n => onChange(configure(d.book, d.file, d.sheet, n, PROTOTYPE.org))}))),
         h('h3', null, '2. 确认列对应关系'), d.notice && alert(d.notice),
+        !d.mapping.phone && phoneCandidates.length > 0 && alert('内容格式像手机号的候选列：' + phoneCandidates.map(o => o.label).join('、') + '。仅作提示，请人工确认客户手机号列。', 'warning'),
         W.field('开卡数量来源', h(Select, {value: d.mode, options: [{value: 'column', label: '按Excel列读取'}, {value: 'uniform', label: '全部客户统一数量'}], onChange: mode => update({mode})})),
         d.mode === 'uniform' && W.field('每人统一开卡数量（张）', h(InputNumber, {value: d.uniform, min: 1, max: 500, precision: 0, placeholder: '请填写，不自动默认为1', onChange: uniform => update({uniform})})),
         h('div', {className: 'import-mappings'}, ...fields.filter(([key]) => !(key === 'quantity' && d.mode === 'uniform')).map(([key, label]) => h('div', {className: 'import-mapping', key},

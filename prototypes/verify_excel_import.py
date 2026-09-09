@@ -167,7 +167,7 @@ def verify():
         page.wait_for_timeout(900)
         assert page.locator('.import-editor').inner_text().find('读取失败') >= 0
         assert page.locator('.import-mappings').count() == 0
-        page.evaluate('File.prototype.arrayBuffer=window.__slowRead')
+        page.evaluate('() => { File.prototype.arrayBuffer=window.__slowRead; }')
         print('error tabs / complete XLSX error export / formula-macro-size guards / upload race / responsive passed', flush=True)
 
         # Explicit fixture handoff only; platform never receives data automatically.
