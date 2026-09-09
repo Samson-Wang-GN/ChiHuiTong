@@ -33,3 +33,15 @@
 .clinic-map-frame svg:focus-visible { outline: 2px solid rgb(var(--primary-6)); outline-offset: -3px; }
 
 .management-logs .arco-table-td:first-child { white-space: nowrap; }
+
+/* REQ-041: Arco controls, dense mapping rows and a single-column narrow layout. */
+.import-editor h3 {font-size:16px;font-weight:500;margin:24px 0 12px}
+.import-file {display:flex;flex-wrap:wrap;gap:8px 16px;padding:12px 0;overflow-wrap:anywhere}
+.import-mappings {border:1px solid var(--color-border-2);border-radius:4px;padding:0 16px;margin:12px 0 16px}
+.import-mapping {display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr);gap:20px;align-items:center;border-bottom:1px solid var(--color-border-1)}
+.import-mapping:last-child {border-bottom:0}
+.import-example {display:flex;align-items:center;gap:8px;overflow-wrap:anywhere;min-width:0;color:var(--color-text-2)}
+.import-example .arco-tag {flex-shrink:0}
+.import-receipt {margin:20px 0}
+.import-samples {align-items:center}
+@media(max-width:800px){.import-mapping{grid-template-columns:1fr;gap:0;padding-bottom:12px}.import-editor .arco-descriptions-table{table-layout:fixed}.import-editor .arco-descriptions-item-value{overflow-wrap:anywhere}}

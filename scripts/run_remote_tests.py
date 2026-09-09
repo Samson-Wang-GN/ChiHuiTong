@@ -15,6 +15,7 @@ import urllib.request
 SERVER_ROOT = Path('/home/ubuntu/ChiHuiTong')
 SERVER_HOSTNAME = 'VM-0-12-ubuntu'
 SUITES = [
+    'verify_excel_import.py',
     'verify.py', 'verify_contracts.py', 'verify_tabs.py',
     'verify_workflows.py', 'verify_contract_groups.py', 'verify_mini.py',
     'verify_operations.py', 'verify_settlement.py', 'verify_sales.py',
@@ -33,7 +34,7 @@ def source_hashes(root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--suite', choices=['all', 'smoke'], default='all')
+    parser.add_argument('--suite', choices=['all', 'smoke', 'import'], default='all')
     args = parser.parse_args()
     release = Path(__file__).resolve().parents[1]
     if sys.platform != 'linux' or socket.gethostname() != SERVER_HOSTNAME:
@@ -52,7 +53,7 @@ def main():
     before = source_hashes(release)
     workspace = result_dir / 'workspace'
     shutil.copytree(release, workspace)
-    suites = SUITES if args.suite == 'all' else ['verify.py', 'verify_rules29.py', 'verify_floating.py']
+    suites = SUITES if args.suite == 'all' else ['verify_excel_import.py', 'verify_sales.py'] if args.suite == 'import' else ['verify.py', 'verify_rules29.py', 'verify_floating.py']
     results = []
     server = None
     try:

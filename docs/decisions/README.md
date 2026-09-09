@@ -4,6 +4,8 @@
 
 ## 命名
 
+本轮决策：[ADR-0020 机构Excel列映射与人工确认](0020-excel-column-mapping.md)。
+
 本轮决策：[ADR-0019 本地Git与公共服务器测试](0019-local-git-remote-testing.md)。
 
 历史提议：[ADR-0015 业务员负责关系交接](0015-responsibility-handover-proposal.md)，功能已延期至上线后；本期仅保留REQ-038解耦约束。

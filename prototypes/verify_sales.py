@@ -118,6 +118,7 @@ def verify():
                 dest.writestr(info.filename, src.read(info.filename))
         page.locator('input[type=file]').set_input_files({'name': '虚构客户.xlsx', 'mimeType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'buffer': compressed.getvalue()})
         page.get_by_text('虚构客户.xlsx', exact=True).wait_for()
+        button('确认列对应关系').click()
         button('下一步').click()
         select('推广产品', '舒适洁牙权益')
         select('来源展示名', '安和保险客户福利')
