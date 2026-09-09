@@ -4,7 +4,7 @@
 
 当前进入开发准备阶段，正式后端技术栈及业务实现尚未启动。本地维护Git并与[GitHub仓库](https://github.com/Samson-Wang-GN/ChiHuiTong)同步；公共开发服务器只接收文件、不运行GitHub同步。所有测试只能在公共开发服务器140.143.125.233执行，详见[开发环境与同步流程](docs/operations/development.md)。
 
-已进入后台原型评审阶段：四组原型分别位于 `prototypes/platform/index.html`、`prototypes/resource/index.html`、`prototypes/channel/index.html`、`prototypes/clinic/index.html`。可直接用浏览器打开；所有依赖已本地化。详细入口和评审说明见 [后台原型说明](docs/prototype-review.md)。
+已进入后台原型评审阶段：四组原型分别位于 `prototypes/platform/index.html`、`prototypes/resource/index.html`、`prototypes/channel/index.html`、`prototypes/clinic/index.html`。所有依赖已随项目保存；只在指定服务器上运行和验证。详细入口和评审说明见 [后台原型说明](docs/prototype-review.md)。
 
 服务器测试入口由 `scripts/run_remote_tests.py` 在服务器本机127.0.0.1:8765临时启动，测试结束关闭。以下历史localhost链接表示测试服务器内的页面地址；不再在本地电脑启动原型或运行浏览器测试，也不开放新的公网端口。
 
@@ -43,7 +43,7 @@
 
 ## 开发与运行
 
-先阅读 `AGENTS.md` 及[开发环境](docs/operations/development.md)。本地提交后执行 `powershell -File scripts/sync-development.ps1` 上传无Git元数据的快照；登录指定服务器后执行 `/home/ubuntu/ChiHuiTong/.venv/bin/python /home/ubuntu/ChiHuiTong/current/scripts/run_remote_tests.py --suite all`。脚本拒绝非目标主机执行，并将逐项日志/截图保存到服务器test-results目录。正式后端技术栈、应用环境变量、CI和生产部署待后续设计，不以静态原型代替。
+先阅读 `AGENTS.md` 及[开发环境](docs/operations/development.md)。本地提交后执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-development.ps1` 上传无Git元数据的快照；登录指定服务器后执行 `/home/ubuntu/ChiHuiTong/.venv/bin/python /home/ubuntu/ChiHuiTong/current/scripts/run_remote_tests.py --suite all`。Bypass只对本次脚本进程生效，不改全局策略。测试脚本拒绝非目标主机执行，并将逐项日志/截图保存到服务器test-results目录。正式后端技术栈、应用环境变量、CI和生产部署待后续设计，不以静态原型代替。
 
 ## 安全提示
 

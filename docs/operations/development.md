@@ -52,3 +52,14 @@ python3 -m venv /home/ubuntu/ChiHuiTong/.venv
 每次保留完整提交快照及归档，切换前记下此前current指向；需要回退时核对目标位于本项目releases下，再切换current到既有版本，不修改GitHub历史或删除预约数据。当前没有数据库迁移、应用服务或资金操作。失败快照、日志不自动清理；后续容量清理需限定对象、保留必要证据后执行。
 
 每次交付记录GitHub提交、服务器current提交、传输摘要、测试报告路径及现有服务状态。仅同步成功、进程存在或服务active均不替代业务测试通过。服务器不提供本项目Git镜像。
+
+## 首次交付证据（2026-09-09）
+
+- 已建立本地main及GitHub origin，正常首推成功，未强推或修改仓库可见性。初始备份推送与服务器回归并行，推送时不视为测试通过；现已取得全量通过结果。后续功能按上面的先验证、后推送流程执行。
+- 已测试代码提交：`34cc8e7e6831e513f4e3302743a23492086eaab5`；服务器快照`/home/ubuntu/ChiHuiTong/releases/34cc8e7e6831e513f4e3302743a23492086eaab5`。
+- 该提交归档SHA-256：`20d5cdca86eb490fbcf1e0ed667fe9491c9f3395a082f5679e4a37835da10596`，传输后校验成功。
+- 全量报告：`/home/ubuntu/ChiHuiTong/test-results/20260909T134858Z-34cc8e7e6831/summary.json`，UTC13:48:58～13:55:01（北京时间21:48:58～21:55:01）；18个脚本全部退出0，`passed=true`、`release_unchanged=true`。其中合同分组兼容入口重复调用工作流，不是新增测试覆盖。
+- 测试覆盖现有后台通用页面、合同/页签/工作流、两套移动原型、待办/结算/销售/指标/过期预约、机构/门诊资料及审核、身份/移动操作、0.29规则和旧浮窗；各脚本日志与生成截图留在报告同级目录及workspace中。
+- 独立venv的`pip check`通过；复用已有匹配Chromium，不改共享Python包。测试结束8765无监听，项目树搜索无`.git`。`chihui-public.service`、`study-system-web.service`、`study-system-syncthing.service`、`nginx.service`均active，既有Study HTTPS入口返回200。本次未更改其配置或业务数据，不把该快照检查称为完整稳定性验收。
+- 最后补充的交付文档将产生新HEAD；重新推送和同步该HEAD。通过本地`git diff 34cc8e7 -- prototypes scripts requirements-test.txt`静态核对运行代码、测试及依赖未变，全量报告仍明确归属于上述已测提交，不伪造新提交测试时间。每次实际current以`readlink /home/ubuntu/ChiHuiTong/current`为准。
+- 首次同步遇到Windows SSH参数引号问题，提交`34cc8e7`已修复；首次失败归档保留。未执行本地测试；正式应用构建和生产验收不在此次范围。
