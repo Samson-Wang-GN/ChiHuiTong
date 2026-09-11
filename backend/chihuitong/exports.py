@@ -19,6 +19,9 @@ def excel_response(headers, rows, *, filename="export.xlsx"):
         sheet.append(cells)
     output = io.BytesIO()
     book.save(output)
-    response = HttpResponse(output.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response

@@ -53,7 +53,7 @@ def current_contract(org_id, *, at=None, product_id=None, stock=False, channel_i
     at = at or timezone.now()
     qs = ContractVersion.objects.select_related("contract", "contract__organization").filter(
         contract__organization_id=org_id,
-        status__in=["approved", "terminated"] if stock else ["approved"],
+        status__in=["approved", "terminated"],
         starts_at__lte=at,
         reviewed_at__lte=at,
     )
@@ -66,6 +66,7 @@ def current_contract(org_id, *, at=None, product_id=None, stock=False, channel_i
     chosen = qs.order_by("-starts_at", "-revision").first()
     require(chosen, "contract_unavailable", "缺少适用的已审核合同或推广产品条款，请联系平台核对")
     if not stock:
+        require(chosen.status == "approved", "contract_terminated", "当前合同已终止，暂不能开展新业务")
         require(chosen.ends_at >= at, "contract_expired", "当前合同已到期，暂不能开展新业务")
         if product_id:
             require(

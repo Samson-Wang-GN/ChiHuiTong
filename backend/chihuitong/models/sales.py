@@ -27,7 +27,11 @@ class CustomerSource(Entity):
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["customer", "organization"], name="customer_source_relation")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["customer", "organization"], name="customer_source_relation"
+            )
+        ]
 
 
 class ImportFormat(Entity):
@@ -62,7 +66,9 @@ class ImportRow(Entity):
     status = models.CharField(max_length=16, default="valid")
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["batch", "row_number"], name="import_original_row")]
+        constraints = [
+            models.UniqueConstraint(fields=["batch", "row_number"], name="import_original_row")
+        ]
 
 
 class SalesOrder(Entity):
@@ -85,7 +91,9 @@ class SalesOrder(Entity):
     source_name = models.CharField(max_length=160)
     submitted_at = models.DateTimeField(null=True)
     approved_at = models.DateTimeField(null=True)
-    reviewed_by = models.ForeignKey(Membership, null=True, on_delete=models.PROTECT, related_name="sales_reviews")
+    reviewed_by = models.ForeignKey(
+        Membership, null=True, on_delete=models.PROTECT, related_name="sales_reviews"
+    )
     reason = EncryptedTextField(default="")
     shipment = EncryptedJSONField(default=dict)
     refund = EncryptedJSONField(default=dict)
@@ -94,7 +102,10 @@ class SalesOrder(Entity):
         constraints = [
             models.CheckConstraint(condition=Q(quantity__gt=0), name="sales_quantity_positive"),
             models.CheckConstraint(condition=Q(units_per_card__gt=0), name="card_units_positive"),
-            models.CheckConstraint(condition=Q(total_cents=F("quantity") * F("unit_price_cents")), name="sales_total_consistent"),
+            models.CheckConstraint(
+                condition=Q(total_cents=F("quantity") * F("unit_price_cents")),
+                name="sales_total_consistent",
+            ),
             models.CheckConstraint(condition=Q(mode__in=["named", "physical"]), name="sales_mode"),
         ]
 
@@ -108,7 +119,9 @@ class SalesRow(Entity):
     quantity = models.PositiveIntegerField()
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["order", "row_number"], name="sales_original_row")]
+        constraints = [
+            models.UniqueConstraint(fields=["order", "row_number"], name="sales_original_row")
+        ]
 
 
 class PurchaseReceipt(Entity):
@@ -121,14 +134,22 @@ class PurchaseReceipt(Entity):
     attachment_ids = models.JSONField(default=list)
     status = models.CharField(max_length=16, default="pending")
     submitted_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
-    reviewed_by = models.ForeignKey(Membership, null=True, on_delete=models.PROTECT, related_name="purchase_reviews")
+    reviewed_by = models.ForeignKey(
+        Membership, null=True, on_delete=models.PROTECT, related_name="purchase_reviews"
+    )
     reviewed_at = models.DateTimeField(null=True)
     reason = EncryptedTextField(default="")
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["order"], condition=Q(status="pending"), name="one_pending_purchase_receipt"),
-            models.UniqueConstraint(fields=["reference_index"], condition=Q(status="approved"), name="purchase_receipt_reference"),
+            models.UniqueConstraint(
+                fields=["order"], condition=Q(status="pending"), name="one_pending_purchase_receipt"
+            ),
+            models.UniqueConstraint(
+                fields=["reference_index"],
+                condition=Q(status="approved"),
+                name="purchase_receipt_reference",
+            ),
         ]
 
 
@@ -172,7 +193,19 @@ class Benefit(Entity):
     expires_at = models.DateTimeField(null=True)
 
     class Meta:
-        constraints = [models.CheckConstraint(condition=Q(total=F("pending") + F("available") + F("reserved") + F("used") + F("restoring") + F("voided")), name="benefit_quantity_conservation")]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(
+                    total=F("pending")
+                    + F("available")
+                    + F("reserved")
+                    + F("used")
+                    + F("restoring")
+                    + F("voided")
+                ),
+                name="benefit_quantity_conservation",
+            )
+        ]
 
 
 class DomainEvent(models.Model):

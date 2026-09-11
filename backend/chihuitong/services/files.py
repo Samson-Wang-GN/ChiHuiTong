@@ -210,10 +210,19 @@ def can_read_file(actor, asset):
     from .clinics import visible_clinics
     from .contracts import accessible_contracts
     from .sales import visible_orders
+    from .finance import visible_clinic_bills
 
     contract_ids = accessible_contracts(actor).values_list("id", flat=True)
     clinic_ids = visible_clinics(actor).values_list("id", flat=True)
-    if asset.links.filter(object_type="salesorder", object_id__in=visible_orders(actor).values("id")).exists():
+    if asset.links.filter(object_type="clinicbill", object_id__in=visible_clinic_bills(actor).values("id")).exists():
+        return True
+    if actor.membership.role == "admin":
+        from chihuitong.models import PartnerBill
+        if asset.links.filter(object_type="partnerbill", object_id__in=PartnerBill.objects.filter(organization=actor.organization).values("id")).exists():
+            return True
+    if asset.links.filter(
+        object_type="salesorder", object_id__in=visible_orders(actor).values("id")
+    ).exists():
         return True
     return (
         asset.links.filter(object_type="contract", object_id__in=contract_ids).exists()
