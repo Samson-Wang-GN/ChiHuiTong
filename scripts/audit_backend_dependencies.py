@@ -23,6 +23,7 @@ def main():
     with (report / "audit.log").open("w") as log:
         if not auditor.exists():
             subprocess.run([sys.executable, "-m", "venv", auditor.parents[1]], check=True, timeout=60, stdout=log, stderr=subprocess.STDOUT)
+        subprocess.run([auditor, "-m", "pip", "install", "--disable-pip-version-check", "pip==26.2.1"], check=True, timeout=300, stdout=log, stderr=subprocess.STDOUT)
         subprocess.run([auditor, "-m", "pip", "install", "--disable-pip-version-check", "pip-audit==2.10.1"], check=True, timeout=300, stdout=log, stderr=subprocess.STDOUT)
         process = subprocess.run([auditor, "-m", "pip_audit", "--path", ROOT / ".venv-backend/lib/python3.12/site-packages", "--strict", "--progress-spinner", "off", "--timeout", "15", "--format", "json", "--output", report / "audit.json"], timeout=600, stdout=log, stderr=subprocess.STDOUT)
     summary = {"commit": release.name, "exit_code": process.returncode, "report": str(report), "passed": False}

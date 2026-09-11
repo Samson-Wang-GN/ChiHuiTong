@@ -16,8 +16,14 @@ class BoundedCapacityTests(TestCase):
         sales_setup(self)
         order = order_fixture(self, physical=True, quantity=10000)
         started = time.monotonic()
-        order = sales.request_approval(self.platform, order.id, approved=True, version=order.version,
-                                      reason="合成容量验证", validity_days=180)
+        order = sales.request_approval(
+            self.platform,
+            order.id,
+            approved=True,
+            version=order.version,
+            reason="合成容量验证",
+            validity_days=180,
+        )
         self.assertEqual(order.status, "issuing")
         jobs.run_one()
         elapsed = time.monotonic() - started

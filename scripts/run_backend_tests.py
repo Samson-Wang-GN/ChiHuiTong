@@ -87,6 +87,7 @@ def main():
     try:
         if not python.exists():
             step("create-venv", [sys.executable, "-m", "venv", ROOT / ".venv-backend"])
+        step("packaging-tool", [python, "-m", "pip", "install", "--disable-pip-version-check", "pip==26.2.1"])
         step("dependencies", [python, "-m", "pip", "install", "--disable-pip-version-check", "-r", workspace / "requirements-dev.txt"])
         step("pip-check", [python, "-m", "pip", "check"])
         if not (pg_data / "PG_VERSION").exists():
@@ -122,6 +123,7 @@ def main():
         step("migrate", [python, "manage.py", "migrate", "--noinput"])
         step("django-check", [python, "manage.py", "check"])
         step("http-smoke", [python, workspace / "smoke_http.py"])
+        step("backup-restore", [python, "manage.py", "verify_backup_restore"])
         step("tests", [python, "-m", "coverage", "run", "manage.py", "test", *args.labels, "--noinput", "--verbosity", "2"])
         step("coverage", [python, "-m", "coverage", "report"])
         step("coverage-json", [python, "-m", "coverage", "json", "-o", result_dir / "coverage.json"])
