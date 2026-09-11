@@ -40,14 +40,17 @@ def normalize_customer(raw):
         "开卡数量必须为正整数，单行不超过10万，可分批继续",
         400,
     )
+    external_number = raw.get("resource_customer_no")
+    require(external_number is None or type(external_number) in {str, int}, "invalid_external_number", "资源方客户编号须为文本或整数", 400)
     result = {
         "name": name.strip(),
         "phone": phone,
         "quantity": quantity,
-        "resource_customer_no": str(raw.get("resource_customer_no") or "")[:160],
+        "resource_customer_no": "" if external_number is None else str(external_number)[:160],
     }
     gender = raw.get("gender")
-    if gender not in {None, ""}:
+    if gender is not None and gender != "":
+        require(isinstance(gender, str), "invalid_gender", "性别须为可识别的文本", 400)
         gender = unicodedata.normalize("NFKC", str(gender)).strip().lower()
         mapping = {
             "男": "male",

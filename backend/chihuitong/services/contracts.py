@@ -80,6 +80,23 @@ def current_contract(org_id, *, at=None, product_id=None, stock=False, channel_i
     return chosen
 
 
+def display_versions(queryset, *, at=None):
+    from django.db.models import Case, CharField, Exists, OuterRef, Q, Value, When
+
+    at = at or timezone.now()
+    newer = ContractVersion.objects.filter(
+        contract_id=OuterRef("contract_id"), status__in=["approved", "terminated"],
+        starts_at__lte=at, reviewed_at__lte=at,
+    ).filter(Q(starts_at__gt=OuterRef("starts_at")) | Q(starts_at=OuterRef("starts_at"), revision__gt=OuterRef("revision")))
+    return queryset.annotate(superseded=Exists(newer)).annotate(display_status=Case(
+        When(~Q(status="approved"), then="status"),
+        When(starts_at__gt=at, then=Value("not_started")),
+        When(superseded=True, then=Value("superseded")),
+        When(ends_at__lt=at, then=Value("expired")),
+        default=Value("effective"), output_field=CharField(),
+    ))
+
+
 def validate_contract_data(data):
     require(
         set(data) == {"starts_at", "ends_at", "settlement_cycle", "contact", "attachment_ids"},
@@ -273,9 +290,13 @@ def review_version(actor, version_id, *, approved, version, reason):
             "不能用较早生效时间覆盖已审核的新合同",
         )
         # Earlier approved revisions remain immutable history. Selection picks the latest effective revision.
+    # Serialize fee-rule activation with redemption and product-price changes.
+    products = list(Product.objects.select_for_update().filter(contractproduct__contract_version=item).order_by("id")) if approved else []
     item.status = "approved" if approved else "rejected"
     item.reviewed_by, item.reviewed_at, item.reason = actor.membership, timezone.now(), reason
     advance(item, "status", "reviewed_by", "reviewed_at", "reason")
+    for product in products:
+        validate_allocations(product)
     audit(
         actor,
         item.contract,
@@ -384,6 +405,29 @@ def term_snapshot(term):
     }
 
 
+def validate_allocations(product):
+    """Check current stock rules and approved future rules, not superseded history.
+
+    Caller holds the Product row lock. Disabled terms still govern existing appointments.
+    Historical redemption snapshots are never recalculated.
+    """
+    now = timezone.now()
+    terms = ContractProduct.objects.select_related("contract_version__contract").filter(
+        product=product, contract_version__status__in=["approved", "terminated"],
+        contract_version__reviewed_at__isnull=False,
+    )
+    latest = terms.filter(contract_version__starts_at__lte=now).order_by(
+        "contract_version__contract_id", "-contract_version__starts_at", "-contract_version__revision"
+    ).distinct("contract_version__contract_id")
+    future = terms.filter(contract_version__starts_at__gt=now, contract_version__status="approved")
+    maxima = {"resource": 0, "channel": 0}
+    for term in [*latest, *future]:
+        kind = term.contract_version.contract.kind
+        if kind in maxima:
+            maxima[kind] = max(maxima[kind], split_cents(product.fee_cents, term.mode, term.value))
+    require(sum(maxima.values()) <= product.fee_cents, "overallocated", "当前或已审核未来合同的分配组合超过获客费，请先调整分配配置")
+
+
 @transaction.atomic
 def save_term(
     actor, contract_version_id, *, product_id, mode, value, status="active", version=None, reason
@@ -428,22 +472,6 @@ def save_term(
     except (InvalidOperation, ValueError, TypeError) as exc:
         raise BusinessError("invalid_split", "分配值不合法", 400) from exc
     require(assigned <= product.fee_cents, "overallocated", "本方分配不能超过获客费")
-    # Check every active opposite-side rule; redemption repeats the actual combination check.
-    opposite_kind = "channel" if item.contract.kind == "resource" else "resource"
-    others = ContractProduct.objects.filter(
-        product=product,
-        status="active",
-        contract_version__status="approved",
-        contract_version__contract__kind=opposite_kind,
-    )
-    if status == "active":
-        for other in others:
-            require(
-                assigned + split_cents(product.fee_cents, other.mode, other.value)
-                <= product.fee_cents,
-                "overallocated",
-                "与已配置合作方组合后分配超过获客费",
-            )
     term = ContractProduct.objects.filter(contract_version=item, product=product).first()
     if term:
         check_version(term, version)
@@ -454,6 +482,8 @@ def save_term(
         term = ContractProduct.objects.create(
             contract_version=item, product=product, mode=mode, value=amount, status=status
         )
+    if item.status == "approved":
+        validate_allocations(product)
     ContractProductRevision.objects.create(
         term=term, revision=term.version, snapshot=term_snapshot(term)
     )

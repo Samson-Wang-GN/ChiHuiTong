@@ -88,6 +88,9 @@ def save_product(actor, data, *, product_id=None, version=None, reason=""):
         require(reason.strip(), "reason_required", "请填写产品变更原因", 400)
         for key, value in data.items():
             setattr(product, key, value)
+        from .contracts import validate_allocations
+
+        validate_allocations(product)
         advance(product, *data)
     else:
         product = Product.objects.create(**data)

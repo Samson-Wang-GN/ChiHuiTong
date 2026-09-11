@@ -180,6 +180,39 @@ class CatalogTests(TestCase):
         with self.assertRaises(BusinessError):
             catalog.save_brand(self.resource, self.resource.organization.id, name="越权")
 
+    def test_fee_validation_ignores_superseded_terms_but_blocks_invalid_price_change(self):
+        contracts.save_term(self.platform, self.resource_contract.id, product_id=self.product.id, mode="percent", value="70", version=1, reason="旧分配")
+        newer = contract_fixture(self.platform, self.resource.organization, product=self.product, split="10", start=timezone.now())
+        term = contracts.save_term(self.platform, self.channel_contract.id, product_id=self.product.id, mode="percent", value="80", version=1, reason="新组合合法")
+        contracts.save_term(self.platform, self.channel_contract.id, product_id=self.product.id, mode="amount", value="50", version=term.version, reason="固定金额")
+        data = catalog.product_snapshot(self.product)
+        data = {key: value for key, value in data.items() if key not in {"id", "version"}}
+        data["fee_cents"] = 5000
+        with self.assertRaises(BusinessError):
+            catalog.save_product(self.platform, data, product_id=self.product.id, version=self.product.version, reason="不得产生负平台收益")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.fee_cents, 6000)
+        self.assertEqual(contracts.current_contract(self.resource.organization.id).id, newer.id)
+
+    def test_cooperation_combines_readonly_contract_and_products_with_state_tabs(self):
+        newer = contract_fixture(self.platform, self.resource.organization, product=self.product, start=timezone.now())
+        response = api_client(self.resource).get(f"/api/v1/organizations/{self.resource.organization.id}/cooperation")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["read_only"])
+        self.assertEqual(response.data["current_contract"]["id"], str(newer.id))
+        self.assertIn(str(newer.id), response.data["products_endpoint"])
+        response = api_client(self.resource).get(f"/api/v1/organizations/{self.resource.organization.id}/contracts", {"status": "superseded"})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["total"], 1)
+        self.assertEqual(response.data["counts"]["effective"], 1)
+        self.assertEqual(api_client(self.channel).get(f"/api/v1/organizations/{self.resource.organization.id}/cooperation").status_code, 404)
+
+    def test_future_contract_approval_checks_combined_allocation(self):
+        with self.assertRaises(BusinessError):
+            contract_fixture(self.platform, self.resource.organization, product=self.product, split="90", start=timezone.now() + timedelta(days=30))
+        future = ContractVersion.objects.filter(contract__organization=self.resource.organization).order_by("-revision").first()
+        self.assertEqual(future.status, "pending")
+
     def test_profile_rejection_preserves_effective_version_and_pending_duplicate(self):
         self.approve_clinic()
         modified = {**self.profile, "business_contact": "新的合成联系人"}

@@ -6,6 +6,7 @@ from . import api_audit as audit
 from . import api_catalog as catalog
 from . import api_finance as finance
 from . import api_metrics as metrics
+from . import api_location as location
 from . import api_notifications as notifications
 from . import api_payments as payments
 from . import api_sales as sales
@@ -27,6 +28,7 @@ urlpatterns = [
     path("products", catalog.product_list),
     path("products/<uuid:product_id>", catalog.product_update),
     path("organizations/<uuid:org_id>/source-brands", catalog.brand_list),
+    path("organizations/<uuid:org_id>/cooperation", catalog.cooperation),
     path("files", catalog.upload),
     path("files/<uuid:asset_id>", catalog.download),
     path("organizations/<uuid:org_id>/contracts", catalog.contract_list),
@@ -36,6 +38,7 @@ urlpatterns = [
     path("contract-versions/<uuid:version_id>/review", catalog.contract_review),
     path("contract-versions/<uuid:version_id>/products", catalog.contract_products),
     path("clinics", catalog.clinic_list),
+    path("clinics/geocode", location.locate),
     path("clinics/<uuid:clinic_id>", catalog.clinic_detail),
     path("clinics/<uuid:clinic_id>/profile-changes", catalog.profile_changes),
     path("profile-changes/<uuid:change_id>/review", catalog.profile_review),
@@ -98,6 +101,7 @@ urlpatterns = [
     path("sms-templates", notifications.templates),
     path("sms-templates/<str:code>", notifications.configure_template),
     path("sms-deliveries", notifications.sms_deliveries),
+    path("sms-deliveries/<uuid:delivery_id>/attempts", notifications.sms_history),
     path("jobs", notifications.jobs),
     path("jobs/<uuid:job_id>/retry", notifications.retry_job),
     path("calendar", notifications.calendar_list),

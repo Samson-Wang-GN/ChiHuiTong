@@ -1,5 +1,6 @@
 import math
 import re
+import uuid
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
@@ -118,8 +119,12 @@ def validate_profile(actor, profile, channel, *, complete=True):
             validate_attachment_ids(actor, value.get(key, []), purposes={"license"})
     if value.get("cover_id"):
         validate_attachment_ids(actor, [value["cover_id"]], purposes={"cover"})
+    try:
+        responsible_id = uuid.UUID(str(value.get("responsible_id")))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise BusinessError("responsible_required", "请选择本渠道有效的负责业务员", 400) from exc
     responsible = Membership.objects.filter(
-        pk=value.get("responsible_id"), organization=channel, active=True, account__active=True
+        pk=responsible_id, organization=channel, active=True, account__active=True
     ).first()
     require(responsible, "responsible_required", "请选择本渠道有效的负责业务员", 400)
     location = value.get("location") or {"status": "unconfirmed"}
@@ -172,7 +177,7 @@ def validate_profile(actor, profile, channel, *, complete=True):
             400,
         )
         require(
-            location.get("source") in {"map_manual", "tencent"},
+            isinstance(location.get("source"), str) and location.get("source") in {"map_manual", "tencent"},
             "invalid_location",
             "定位来源不合法",
             400,
@@ -186,7 +191,7 @@ def validate_profile(actor, profile, channel, *, complete=True):
         )
     else:
         require(
-            location.get("status") in {"unconfirmed", None},
+            location.get("status") is None or location.get("status") == "unconfirmed",
             "invalid_location",
             "定位状态不合法",
             400,

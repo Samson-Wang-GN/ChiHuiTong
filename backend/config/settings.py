@@ -70,6 +70,7 @@ PRIVATE_STORAGE = Path(required("CHT_PRIVATE_STORAGE")).resolve()
 if PRIVATE_STORAGE == BASE_DIR or BASE_DIR in PRIVATE_STORAGE.parents:
     raise ImproperlyConfigured("附件必须位于源码目录之外")
 SMS_BACKEND = os.environ.get("CHT_SMS_BACKEND", "chihuitong.integrations.sms.DisabledSMS")
+TENCENT_MAP_KEY = os.environ.get("CHT_TENCENT_MAP_KEY", "")
 TENCENT_SMS = {key: os.environ.get("CHT_TENCENT_SMS_" + key.upper(), "") for key in ["secret_id", "secret_key", "sdk_app_id", "region"]}
 OTP_SECONDS = 300
 OTP_COOLDOWN_SECONDS = 60

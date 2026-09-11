@@ -115,12 +115,21 @@ class NotificationTests(TestCase):
         appointment.refresh_from_db()
         self.assertEqual(appointment.status, "pending")
         MemoryBusinessSMS.fail = False
+        new_template = self.enable()
         Outbox.objects.filter(pk=job.id).update(available_at=timezone.now())
         jobs.run_one()
         self.assertEqual(SmsDelivery.objects.get().status, "accepted")
         notifications.send_business(job)
         self.assertEqual(len(MemoryBusinessSMS.sent), 1)
         self.assertNotIn(self.customer.name, str(MemoryBusinessSMS.sent))
+        delivery = SmsDelivery.objects.get()
+        self.assertEqual(delivery.template_version, new_template.version)
+        history = list(delivery.history.order_by("number"))
+        self.assertEqual([item.status for item in history], ["unknown", "accepted"])
+        self.assertLess(history[0].template_version, history[1].template_version)
+        response = api_client(self.platform).get(f"/api/v1/sms-deliveries/{delivery.id}/attempts")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(self.customer.phone, str(response.data))
 
     def test_scheduler_24_72_and_expired_reschedule_requeues(self):
         item = confirmed_appointment(self)

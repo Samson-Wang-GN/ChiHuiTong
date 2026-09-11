@@ -23,7 +23,9 @@ class OverviewQuery(StrictSerializer):
     resource_id = serializers.UUIDField(required=False)
     product_id = serializers.UUIDField(required=False)
     mode = serializers.ChoiceField(choices=["all", "named", "physical"], default="all")
-    metric = serializers.ChoiceField(choices=sorted(metrics.COUNTS | metrics.RATES.keys()), default="purchased")
+    metric = serializers.ChoiceField(
+        choices=sorted(metrics.COUNTS | metrics.RATES.keys()), default="purchased"
+    )
     component = serializers.ChoiceField(choices=["numerator", "denominator"], default="numerator")
     trend_from = serializers.DateField(required=False)
     trend_to = serializers.DateField(required=False)
@@ -42,14 +44,33 @@ def context(request):
     form.is_valid(raise_exception=True)
     params = form.validated_data
     today = timezone.localdate()
-    cohort = metrics.Cohort(actor, **{key: params[key] for key in ["as_of", "recorded_cutoff", "resource_id", "product_id", "mode"] if key in params}, date_from=params.get("date_from", today - timedelta(days=29)), date_to=params.get("date_to", today))
+    cohort = metrics.Cohort(
+        actor,
+        **{
+            key: params[key]
+            for key in ["as_of", "recorded_cutoff", "resource_id", "product_id", "mode"]
+            if key in params
+        },
+        date_from=params.get("date_from", today - timedelta(days=29)),
+        date_to=params.get("date_to", today),
+    )
     return actor, cohort, params
 
 
 @api_view(["GET"])
 def overview(request):
     actor, cohort, _ = context(request)
-    return Response({"context": cohort.context(), "metrics": cohort.summary(), "resources": list(Organization.objects.filter(kind__in=RESOURCE_KINDS).values("id", "name")) if actor.platform else [{"id": str(actor.organization.id), "name": actor.organization.name}]})
+    return Response(
+        {
+            "context": cohort.context(),
+            "metrics": cohort.summary(),
+            "resources": list(
+                Organization.objects.filter(kind__in=RESOURCE_KINDS).values("id", "name")
+            )
+            if actor.platform
+            else [{"id": str(actor.organization.id), "name": actor.organization.name}],
+        }
+    )
 
 
 @api_view(["GET"])
@@ -58,7 +79,18 @@ def products(request):
     qs = Product.objects.filter(pk__in=cohort.base_cards.values("order__product_id"))
     if params.get("search"):
         qs = qs.filter(internal_name__icontains=params["search"])
-    response = paginated(request, qs, lambda item: {"id": str(item.id), "internal_name": item.internal_name, "external_name": item.external_name, "status": item.status, **cohort.summary(product_id=item.id)}, states=["active", "disabled"])
+    response = paginated(
+        request,
+        qs,
+        lambda item: {
+            "id": str(item.id),
+            "internal_name": item.internal_name,
+            "external_name": item.external_name,
+            "status": item.status,
+            **cohort.summary(product_id=item.id),
+        },
+        states=["active", "disabled"],
+    )
     response.data["context"] = cohort.context()
     return response
 
@@ -66,7 +98,18 @@ def products(request):
 @api_view(["GET"])
 def trend(request):
     _, cohort, params = context(request)
-    return Response({"context": cohort.context(), **cohort.trend(metric=params["metric"], date_from=params.get("trend_from", cohort.date_from), date_to=params.get("trend_to", timezone.localdate(cohort.as_of)), granularity=params["granularity"], display=params["display"])})
+    return Response(
+        {
+            "context": cohort.context(),
+            **cohort.trend(
+                metric=params["metric"],
+                date_from=params.get("trend_from", cohort.date_from),
+                date_to=params.get("trend_to", timezone.localdate(cohort.as_of)),
+                granularity=params["granularity"],
+                display=params["display"],
+            ),
+        }
+    )
 
 
 def detail_query(cohort, params, *, customer_cards=False):
@@ -85,15 +128,27 @@ def detail_query(cohort, params, *, customer_cards=False):
             if search.upper().startswith("C"):
                 customers = Customer.objects.filter(number=search.upper())
             else:
-                customers = Customer.objects.filter(phone_index=digest(normalize_phone(search), purpose="phone"))
-            lookup = "pk__in" if kind == "customer" else "customer__in" if kind == "appointment" else "appointment__customer__in"
+                customers = Customer.objects.filter(
+                    phone_index=digest(normalize_phone(search), purpose="phone")
+                )
+            lookup = (
+                "pk__in"
+                if kind == "customer"
+                else "customer__in"
+                if kind == "appointment"
+                else "appointment__customer__in"
+            )
             qs = qs.filter(**{lookup: customers})
     if kind == "card":
         qs = qs.select_related("order__product")
     elif kind == "appointment":
         qs = qs.select_related("benefit__card__order__product", "customer", "clinic__organization")
     elif kind == "redemption":
-        qs = qs.select_related("appointment__benefit__card__order__product", "appointment__customer", "appointment__clinic__organization")
+        qs = qs.select_related(
+            "appointment__benefit__card__order__product",
+            "appointment__customer",
+            "appointment__clinic__organization",
+        )
     return kind, qs
 
 
@@ -101,9 +156,27 @@ def detail_query(cohort, params, *, customer_cards=False):
 def details(request, customer_cards=False):
     _, cohort, params = context(request)
     kind, qs = detail_query(cohort, params, customer_cards=customer_cards)
-    states = {"card": ["unclaimed", "activated", "voided"], "appointment": ["pending", "success", "completed"], "redemption": ["active"], "customer": ["related"]}
-    response = paginated(request, qs, lambda item: metrics.detail_projection(kind, item, cohort), status_field="snapshot_status", states=states[kind])
-    response.data.update({"context": cohort.context(), "kind": kind, "metric": params["metric"], "component": params["component"]})
+    states = {
+        "card": ["unclaimed", "activated", "voided"],
+        "appointment": ["pending", "success", "completed"],
+        "redemption": ["active"],
+        "customer": ["related"],
+    }
+    response = paginated(
+        request,
+        qs,
+        lambda item: metrics.detail_projection(kind, item, cohort),
+        status_field="snapshot_status",
+        states=states[kind],
+    )
+    response.data.update(
+        {
+            "context": cohort.context(),
+            "kind": kind,
+            "metric": params["metric"],
+            "component": params["component"],
+        }
+    )
     return response
 
 
@@ -112,14 +185,70 @@ def export(request):
     actor, cohort, params = context(request)
     kind, qs = detail_query(cohort, params)
     state = params["status"]
-    require(state in {"all", "unclaimed", "activated", "voided", "pending", "success", "completed", "active", "related"}, "invalid_status", "明细状态不合法", 400)
+    require(
+        state
+        in {
+            "all",
+            "unclaimed",
+            "activated",
+            "voided",
+            "pending",
+            "success",
+            "completed",
+            "active",
+            "related",
+        },
+        "invalid_status",
+        "明细状态不合法",
+        400,
+    )
     if state != "all":
         qs = qs.filter(snapshot_status=state)
-    keys = ["id", "status", "customer_number", "name", "phone", "card_id", "serial", "order_id", "product_id", "internal_name", "appointment_id", "completion_source", "units", "clinic_settled"]
-    headers = ["记录编号", "观察时点状态", "系统客户编号", "客户姓名", "手机号", "卡片编号", "卡号", "销售订单编号", "推广产品编号", "推广产品内部名称", "预约编号", "完成来源", "消耗份数", "门诊是否结清"]
+    keys = [
+        "id",
+        "status",
+        "customer_number",
+        "name",
+        "phone",
+        "card_id",
+        "serial",
+        "order_id",
+        "product_id",
+        "internal_name",
+        "appointment_id",
+        "completion_source",
+        "units",
+        "clinic_settled",
+    ]
+    headers = [
+        "记录编号",
+        "观察时点状态",
+        "系统客户编号",
+        "客户姓名",
+        "手机号",
+        "卡片编号",
+        "卡号",
+        "销售订单编号",
+        "推广产品编号",
+        "推广产品内部名称",
+        "预约编号",
+        "完成来源",
+        "消耗份数",
+        "门诊是否结清",
+    ]
+
     def rows():
         for item in qs.order_by("created_at", "id").iterator(chunk_size=500):
             projection = metrics.detail_projection(kind, item, cohort)
             yield [projection.get(key) for key in keys]
-    audit(actor, actor.organization, "metrics.details_exported", metric=params["metric"], component=params["component"], count=qs.count(), context=cohort.context())
+
+    audit(
+        actor,
+        actor.organization,
+        "metrics.details_exported",
+        metric=params["metric"],
+        component=params["component"],
+        count=qs.count(),
+        context=cohort.context(),
+    )
     return excel_response(headers, rows(), filename="customer-overview-details.xlsx")

@@ -45,3 +45,17 @@ class SmsDelivery(Entity):
     last_error_code = models.CharField(max_length=80, blank=True)
     accepted_at = models.DateTimeField(null=True)
     # Accepted means provider accepted; never label this as handset delivery confirmed.
+
+
+class SmsAttempt(Entity):
+    delivery = models.ForeignKey(SmsDelivery, on_delete=models.PROTECT, related_name="history")
+    number = models.PositiveIntegerField()
+    template_version = models.PositiveIntegerField()
+    template_snapshot = models.JSONField(default=dict)
+    status = models.CharField(max_length=16, default="sending")
+    error_code = models.CharField(max_length=80, blank=True)
+    provider_reference = EncryptedTextField(default="")
+    finished_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["delivery", "number"], name="sms_attempt_number")]
