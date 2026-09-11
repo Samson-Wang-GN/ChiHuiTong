@@ -72,7 +72,10 @@ if PRIVATE_STORAGE == BASE_DIR or BASE_DIR in PRIVATE_STORAGE.parents:
 SMS_BACKEND = os.environ.get("CHT_SMS_BACKEND", "chihuitong.integrations.sms.DisabledSMS")
 TENCENT_MAP_KEY = os.environ.get("CHT_TENCENT_MAP_KEY", "")
 MINI_PROGRAMS = {
-    audience: {key: os.environ.get(f"CHT_MINI_{audience.upper()}_{key.upper()}", "") for key in ["appid", "secret"]}
+    audience: {
+        key: os.environ.get(f"CHT_MINI_{audience.upper()}_{key.upper()}", "")
+        for key in ["appid", "secret"]
+    }
     for audience in ["customer", "clinic"]
 }
 TENCENT_SMS = {

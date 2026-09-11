@@ -224,6 +224,49 @@ class PaymentTests(TestCase):
             )
             self.assertEqual(attempt.id, again.id)
 
+    def test_retry_lost_creation_reuses_number_and_does_not_mark_paid(self):
+        attempt = self.create()
+        attempt.status, attempt.gateway_payload = "unknown", {}
+        attempt.save(update_fields=["status", "gateway_payload"])
+        with patch("chihuitong.services.payments.WeChatPay", return_value=self.gateway()):
+            retried = payments.retry_preparation(self.clinic_actor, attempt.id)
+        self.assertEqual(retried.number, attempt.number)
+        self.assertEqual(retried.preparation_count, 2)
+        self.assertEqual(retried.status, "pending")
+        self.assertEqual(PaymentAttempt.objects.count(), 1)
+        self.assertFalse(ReceiptLedger.objects.exists())
+        self.bill.refresh_from_db()
+        self.assertEqual(self.bill.status, "open")
+        with patch("chihuitong.services.payments.WeChatPay", return_value=self.gateway()):
+            with self.assertRaises(BusinessError):
+                payments.retry_preparation(self.clinic_actor, attempt.id)
+
+    def test_retry_generation_and_success_dominate_delayed_create(self):
+        attempt = self.create()
+        attempt.status, attempt.gateway_payload = "unknown", {}
+        attempt.save(update_fields=["status", "gateway_payload"])
+        gateway = self.gateway()
+        def create_after_success(item, openid=None):
+            payments.observe(item.id, self.success(item))
+            return {"code_url": "weixin://wxpay/late"}
+        gateway.create = create_after_success
+        with patch("chihuitong.services.payments.WeChatPay", return_value=gateway):
+            result = payments.retry_preparation(self.clinic_actor, attempt.id)
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.gateway_payload, {})
+        self.assertEqual(ReceiptLedger.objects.count(), 1)
+
+    def test_nonfinancial_feedback_does_not_invalidate_inflight_payment(self):
+        from chihuitong.services import finance
+        attempt = self.create()
+        feedback = finance.submit_feedback(self.clinic_actor, self.bill.id, partner=False,
+                                           message="合成核对说明", version=self.bill.version)
+        finance.respond_feedback(self.platform, feedback.id, response="合成回复", version=feedback.version)
+        payments.observe(attempt.id, self.success(attempt))
+        self.bill.refresh_from_db()
+        self.assertEqual(self.bill.status, "settled")
+        self.assertEqual(ReceiptLedger.objects.get().anomaly, "")
+
     def test_verified_success_once_and_late_pending_cannot_downgrade(self):
         attempt = self.create()
         data = self.success(attempt)

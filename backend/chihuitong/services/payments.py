@@ -34,6 +34,7 @@ def projection(attempt):
         "version": attempt.version,
         "expires_at": attempt.expires_at.isoformat() if attempt.expires_at else None,
         "error_code": attempt.error_code,
+        "can_retry_preparation": attempt.status == "unknown" or attempt.status == "pending" and not attempt.gateway_payload,
     }
     if attempt.status == "pending" and attempt.expires_at and attempt.expires_at > timezone.now():
         data["payment_parameters"] = attempt.gateway_payload
@@ -103,6 +104,8 @@ def create_payment(
             appid=gateway.config.appid,
             mchid=gateway.config.mchid,
             request_key=key,
+            payer_openid=verified_openid or "",
+            preparation_started_at=timezone.now(),
             expires_at=timezone.now() + timedelta(minutes=15),
         )
         enqueue_reconciliation(attempt)
@@ -120,14 +123,49 @@ def create_payment(
     except BusinessError as exc:
         with transaction.atomic():
             current = PaymentAttempt.objects.select_for_update().get(pk=attempt.id)
-            if current.status == "creating":
+            if current.status == "creating" and current.preparation_count == attempt.preparation_count:
                 current.status, current.error_code = "unknown", exc.code
                 advance(current, "status", "error_code")
         return PaymentAttempt.objects.get(pk=attempt.id)
     with transaction.atomic():
         current = PaymentAttempt.objects.select_for_update().get(pk=attempt.id)
         # A callback may arrive before create returns. Never downgrade an observed success.
-        if current.status == "creating":
+        if current.status == "creating" and current.preparation_count == attempt.preparation_count:
+            current.status, current.gateway_payload = "pending", result
+            advance(current, "status", "gateway_payload")
+    return current
+
+
+def retry_preparation(actor, attempt_id):
+    """Retry the same merchant order after a lost creation response, never invent a receipt."""
+    ref = get_attempt(actor, attempt_id, operate=True)
+    gateway = WeChatPay()
+    with transaction.atomic():
+        bill = get_bill(actor, ref.bill_id, lock=True, pay=True)
+        attempt = PaymentAttempt.objects.select_for_update().get(pk=attempt_id)
+        require(attempt.appid == gateway.config.appid and attempt.mchid == gateway.config.mchid, "payment_config_changed", "请核对原收款主体", 409)
+        if attempt.status == "creating" and attempt.preparation_started_at and timezone.now() < attempt.preparation_started_at + timedelta(seconds=10):
+            return attempt
+        require(attempt.status in {"creating", "unknown"} or attempt.status == "pending" and not attempt.gateway_payload, "invalid_state", "当前支付无需重新准备，请查单或使用已有付款信息")
+        require(bill.status == "open" and bill.version == attempt.bill_version and bill.total_cents - bill.received_cents == attempt.amount_cents, "bill_changed", "账单已变化，请先查单或关单核对")
+        require(not bill.receipts.filter(status="pending").exists(), "receipt_pending", "请先核对线下付款凭证")
+        require(attempt.method != "jsapi" or attempt.payer_openid, "openid_required", "原小程序付款身份缺失，请先关单后重新发起")
+        attempt.status, attempt.error_code = "creating", ""
+        attempt.preparation_count += 1
+        attempt.preparation_started_at = timezone.now()
+        attempt.expires_at = timezone.now() + timedelta(minutes=15)
+        advance(attempt, "status", "error_code", "preparation_count", "preparation_started_at", "expires_at")
+        audit(actor, bill, "payment.preparation_retried", attempt_id=str(attempt.id), preparation=attempt.preparation_count)
+    try:
+        result = gateway.create(attempt, openid=attempt.payer_openid or None)
+        if attempt.method == "jsapi":
+            result = gateway.client_parameters(result["prepay_id"])
+    except BusinessError as exc:
+        PaymentAttempt.objects.filter(pk=attempt.id, preparation_count=attempt.preparation_count, status="creating").update(status="unknown", error_code=exc.code)
+        return PaymentAttempt.objects.get(pk=attempt.id)
+    with transaction.atomic():
+        current = PaymentAttempt.objects.select_for_update().get(pk=attempt.id)
+        if current.status == "creating" and current.preparation_count == attempt.preparation_count:
             current.status, current.gateway_payload = "pending", result
             advance(current, "status", "gateway_payload")
     return current
@@ -213,6 +251,8 @@ def observe(attempt_id, data):
             "payment_transaction_mismatch",
             "同一支付订单出现不同流水，请核对",
         )
+        if attempt.status == "success":
+            return attempt
         ledger = record_funds(
             bill,
             reference_index=digest(
@@ -244,6 +284,8 @@ def observe(attempt_id, data):
             advance(attempt, "error_code")
             audit(None, bill, "payment.external_refund_detected", attempt_id=str(attempt.id))
     elif state == "CLOSED":
+        if attempt.status == "closed":
+            return attempt
         attempt.status, attempt.gateway_payload = "closed", {}
         advance(attempt, "status", "gateway_payload")
         audit(None, bill, "payment.closed", attempt_id=str(attempt.id))
@@ -266,6 +308,7 @@ def reconcile(attempt_id, *, close=False):
     )
     data = gateway.query(attempt.number)
     state = validate_observation(attempt, data)
+    attempt.refresh_from_db()
     if state == "NOTPAY" and (
         close or (attempt.expires_at and attempt.expires_at <= timezone.now())
     ):

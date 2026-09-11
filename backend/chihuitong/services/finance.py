@@ -523,7 +523,8 @@ def submit_feedback(actor, bill_id, *, partner, message, version):
     elif not partner:
         # Feedback never changes the statement amount, issue date or payment deadline.
         bill.dispute = True
-        advance(bill, "dispute")
+        # Non-financial feedback must not invalidate an in-flight payment's amount revision.
+        bill.save(update_fields=["dispute", "updated_at"])
     audit(actor, bill, "bill.feedback_submitted", feedback_id=str(feedback.id))
     return feedback
 
@@ -552,7 +553,7 @@ def respond_feedback(actor, feedback_id, *, response, version):
     advance(feedback, "response", "status", "responded_by", "responded_at")
     if feedback.clinic_bill_id:
         bill.dispute = bill.feedback.filter(status="open").exists()
-        advance(bill, "dispute")
+        bill.save(update_fields=["dispute", "updated_at"])
     elif bill.status == "disputed":
         bill.status = "pending_confirmation"
         advance(bill, "status")

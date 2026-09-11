@@ -18,8 +18,14 @@ class MiniIdentity(Entity):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["appid", "openid_index"], name="mini_application_identity"),
-            models.CheckConstraint(condition=Q(audience="customer", customer__isnull=False, account__isnull=True) | Q(audience="clinic", account__isnull=False, customer__isnull=True), name="mini_identity_audience_owner"),
+            models.UniqueConstraint(
+                fields=["appid", "openid_index"], name="mini_application_identity"
+            ),
+            models.CheckConstraint(
+                condition=Q(audience="customer", customer__isnull=False, account__isnull=True)
+                | Q(audience="clinic", account__isnull=False, customer__isnull=True),
+                name="mini_identity_audience_owner",
+            ),
         ]
 
 

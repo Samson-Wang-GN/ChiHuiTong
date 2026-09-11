@@ -77,6 +77,9 @@ class Clinic(Entity):
     review_status = models.CharField(max_length=16, default="draft")
     service_status = models.CharField(max_length=16, default="offline")
     confirmation_hours = models.PositiveIntegerField(default=24)
+    # Published business address coordinates only; never a customer's live location.
+    longitude = models.DecimalField(max_digits=10, decimal_places=6, null=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True)
 
     class Meta:
         constraints = [

@@ -6,8 +6,8 @@ from . import api_audit as audit
 from . import api_catalog as catalog
 from . import api_finance as finance
 from . import api_location as location
-from . import api_mini as mini
 from . import api_metrics as metrics
+from . import api_mini as mini
 from . import api_notifications as notifications
 from . import api_payments as payments
 from . import api_sales as sales
@@ -122,6 +122,9 @@ urlpatterns = [
     path("mini/customer/logout", api.logout),
     path("mini/customer/profile", mini.profile),
     path("mini/customer/benefits", mini.benefits),
+    path("mini/customer/clinics", mini.clinic_search),
+    path("mini/customer/clinics/<uuid:clinic_id>", mini.clinic_detail),
+    path("mini/customer/clinics/<uuid:clinic_id>/cover", mini.clinic_cover),
     path("mini/customer/cards/<uuid:card_id>/claim", mini.claim),
     path("mini/customer/cards/activate", mini.activate),
     path("mini/customer/appointments", mini.appointment_list),
@@ -137,7 +140,10 @@ urlpatterns = [
     path("mini/clinic/workbench/tasks/<str:category>/<uuid:object_id>", workbench.task_detail),
     path("mini/clinic/appointments", appointments.appointment_list),
     path("mini/clinic/appointments/<uuid:appointment_id>", appointments.appointment_detail),
-    path("mini/clinic/appointments/<uuid:appointment_id>/<str:action>", appointments.appointment_action),
+    path(
+        "mini/clinic/appointments/<uuid:appointment_id>/<str:action>",
+        appointments.appointment_action,
+    ),
     path("mini/clinic/reschedules", appointments.reschedules),
     path("mini/clinic/reschedules/<uuid:change_id>/review", appointments.reschedule_review),
     path("mini/clinic/redemptions/scan", appointments.scan),

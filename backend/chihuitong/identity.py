@@ -112,7 +112,9 @@ def verify_code(phone, code, remote_address):
 
 class SessionAuthentication(BaseAuthentication):
     def authenticate(self, request):
-        if request.path.startswith("/api/v1/mini/customer/") or request.path.startswith("/api/v1/mini/clinic/"):
+        if request.path.startswith("/api/v1/mini/customer/") or request.path.startswith(
+            "/api/v1/mini/clinic/"
+        ):
             from .mini_identity import authenticate_mini
 
             audience = "customer" if request.path.startswith("/api/v1/mini/customer/") else "clinic"
@@ -162,5 +164,7 @@ def request_actor(request):
     )
     require(membership, "forbidden", "无权使用该机构身份", 403)
     if getattr(request.auth, "audience", "web") == "clinic":
-        require(membership.organization.kind == "clinic", "forbidden", "门诊小程序仅能使用门诊身份", 403)
+        require(
+            membership.organization.kind == "clinic", "forbidden", "门诊小程序仅能使用门诊身份", 403
+        )
     return Actor(membership, getattr(request, "request_id", None))

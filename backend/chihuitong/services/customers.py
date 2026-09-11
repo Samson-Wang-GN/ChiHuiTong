@@ -149,8 +149,15 @@ def register_verified_customer(phone, *, name=None):
     advisory_lock("customer", index)
     customer = Customer.objects.select_for_update().filter(phone_index=index).first()
     if not customer:
-        require(name is None or isinstance(name, str) and 0 < len(name.strip()) <= 100, "invalid_name", "客户姓名不合法", 400)
-        customer = Customer.objects.create(phone=phone, phone_index=index, name=name.strip() if name else "")
+        require(
+            name is None or isinstance(name, str) and 0 < len(name.strip()) <= 100,
+            "invalid_name",
+            "客户姓名不合法",
+            400,
+        )
+        customer = Customer.objects.create(
+            phone=phone, phone_index=index, name=name.strip() if name else ""
+        )
     if customer.registered_at is None:
         customer.registered_at = timezone.now()
         advance(customer, "registered_at")

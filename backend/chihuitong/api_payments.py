@@ -51,11 +51,11 @@ class PaymentActionInput(StrictSerializer):
 def payment_action(request, attempt_id, action):
     actor = request_actor(request)
     attempt = payments.get_attempt(actor, attempt_id, operate=True)
-    require(action in {"query", "close"}, "not_found", "支付操作不存在", 404)
+    require(action in {"query", "close", "retry"}, "not_found", "支付操作不存在", 404)
     data = validated(PaymentActionInput, request)
     require(data["confirmed"] is True, "confirmation_required", "请确认支付核对操作", 400)
     rate_limit(f"payment-query:{attempt.id}", seconds=60, maximum=6)
-    result = payments.reconcile(attempt.id, close=action == "close")
+    result = payments.retry_preparation(actor, attempt.id) if action == "retry" else payments.reconcile(attempt.id, close=action == "close")
     return Response(payments.projection(result))
 
 

@@ -91,6 +91,9 @@ class PaymentAttempt(Entity):
     mchid = models.CharField(max_length=32, blank=True)
     expires_at = models.DateTimeField(null=True)
     request_key = models.CharField(max_length=128, blank=True)
+    payer_openid = EncryptedTextField(default="")
+    preparation_count = models.PositiveIntegerField(default=1)
+    preparation_started_at = models.DateTimeField(null=True)
 
     class Meta:
         constraints = [
