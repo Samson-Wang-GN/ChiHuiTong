@@ -28,7 +28,11 @@ class FinanceAPITests(TestCase):
             lines = client.get(f"/api/v1/clinic-bills/{self.bill.id}/lines")
             row = lines.data["results"][0]["transaction"]
             self.assertFalse(row["clinic_settled"])
-            expected = self.customer.phone if actor != self.channel else self.customer.phone[:3] + "****" + self.customer.phone[-4:]
+            expected = (
+                self.customer.phone
+                if actor != self.channel
+                else self.customer.phone[:3] + "****" + self.customer.phone[-4:]
+            )
             self.assertEqual(row["phone"], expected)
             if actor == self.channel:
                 self.assertNotIn("resource_cents", row)
@@ -40,9 +44,16 @@ class FinanceAPITests(TestCase):
             self.assertEqual(rows[1][4], expected)
             book.close()
         employee = actor_fixture("clinic", "13900000073", "staff", self.clinic_actor.organization)
-        for path in ["/api/v1/clinic-bills", f"/api/v1/clinic-bills/{self.bill.id}/lines", f"/api/v1/clinic-bills/{self.bill.id}/export.xlsx"]:
+        for path in [
+            "/api/v1/clinic-bills",
+            f"/api/v1/clinic-bills/{self.bill.id}/lines",
+            f"/api/v1/clinic-bills/{self.bill.id}/export.xlsx",
+        ]:
             self.assertIn(api_client(employee).get(path).status_code, [403, 404])
-            self.assertIn(api_client(self.resource).get(path).status_code, [403, 404, 200] if path == "/api/v1/clinic-bills" else [403, 404])
+            self.assertIn(
+                api_client(self.resource).get(path).status_code,
+                [403, 404, 200] if path == "/api/v1/clinic-bills" else [403, 404],
+            )
 
     def test_receipt_api_idempotency_feedback_and_response(self):
         client = api_client(self.clinic_actor)
@@ -54,21 +65,41 @@ class FinanceAPITests(TestCase):
         self.assertEqual(response.data, again.data)
         self.bill.refresh_from_db()
         self.assertTrue(self.bill.dispute)
-        replied = api_client(self.platform).post(f"/api/v1/finance-feedback/{response.data['id']}/respond",
-            {"version": response.data["version"], "response": "逐笔核对无误，请确认"}, format="json", HTTP_IDEMPOTENCY_KEY="reply-one")
+        replied = api_client(self.platform).post(
+            f"/api/v1/finance-feedback/{response.data['id']}/respond",
+            {"version": response.data["version"], "response": "逐笔核对无误，请确认"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="reply-one",
+        )
         self.assertEqual(replied.status_code, 200, replied.data)
         self.bill.refresh_from_db()
         self.assertFalse(self.bill.dispute)
         with patch("django.utils.timezone.now", return_value=self.clock):
-            proof = client.post(f"/api/v1/clinic-bills/{self.bill.id}/receipts", {
-                "version": self.bill.version, "amount_cents": self.bill.total_cents,
-                "paid_at": self.clock.isoformat(), "payer": "合成门诊", "reference": "API-SYNTHETIC-001",
-                "attachment_ids": [str(self.proof.id)],
-            }, format="json", HTTP_IDEMPOTENCY_KEY="receipt-one")
+            client = api_client(self.clinic_actor)
+            proof = client.post(
+                f"/api/v1/clinic-bills/{self.bill.id}/receipts",
+                {
+                    "version": self.bill.version,
+                    "amount_cents": self.bill.total_cents,
+                    "paid_at": self.clock.isoformat(),
+                    "payer": "合成门诊",
+                    "reference": "API-SYNTHETIC-001",
+                    "attachment_ids": [str(self.proof.id)],
+                },
+                format="json",
+                HTTP_IDEMPOTENCY_KEY="receipt-one",
+            )
             self.assertEqual(proof.status_code, 201, proof.data)
-            review = api_client(self.platform).post(f"/api/v1/clinic-receipts/{proof.data['id']}/review", {
-                "version": proof.data["version"], "approved": True, "reason": "已核对实际到账",
-            }, format="json", HTTP_IDEMPOTENCY_KEY="receipt-review-one")
+            review = api_client(self.platform).post(
+                f"/api/v1/clinic-receipts/{proof.data['id']}/review",
+                {
+                    "version": proof.data["version"],
+                    "approved": True,
+                    "reason": "已核对实际到账",
+                },
+                format="json",
+                HTTP_IDEMPOTENCY_KEY="receipt-review-one",
+            )
             self.assertEqual(review.status_code, 200, review.data)
         self.bill.refresh_from_db()
         self.assertEqual(self.bill.status, "settled")
@@ -81,7 +112,9 @@ class FinanceAPITests(TestCase):
         bill = PartnerBill.objects.get(organization=self.resource.organization)
         client = api_client(self.staff)
         for suffix in ["", "/lines", "/export.xlsx"]:
-            self.assertEqual(client.get(f"/api/v1/partner-bills/{bill.id}{suffix}").status_code, 403)
+            self.assertEqual(
+                client.get(f"/api/v1/partner-bills/{bill.id}{suffix}").status_code, 403
+            )
         self.assertEqual(client.get("/api/v1/partner-bills").status_code, 403)
         rows = client.get("/api/v1/settlement-details")
         self.assertEqual(rows.status_code, 200)
@@ -97,5 +130,7 @@ class FinanceAPITests(TestCase):
 
     def test_non_object_json_rejected_without_server_error(self):
         client = api_client(self.clinic_actor)
-        response = client.post(f"/api/v1/clinic-bills/{self.bill.id}/receipts", [["bad"]], format="json")
+        response = client.post(
+            f"/api/v1/clinic-bills/{self.bill.id}/receipts", [["bad"]], format="json"
+        )
         self.assertEqual(response.status_code, 400)

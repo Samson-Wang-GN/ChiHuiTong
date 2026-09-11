@@ -2,8 +2,9 @@ from django.urls import path
 
 from . import api
 from . import api_catalog as catalog
-from . import api_sales as sales
 from . import api_finance as finance
+from . import api_appointments as appointments
+from . import api_sales as sales
 
 urlpatterns = [
     path("health", api.health),
@@ -65,4 +66,16 @@ urlpatterns = [
     path("settlement-details", finance.partner_bill_lines),
     path("settlement-details/export.xlsx", finance.own_partner_export),
     path("finance-feedback/<uuid:feedback_id>/respond", finance.feedback_response),
+    path("appointments", appointments.appointment_list),
+    path("appointments/export.xlsx", appointments.appointment_export),
+    path("appointments/reminder-snapshot", appointments.reminder_snapshot),
+    path("appointments/<uuid:appointment_id>", appointments.appointment_detail),
+    path("appointments/<uuid:appointment_id>/<str:action>", appointments.appointment_action),
+    path("reschedules", appointments.reschedules),
+    path("reschedules/<uuid:change_id>/review", appointments.reschedule_review),
+    path("redemptions/scan", appointments.scan),
+    path("redemptions/quote", appointments.redemption_quote),
+    path("redemptions", appointments.redeem),
+    path("redemptions/<uuid:redemption_id>/reverse", appointments.reverse_redemption),
+    path("fulfillment-tasks", appointments.fulfillment_tasks),
 ]

@@ -487,18 +487,33 @@ def receive_partner_bill(actor, bill_id, *, version, actual_received_on, confirm
 def submit_feedback(actor, bill_id, *, partner, message, version):
     actor.require_admin()
     require(not actor.platform, "forbidden", "平台通过回复处理对账反馈", 403)
-    bill = (get_partner_bill(actor, bill_id, lock=True, operate=True) if partner
-            else get_bill(actor, bill_id, lock=True, pay=True))
+    bill = (
+        get_partner_bill(actor, bill_id, lock=True, operate=True)
+        if partner
+        else get_bill(actor, bill_id, lock=True, pay=True)
+    )
     check_version(bill, version)
-    require(bill.status not in {"completed", "settled", "cancelled", "no_payment"},
-            "invalid_state", "已结束的账单不再新增对账反馈")
-    require(isinstance(message, str) and 1 <= len(message.strip()) <= 2000,
-            "message_required", "请填写对账反馈，最多2000字", 400)
-    require(not bill.feedback.filter(status="open").exists(),
-            "feedback_pending", "已有待处理反馈，请等待平台回复")
+    require(
+        bill.status not in {"completed", "settled", "cancelled", "no_payment"},
+        "invalid_state",
+        "已结束的账单不再新增对账反馈",
+    )
+    require(
+        isinstance(message, str) and 1 <= len(message.strip()) <= 2000,
+        "message_required",
+        "请填写对账反馈，最多2000字",
+        400,
+    )
+    require(
+        not bill.feedback.filter(status="open").exists(),
+        "feedback_pending",
+        "已有待处理反馈，请等待平台回复",
+    )
     feedback = FinanceFeedback.objects.create(
         **{"partner_bill" if partner else "clinic_bill": bill},
-        kind="reconciliation", message=message.strip(), actor=actor.membership,
+        kind="reconciliation",
+        message=message.strip(),
+        actor=actor.membership,
     )
     if not partner:
         # Feedback never changes the statement amount, issue date or payment deadline.
@@ -513,13 +528,20 @@ def respond_feedback(actor, feedback_id, *, response, version):
     actor.require_platform()
     ref = FinanceFeedback.objects.filter(pk=feedback_id).first()
     require(ref, "not_found", "反馈不存在", 404)
-    bill = (get_partner_bill(actor, ref.partner_bill_id, lock=True) if ref.partner_bill_id
-            else get_bill(actor, ref.clinic_bill_id, lock=True))
+    bill = (
+        get_partner_bill(actor, ref.partner_bill_id, lock=True)
+        if ref.partner_bill_id
+        else get_bill(actor, ref.clinic_bill_id, lock=True)
+    )
     feedback = FinanceFeedback.objects.select_for_update().get(pk=feedback_id)
     check_version(feedback, version)
     require(feedback.status == "open", "invalid_state", "反馈已处理")
-    require(isinstance(response, str) and 1 <= len(response.strip()) <= 2000,
-            "response_required", "请填写处理结果，最多2000字", 400)
+    require(
+        isinstance(response, str) and 1 <= len(response.strip()) <= 2000,
+        "response_required",
+        "请填写处理结果，最多2000字",
+        400,
+    )
     feedback.response, feedback.status = response.strip(), "closed"
     feedback.responded_by, feedback.responded_at = actor.membership, timezone.now()
     advance(feedback, "response", "status", "responded_by", "responded_at")

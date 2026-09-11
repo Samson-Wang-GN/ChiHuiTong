@@ -62,7 +62,8 @@ def current_contract(org_id, *, at=None, product_id=None, stock=False, channel_i
     if not stock:
         qs = qs.filter(contract__organization__status="active")
     if product_id and stock:
-        qs = qs.filter(products__product_id=product_id, products__status="active")
+        # Disabling a product stops new business, never removes existing service terms.
+        qs = qs.filter(products__product_id=product_id)
     chosen = qs.order_by("-starts_at", "-revision").first()
     require(chosen, "contract_unavailable", "缺少适用的已审核合同或推广产品条款，请联系平台核对")
     if not stock:
@@ -402,8 +403,8 @@ def resolve_fees(resource_id, clinic, product, *, at=None):
     clinic_contract = current_contract(
         clinic.organization_id, at=at, stock=True, channel_id=clinic.channel_id
     )
-    resource_term = resource_contract.products.get(product=product, status="active")
-    channel_term = channel_contract.products.get(product=product, status="active")
+    resource_term = resource_contract.products.get(product=product)
+    channel_term = channel_contract.products.get(product=product)
     resource_amount = split_cents(product.fee_cents, resource_term.mode, resource_term.value)
     channel_amount = split_cents(product.fee_cents, channel_term.mode, channel_term.value)
     require(

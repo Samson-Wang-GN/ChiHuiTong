@@ -180,8 +180,10 @@ class FinanceFeedback(Entity):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=(Q(clinic_bill__isnull=False, partner_bill__isnull=True)
-                           | Q(clinic_bill__isnull=True, partner_bill__isnull=False)),
+                condition=(
+                    Q(clinic_bill__isnull=False, partner_bill__isnull=True)
+                    | Q(clinic_bill__isnull=True, partner_bill__isnull=False)
+                ),
                 name="feedback_exactly_one_bill",
             )
         ]
