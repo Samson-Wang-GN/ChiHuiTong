@@ -103,7 +103,9 @@ def load_configuration():
         path = configured_path.resolve()
         require(
             configured_path.is_absolute() and not path.is_relative_to(settings.BASE_DIR.resolve()),
-            "wechat_key_location", "商户私钥须使用源码目录外的绝对路径", 503,
+            "wechat_key_location",
+            "商户私钥须使用源码目录外的绝对路径",
+            503,
         )
         require(
             path.is_file() and path.stat().st_size <= 16384 and not (path.stat().st_mode & 0o077),

@@ -20,7 +20,7 @@ from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone
 
 from chihuitong.errors import require
-from chihuitong.models import Appointment, Card, Customer, DomainEvent, Product, Redemption
+from chihuitong.models import Appointment, Card, Customer, DomainEvent, Redemption
 
 from .common import RESOURCE_KINDS
 from .sales import visible_orders
@@ -260,20 +260,6 @@ class Cohort:
             missing = missing.filter(order__product_id=product_id)
         result["excluded_missing_issuance"] = missing.count()
         return result
-
-    def product_rows(self):
-        products = Product.objects.filter(
-            pk__in=self.base_cards.values("order__product_id")
-        ).order_by("internal_name", "id")
-        return [
-            {
-                "product_id": str(product.id),
-                "internal_name": product.internal_name,
-                "external_name": product.external_name,
-                **self.summary(product_id=product.id),
-            }
-            for product in products
-        ]
 
     def trend(self, *, metric, date_from, date_to, granularity, display="cumulative"):
         require(

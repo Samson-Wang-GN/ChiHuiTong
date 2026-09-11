@@ -2,11 +2,11 @@ import base64
 import io
 import json
 import re
-import time
 import tempfile
-from pathlib import Path
+import time
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -155,16 +155,29 @@ class CryptoTests(SimpleTestCase):
         with tempfile.TemporaryDirectory(prefix="cht-key-test-") as directory:
             private = Path(directory) / "merchant.pem"
             public = Path(directory) / "wechat.pem"
-            private.write_bytes(self.config.private_key.private_bytes(serialization.Encoding.PEM,
-                               serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+            private.write_bytes(
+                self.config.private_key.private_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PrivateFormat.PKCS8,
+                    serialization.NoEncryption(),
+                )
+            )
             private.chmod(0o600)
-            public.write_bytes(self.wx_key.public_key().public_bytes(serialization.Encoding.PEM,
-                               serialization.PublicFormat.SubjectPublicKeyInfo))
-            values = {"mchid": self.config.mchid, "appid": self.config.appid,
-                      "certificate_serial": self.config.certificate_serial, "private_key_path": str(private),
-                      "public_key_id": self.config.public_key_id,
-                      "public_keys": json.dumps({self.config.public_key_id: str(public)}),
-                      "api_v3_key": "0" * 32, "notify_url": self.config.notify_url}
+            public.write_bytes(
+                self.wx_key.public_key().public_bytes(
+                    serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+            )
+            values = {
+                "mchid": self.config.mchid,
+                "appid": self.config.appid,
+                "certificate_serial": self.config.certificate_serial,
+                "private_key_path": str(private),
+                "public_key_id": self.config.public_key_id,
+                "public_keys": json.dumps({self.config.public_key_id: str(public)}),
+                "api_v3_key": "0" * 32,
+                "notify_url": self.config.notify_url,
+            }
             with override_settings(WECHAT_PAY_ENABLED=True, WECHAT_PAY=values):
                 self.assertEqual(load_configuration().mchid, self.config.mchid)
                 private.chmod(0o644)
