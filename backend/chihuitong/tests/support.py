@@ -28,7 +28,14 @@ def actor_fixture(kind="platform", phone="13900000001", role="admin", org=None):
 
 def api_client(actor):
     token = secrets.token_urlsafe(48)
-    Session.objects.create(token_digest=digest(token, purpose="session"), account=actor.account, audience="web", expires_at=timezone.now() + timedelta(hours=1))
+    Session.objects.create(
+        token_digest=digest(token, purpose="session"),
+        account=actor.account,
+        audience="web",
+        expires_at=timezone.now() + timedelta(hours=1),
+    )
     client = APIClient()
-    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}", HTTP_X_MEMBERSHIP_ID=str(actor.membership.id))
+    client.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {token}", HTTP_X_MEMBERSHIP_ID=str(actor.membership.id)
+    )
     return client

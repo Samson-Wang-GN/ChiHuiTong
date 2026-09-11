@@ -38,7 +38,7 @@ def normalize_phone(value):
     phone = re.sub(r"[\s\-()]", "", phone)
     for prefix in ("+86", "0086"):
         if phone.startswith(prefix):
-            phone = phone[len(prefix):]
+            phone = phone[len(prefix) :]
             break
     if not re.fullmatch(r"1[3-9]\d{9}", phone):
         raise BusinessError("invalid_phone", "请输入有效的大陆手机号", 400)

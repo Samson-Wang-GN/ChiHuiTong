@@ -46,14 +46,23 @@ def health(request):
 @authentication_classes([])
 @permission_classes([AllowAny])
 def send_code(request):
-    return Response(request_code(validated(PhoneInput, request)["phone"], request.META.get("REMOTE_ADDR", "unknown")))
+    return Response(
+        request_code(
+            validated(PhoneInput, request)["phone"], request.META.get("REMOTE_ADDR", "unknown")
+        )
+    )
 
 
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def login(request):
-    return Response(verify_code(**validated(LoginInput, request), remote_address=request.META.get("REMOTE_ADDR", "unknown")))
+    return Response(
+        verify_code(
+            **validated(LoginInput, request),
+            remote_address=request.META.get("REMOTE_ADDR", "unknown"),
+        )
+    )
 
 
 @api_view(["POST"])
@@ -68,10 +77,21 @@ def me(request):
     memberships = Membership.objects.select_related("organization").filter(
         account=request.user, active=True, organization__status="active"
     )
-    return Response({
-        "account_id": str(request.user.id),
-        "memberships": [{"id": str(m.id), "organization_id": str(m.organization_id), "organization_name": m.organization.name, "kind": m.organization.kind, "role": m.role} for m in memberships],
-    })
+    return Response(
+        {
+            "account_id": str(request.user.id),
+            "memberships": [
+                {
+                    "id": str(m.id),
+                    "organization_id": str(m.organization_id),
+                    "organization_name": m.organization.name,
+                    "kind": m.organization.kind,
+                    "role": m.role,
+                }
+                for m in memberships
+            ],
+        }
+    )
 
 
 class OrganizationInput(StrictSerializer):
@@ -101,7 +121,13 @@ class OrganizationUpdate(StrictSerializer):
 
 
 def org_projection(org):
-    return {"id": str(org.id), "name": org.name, "kind": org.kind, "status": org.status, "version": org.version}
+    return {
+        "id": str(org.id),
+        "name": org.name,
+        "kind": org.kind,
+        "status": org.status,
+        "version": org.version,
+    }
 
 
 def paginated(request, queryset, projection, *, status_field="status", states=()):
@@ -117,7 +143,12 @@ def paginated(request, queryset, projection, *, status_field="status", states=()
         raise serializers.ValidationError("分页大小必须为1～100")
     counts = {state: 0 for state in states}
     if status_field:
-        counts.update({item[status_field]: item["total"] for item in queryset.order_by().values(status_field).annotate(total=Count("pk"))})
+        counts.update(
+            {
+                item[status_field]: item["total"]
+                for item in queryset.order_by().values(status_field).annotate(total=Count("pk"))
+            }
+        )
     counts["all"] = queryset.count()
     state = request.query_params.get("status", "all")
     if state != "all":
@@ -127,10 +158,22 @@ def paginated(request, queryset, projection, *, status_field="status", states=()
             raise serializers.ValidationError("列表状态不合法")
         queryset = queryset.filter(**{status_field: state})
     total = queryset.count()
-    rows = queryset.order_by("-created_at", "id")[(page - 1) * size:page * size]
+    rows = queryset.order_by("-created_at", "id")[(page - 1) * size : page * size]
     if status_field == "active":
-        counts = {"active": counts.get(True, 0), "disabled": counts.get(False, 0), "all": counts["all"]}
-    return Response({"results": [projection(row) for row in rows], "total": total, "counts": counts, "page": page, "page_size": size})
+        counts = {
+            "active": counts.get(True, 0),
+            "disabled": counts.get(False, 0),
+            "all": counts["all"],
+        }
+    return Response(
+        {
+            "results": [projection(row) for row in rows],
+            "total": total,
+            "counts": counts,
+            "page": page,
+            "page_size": size,
+        }
+    )
 
 
 @api_view(["GET", "POST"])
@@ -149,7 +192,13 @@ def organization_list(request):
 
 @api_view(["POST"])
 def organization_status(request, org_id):
-    return Response(org_projection(organizations.set_organization_status(request_actor(request), org_id, **validated(OrganizationUpdate, request))))
+    return Response(
+        org_projection(
+            organizations.set_organization_status(
+                request_actor(request), org_id, **validated(OrganizationUpdate, request)
+            )
+        )
+    )
 
 
 @api_view(["GET", "POST"])
@@ -160,10 +209,14 @@ def member_list(request, org_id):
         member = organizations.create_member(actor, org.id, **validated(MemberInput, request))
         return Response(organizations.member_projection(member), status=201)
     qs = Membership.objects.select_related("account").filter(organization=org)
-    return paginated(request, qs, organizations.member_projection, status_field="active", states=[True, False])
+    return paginated(
+        request, qs, organizations.member_projection, status_field="active", states=[True, False]
+    )
 
 
 @api_view(["POST"])
 def member_update(request, member_id):
-    member = organizations.update_member(request_actor(request), member_id, **validated(MemberUpdate, request))
+    member = organizations.update_member(
+        request_actor(request), member_id, **validated(MemberUpdate, request)
+    )
     return Response(organizations.member_projection(member))

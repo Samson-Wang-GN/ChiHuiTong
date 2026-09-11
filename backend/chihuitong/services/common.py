@@ -52,7 +52,8 @@ def audit(actor, obj, action, *, reason="", **metadata):
 def check_version(obj, expected):
     require(
         isinstance(expected, int) and not isinstance(expected, bool) and obj.version == expected,
-        "stale_version", "记录已更新，请刷新后重新操作",
+        "stale_version",
+        "记录已更新，请刷新后重新操作",
     )
 
 
@@ -71,14 +72,20 @@ def advisory_lock(namespace, key):
 
 @transaction.atomic
 def idempotent(actor_id, operation, key, payload, callback):
-    require(isinstance(key, str) and 8 <= len(key) <= 128, "idempotency_key", "请提供幂等请求编号", 400)
+    require(
+        isinstance(key, str) and 8 <= len(key) <= 128, "idempotency_key", "请提供幂等请求编号", 400
+    )
     fingerprint = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
     advisory_lock(operation, f"{actor_id}:{key}")
     old = IdempotencyRecord.objects.filter(actor_id=actor_id, operation=operation, key=key).first()
     if old:
-        require(old.request_digest == fingerprint, "idempotency_conflict", "同一请求编号不可用于不同内容")
+        require(
+            old.request_digest == fingerprint,
+            "idempotency_conflict",
+            "同一请求编号不可用于不同内容",
+        )
         return old.result
     result = callback()
     IdempotencyRecord.objects.create(

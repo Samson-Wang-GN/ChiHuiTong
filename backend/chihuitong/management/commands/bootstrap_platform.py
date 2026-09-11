@@ -20,6 +20,8 @@ class Command(BaseCommand):
                 raise CommandError("平台已初始化，请通过平台账号管理增设人员")
             org = Organization.objects.create(name="齿慧通平台", kind="platform")
             account = account_for(phone, name)
-            member = Membership.objects.create(organization=org, account=account, role="admin", platform_created=True)
+            member = Membership.objects.create(
+                organization=org, account=account, role="admin", platform_created=True
+            )
             audit(None, org, "platform.bootstrapped", initial_admin=str(member.id))
         self.stdout.write(self.style.SUCCESS("平台管理员已开通；配置短信服务后可登录。"))

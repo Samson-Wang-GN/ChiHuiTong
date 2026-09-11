@@ -43,13 +43,19 @@ def request_code(phone, remote_address):
         old = LoginChallenge.objects.filter(phone_index=index).first()
         require(
             not old or now >= old.sent_at + timedelta(seconds=settings.OTP_COOLDOWN_SECONDS),
-            "otp_cooldown", "请稍后重新获取验证码", 429,
+            "otp_cooldown",
+            "请稍后重新获取验证码",
+            429,
         )
         challenge, _ = LoginChallenge.objects.update_or_create(
             phone_index=index,
             defaults={
-                "code_digest": code_hash, "expires_at": now + timedelta(seconds=settings.OTP_SECONDS),
-                "sent_at": now, "attempts": 0, "consumed": False, "delivered": False,
+                "code_digest": code_hash,
+                "expires_at": now + timedelta(seconds=settings.OTP_SECONDS),
+                "sent_at": now,
+                "attempts": 0,
+                "consumed": False,
+                "delivered": False,
             },
         )
     # Sending does not hold a database lock. A later replacement cannot be marked delivered.
@@ -68,8 +74,11 @@ def verify_code(phone, code, remote_address):
         advisory_lock("otp", index)
         challenge = LoginChallenge.objects.select_for_update().filter(phone_index=index).first()
         valid = (
-            challenge and challenge.delivered and not challenge.consumed
-            and challenge.expires_at > now and challenge.attempts < settings.OTP_MAX_ATTEMPTS
+            challenge
+            and challenge.delivered
+            and not challenge.consumed
+            and challenge.expires_at > now
+            and challenge.attempts < settings.OTP_MAX_ATTEMPTS
         )
         if valid:
             challenge.attempts += 1
@@ -79,13 +88,18 @@ def verify_code(phone, code, remote_address):
             if matches:
                 challenge.consumed = True
                 account = Account.objects.filter(phone_index=index, active=True).first()
-                if account and Membership.objects.filter(
-                    account=account, active=True, organization__status="active"
-                ).exists():
+                if (
+                    account
+                    and Membership.objects.filter(
+                        account=account, active=True, organization__status="active"
+                    ).exists()
+                ):
                     token = secrets.token_urlsafe(48)
                     Session.objects.create(
-                        token_digest=digest(token, purpose="session"), account=account,
-                        audience="web", expires_at=now + timedelta(seconds=settings.SESSION_SECONDS),
+                        token_digest=digest(token, purpose="session"),
+                        account=account,
+                        audience="web",
+                        expires_at=now + timedelta(seconds=settings.SESSION_SECONDS),
                     )
             challenge.save(update_fields=["attempts", "consumed"])
     # Failure is raised after committing attempts/consumption; failures cannot roll these back.
@@ -101,10 +115,17 @@ class SessionAuthentication(BaseAuthentication):
         parts = header.split()
         if len(parts) != 2 or parts[0] != "Bearer" or len(parts[1]) > 256:
             raise AuthenticationFailed("无效会话")
-        session = Session.objects.select_related("account").filter(
-            token_digest=digest(parts[1], purpose="session"), revoked_at__isnull=True,
-            expires_at__gt=timezone.now(), account__active=True, audience="web",
-        ).first()
+        session = (
+            Session.objects.select_related("account")
+            .filter(
+                token_digest=digest(parts[1], purpose="session"),
+                revoked_at__isnull=True,
+                expires_at__gt=timezone.now(),
+                account__active=True,
+                audience="web",
+            )
+            .first()
+        )
         if not session:
             raise AuthenticationFailed("会话已失效，请重新登录")
         return session.account, session
@@ -120,9 +141,16 @@ def request_actor(request):
         membership_id = uuid.UUID(request.headers.get("X-Membership-ID", ""))
     except (ValueError, TypeError, AttributeError) as exc:
         raise BusinessError("membership_required", "请选择有效的机构身份", 403) from exc
-    membership = Membership.objects.select_related("account", "organization").filter(
-        id=membership_id, account=request.user, active=True, organization__status="active",
-        account__active=True,
-    ).first()
+    membership = (
+        Membership.objects.select_related("account", "organization")
+        .filter(
+            id=membership_id,
+            account=request.user,
+            active=True,
+            organization__status="active",
+            account__active=True,
+        )
+        .first()
+    )
     require(membership, "forbidden", "无权使用该机构身份", 403)
     return Actor(membership, getattr(request, "request_id", None))

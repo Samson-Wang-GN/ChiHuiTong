@@ -9,7 +9,12 @@ from .common import RESOURCE_KINDS, advance, advisory_lock, audit, check_version
 
 def account_for(phone, name):
     phone = normalize_phone(phone)
-    require(isinstance(name, str) and 0 < len(name.strip()) <= 100, "invalid_name", "请输入账号姓名", 400)
+    require(
+        isinstance(name, str) and 0 < len(name.strip()) <= 100,
+        "invalid_name",
+        "请输入账号姓名",
+        400,
+    )
     index = digest(phone, purpose="phone")
     advisory_lock("account", index)
     account, _ = Account.objects.get_or_create(
@@ -22,8 +27,15 @@ def account_for(phone, name):
 @transaction.atomic
 def create_organization(actor, *, name, kind, admin_name, admin_phone):
     actor.require_platform()
-    require(kind in RESOURCE_KINDS | {"channel"}, "invalid_kind", "请选择客户资源方或渠道机构类型", 400)
-    require(isinstance(name, str) and 0 < len(name.strip()) <= 200, "invalid_name", "请输入机构名称", 400)
+    require(
+        kind in RESOURCE_KINDS | {"channel"}, "invalid_kind", "请选择客户资源方或渠道机构类型", 400
+    )
+    require(
+        isinstance(name, str) and 0 < len(name.strip()) <= 200,
+        "invalid_name",
+        "请输入机构名称",
+        400,
+    )
     org = Organization.objects.create(name=name.strip(), kind=kind)
     account = account_for(admin_phone, admin_name)
     member = Membership.objects.create(
@@ -55,7 +67,11 @@ def create_member(actor, org_id, *, name, phone, role):
         actor.require_platform()
         require(role == "admin", "invalid_role", "本期平台仅支持管理员", 400)
     account = account_for(phone, name)
-    require(not Membership.objects.filter(organization=org, account=account).exists(), "duplicate_member", "此机构已存在该手机号账号")
+    require(
+        not Membership.objects.filter(organization=org, account=account).exists(),
+        "duplicate_member",
+        "此机构已存在该手机号账号",
+    )
     member = Membership.objects.create(organization=org, account=account, role=role)
     audit(actor, member, "membership.created", role=role)
     return member
@@ -70,12 +86,31 @@ def update_member(actor, member_id, *, role, active, version, reason):
     Organization.objects.select_for_update().get(pk=org.pk)
     member = Membership.objects.select_for_update().get(pk=member.pk)
     check_version(member, version)
-    require(role in {"admin", "staff"} and isinstance(active, bool), "invalid_role", "身份或状态不合法", 400)
+    require(
+        role in {"admin", "staff"} and isinstance(active, bool),
+        "invalid_role",
+        "身份或状态不合法",
+        400,
+    )
     require(bool(reason.strip()), "reason_required", "请填写变更原因", 400)
-    require(not (member.id == actor.membership.id and (not active or role != member.role)), "self_change", "不能修改自己的身份或停用自己")
-    require(not member.platform_created or role == "admin", "protected_admin", "平台开通的管理员身份不可修改")
+    require(
+        not (member.id == actor.membership.id and (not active or role != member.role)),
+        "self_change",
+        "不能修改自己的身份或停用自己",
+    )
+    require(
+        not member.platform_created or role == "admin",
+        "protected_admin",
+        "平台开通的管理员身份不可修改",
+    )
     if member.active and member.role == "admin" and (not active or role != "admin"):
-        require(Membership.objects.filter(organization=org, active=True, role="admin").exclude(pk=member.pk).exists(), "last_admin", "不能停用或降级最后一个管理员")
+        require(
+            Membership.objects.filter(organization=org, active=True, role="admin")
+            .exclude(pk=member.pk)
+            .exists(),
+            "last_admin",
+            "不能停用或降级最后一个管理员",
+        )
     require(org.kind != "platform" or role == "admin", "invalid_role", "平台账号必须为管理员")
     member.role, member.active = role, active
     advance(member, "role", "active")
@@ -90,7 +125,12 @@ def set_organization_status(actor, org_id, *, status, version, reason):
     require(org, "not_found", "机构不存在", 404)
     check_version(org, version)
     require(org.kind != "platform", "protected_platform", "不能停用平台机构")
-    require(status in {"active", "disabled"} and reason.strip(), "invalid_status", "请选择状态并填写原因", 400)
+    require(
+        status in {"active", "disabled"} and reason.strip(),
+        "invalid_status",
+        "请选择状态并填写原因",
+        400,
+    )
     org.status = status
     advance(org, "status")
     audit(actor, org, "organization.status", reason=reason, status=status)
@@ -99,8 +139,12 @@ def set_organization_status(actor, org_id, *, status, version, reason):
 
 def member_projection(member):
     return {
-        "id": str(member.id), "organization_id": str(member.organization_id),
-        "name": member.account.name, "phone": masked_phone(member.account.phone),
-        "role": member.role, "active": member.active, "platform_created": member.platform_created,
+        "id": str(member.id),
+        "organization_id": str(member.organization_id),
+        "name": member.account.name,
+        "phone": masked_phone(member.account.phone),
+        "role": member.role,
+        "active": member.active,
+        "platform_created": member.platform_created,
         "version": member.version,
     }
