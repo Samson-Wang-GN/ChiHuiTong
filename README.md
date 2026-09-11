@@ -14,6 +14,8 @@
 
 ## 当前状态
 
+正式后端接入见[API说明](docs/backend-api.md)，环境、启动、备份和真实联调边界见[后端运维交接](docs/operations/backend.md)。
+
 2026-09-12正式后端位于`backend/`，采用Django5.2 LTS/DRF/PostgreSQL16。小程序与原型页面未修改。四角色机构/合同/门诊、推广产品销售及Excel/权益、预约/核销、账单/分配、微信支付适配、短信/任务、概览及共用客户接口均已实现，正在综合安全与运维验证。阶段提交`1620449`在指定服务器140项测试通过，覆盖率89%；不是最终提交验收或真实第三方联调通过。范围、决定和逐阶段证据见[实施清单](docs/backend-plan.md)，技术边界见[ADR-0022](docs/decisions/0022-backend-monolith-and-isolated-validation.md)。
 
 后端测试命令只可在指定服务器执行：`python3 /home/ubuntu/ChiHuiTong/current/scripts/run_backend_tests.py`。该脚本在独立测试副本运行，使用本项目PG实例和`.venv-backend`，不使用共享数据库；必要变量见`.env.example`，真实配置不得提交。服务器测试产物中生成的迁移和格式化代码须取回评审、提交后再验证。正式应用尚未配置公开入口，不在本地启动。

@@ -3,15 +3,17 @@ import io
 import json
 import re
 import time
+import tempfile
+from pathlib import Path
 from dataclasses import replace
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -148,6 +150,32 @@ class CryptoTests(SimpleTestCase):
     def test_missing_real_configuration_fails_closed(self):
         with self.assertRaises(BusinessError):
             load_configuration()
+
+    def test_private_key_configuration_requires_private_runtime_path_and_permissions(self):
+        with tempfile.TemporaryDirectory(prefix="cht-key-test-") as directory:
+            private = Path(directory) / "merchant.pem"
+            public = Path(directory) / "wechat.pem"
+            private.write_bytes(self.config.private_key.private_bytes(serialization.Encoding.PEM,
+                               serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+            private.chmod(0o600)
+            public.write_bytes(self.wx_key.public_key().public_bytes(serialization.Encoding.PEM,
+                               serialization.PublicFormat.SubjectPublicKeyInfo))
+            values = {"mchid": self.config.mchid, "appid": self.config.appid,
+                      "certificate_serial": self.config.certificate_serial, "private_key_path": str(private),
+                      "public_key_id": self.config.public_key_id,
+                      "public_keys": json.dumps({self.config.public_key_id: str(public)}),
+                      "api_v3_key": "0" * 32, "notify_url": self.config.notify_url}
+            with override_settings(WECHAT_PAY_ENABLED=True, WECHAT_PAY=values):
+                self.assertEqual(load_configuration().mchid, self.config.mchid)
+                private.chmod(0o644)
+                with self.assertRaises(BusinessError) as failure:
+                    load_configuration()
+                self.assertEqual(failure.exception.code, "wechat_key_permissions")
+                private.chmod(0o600)
+                with override_settings(BASE_DIR=Path(directory)):
+                    with self.assertRaises(BusinessError) as failure:
+                        load_configuration()
+                    self.assertEqual(failure.exception.code, "wechat_key_location")
 
 
 class PaymentTests(TestCase):

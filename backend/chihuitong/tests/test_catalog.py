@@ -139,6 +139,15 @@ class CatalogTests(TestCase):
         self.clinic.refresh_from_db()
         return self.clinic
 
+    def test_resource_and_channel_cooperation_links_resolve_to_authorized_endpoints(self):
+        for actor in [self.resource, self.channel]:
+            client = api_client(actor)
+            page = client.get(f"/api/v1/organizations/{actor.organization.id}/cooperation")
+            self.assertEqual(page.status_code, 200, page.data)
+            for key in ["history_endpoint", "products_endpoint"]:
+                response = client.get(page.data[key])
+                self.assertEqual(response.status_code, 200, (key, page.data[key], response.data))
+
     def test_product_revision_and_decimal_split(self):
         self.assertEqual(catalog.cents("1.005"), 101)
         self.assertEqual(contracts.split_cents(1, "percent", "50"), 1)

@@ -236,7 +236,7 @@ def cooperation(request, org_id):
             "can_submit_clinic_contract": org.kind == "clinic"
             and (actor.platform or actor.organization.kind == "channel"),
             "history_endpoint": f"{prefix}/organizations/{org.id}/contracts",
-            "products_endpoint": f"{prefix}/contracts/{current.id}/products"
+            "products_endpoint": f"{prefix}/contract-versions/{current.id}/products"
             if current and org.kind != "clinic"
             else f"{prefix}/clinics/{org.clinic.id}/products"
             if org.kind == "clinic"

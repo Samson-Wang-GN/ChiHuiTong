@@ -99,9 +99,14 @@ def load_configuration():
             "支付回调必须是固定HTTPS地址",
             503,
         )
-        path = Path(values["private_key_path"]).resolve()
+        configured_path = Path(values["private_key_path"])
+        path = configured_path.resolve()
         require(
-            path.is_file() and not (path.stat().st_mode & 0o077),
+            configured_path.is_absolute() and not path.is_relative_to(settings.BASE_DIR.resolve()),
+            "wechat_key_location", "商户私钥须使用源码目录外的绝对路径", 503,
+        )
+        require(
+            path.is_file() and path.stat().st_size <= 16384 and not (path.stat().st_mode & 0o077),
             "wechat_key_permissions",
             "商户私钥文件权限必须仅服务用户可读",
             503,

@@ -161,6 +161,8 @@ urlpatterns = [
     path("mini/clinic/organizations/<uuid:org_id>/cooperation", catalog.cooperation),
     path("mini/clinic/organizations/<uuid:org_id>/contracts", catalog.contract_list),
     path("mini/clinic/contracts/<uuid:version_id>", catalog.contract_detail),
+    path("mini/clinic/contract-versions/<uuid:version_id>", catalog.contract_detail),
+    path("mini/clinic/objects/<str:object_type>/<uuid:object_id>/logs", audit.object_log),
     path("mini/clinic/clinics/<uuid:clinic_id>/products", catalog.clinic_products),
     path("mini/clinic/files", catalog.upload),
     path("mini/clinic/files/<uuid:asset_id>", catalog.download),
