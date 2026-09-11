@@ -2,12 +2,12 @@
 window.PrototypeImport = (() => {
   const h = React.createElement, W = PrototypeWorkflows;
   const {Button, Select, InputNumber, Checkbox, Alert, Upload, Descriptions, Tag} = arco;
-  const fields = [['name', '客户姓名'], ['phone', '手机号'], ['quantity', '开卡数量'], ['customerNo', '客户编号（选填）']];
+  const fields = [['name', '客户姓名'], ['phone', '手机号'], ['quantity', '开卡数量'], ['customerNo', '资源方客户编号（选填）']];
   const aliases = {
     name: ['姓名', '客户姓名', '客户名称', 'name', 'customername'],
     phone: ['手机号', '手机号码', '客户手机', '客户手机号', '客户手机号码', 'mobile', 'phone'],
     quantity: ['开卡数量', '购卡数量', '卡片数量', 'quantity', 'cardcount'],
-    customerNo: ['客户编号', '客户编码', '会员编号', 'customerno', 'customerid']
+    customerNo: ['资源方客户编号', '资源方客户编码', '客户编号', '客户编码', '会员编号', 'customerno', 'customerid']
   };
   const norm = v => String(v ?? '').normalize('NFKC').replace(/\s/g, '').toLowerCase();
   const col = i => i < 26 ? String.fromCharCode(65 + i) : 'A' + String.fromCharCode(65 + i - 26);
@@ -220,7 +220,7 @@ window.PrototypeImport = (() => {
       h('h3', null, '1. 上传客户名单'),
       h('div', {className: 'flow-actions'},
         h(Upload, {autoUpload: false, showUploadList: false, beforeUpload: load, accept: '.xlsx', disabled: d.reading}, button(d.reading ? '正在读取' : '上传客户Excel')),
-        button('下载客户Excel模板', () => PrototypeExcel.download('记名销售客户模板', [{name: '客户清单', rows: [['客户编号', '姓名', '手机号', '开卡数量'], ['C001', '客户甲（演示）', '13800000011', 2], ['C002', '客户乙（演示）', '13800000012', 1]]}]))),
+        button('下载客户Excel模板', () => PrototypeExcel.download('记名销售客户模板', [{name: '客户清单', rows: [['资源方客户编号', '姓名', '手机号', '开卡数量'], ['C001', '客户甲（演示）', '13800000011', 2], ['C002', '客户乙（演示）', '13800000012', 1]]}]))),
       h('div', {className: 'flow-actions import-samples'}, h('span', {className: 'muted'}, '快速体验：'),
         ...[['standard', '使用机构格式示例'], ['uniform', '使用缺数量列示例'], ['error', '使用异常名单示例']].map(([kind, text]) => button(text, () => load(new File([PrototypeExcel.workbook(sample(kind))], text + '.xlsx')), {disabled: d.reading}))),
       d.error && alert(d.error, 'error'),
@@ -230,6 +230,7 @@ window.PrototypeImport = (() => {
           W.field('工作表', h(Select, {value: d.sheet, options: d.book.sheets.map((s, i) => ({value: i, label: s.name})), onChange: i => onChange(configure(d.book, d.file, i, bestHeader(d.book.sheets[i]).number, PROTOTYPE.org))})),
           W.field('表头所在行', h(Select, {value: d.header, options: sheet.rows.map(r => ({value: r.number, label: '第 ' + r.number + ' 行 · ' + r.cells.filter(Boolean).join(' / ').slice(0, 80)})), onChange: n => onChange(configure(d.book, d.file, d.sheet, n, PROTOTYPE.org))}))),
         h('h3', null, '2. 确认列对应关系'), d.notice && alert(d.notice),
+        alert('资源方客户编号仅留存，不参与客户匹配或关联；平台客户编号由系统自动生成。客户匹配按手机号及姓名一致性校验。'),
         !d.mapping.phone && phoneCandidates.length > 0 && alert('内容格式像手机号的候选列：' + phoneCandidates.map(o => o.label).join('、') + '。仅作提示，请人工确认客户手机号列。', 'warning'),
         W.field('开卡数量来源', h(Select, {value: d.mode, options: [{value: 'column', label: '按Excel列读取'}, {value: 'uniform', label: '全部客户统一数量'}], onChange: mode => update({mode})})),
         d.mode === 'uniform' && W.field('每人统一开卡数量（张）', h(InputNumber, {value: d.uniform, min: 1, max: 500, precision: 0, placeholder: '请填写，不自动默认为1', onChange: uniform => update({uniform})})),

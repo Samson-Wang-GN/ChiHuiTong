@@ -86,6 +86,7 @@ def verify():
         select('销售方式', '记名非实体卡')
         select('客户录入方式', '单个客户')
         button('下一步').click()
+        page.get_by_label('资源方客户编号（选填）', exact=True).fill('000042')
         page.get_by_label('客户姓名', exact=True).fill('客户甲（演示）')
         page.get_by_label('客户手机号', exact=True).fill('+86 138 0000 0011')
         page.get_by_label('客户开卡张数', exact=True).fill('3')
@@ -136,9 +137,15 @@ def verify():
           const bad=await S.readExcel(new File(['bad'],'bad.xlsx')).then(()=>false,()=>true);
           const z=PrototypeExcel.workbook([{name:'x',rows:[['错误列'],[1]]}]);
           const header=await S.readExcel(new File([z],'bad.xlsx')).then(()=>false,()=>true);
-          return {conflict,duplicate,bad,header};
+          const numbers=[];
+          for(const title of ['资源方客户编号','客户编号','会员编号']){
+            const bytes=PrototypeExcel.workbook([{name:'x',rows:[[title,'姓名','手机号','开卡数量'],['000042','虚构甲','13800000091',1]]}]);
+            numbers.push((await S.readExcel(new File([bytes],'numbers.xlsx')))[0].customerNo);
+          }
+          return {conflict,duplicate,bad,header,numbers};
         }""")
         assert checks['conflict'] and checks['duplicate'] and checks['bad'] and checks['header']
+        assert checks['numbers'] == ['000042'] * 3
         print('three resource sale routes / price cents / real XLSX import / validation passed', flush=True)
 
         # 交接使用测试夹具注入，不代表原型有跨角色同步。
@@ -162,6 +169,7 @@ def verify():
         issued = next(o for o in sales() if o['id'] == single['id'])
         assert len(issued['cards']) == 3 and all(c['status'] == '待领取' for c in issued['cards'])
         assert issued['customers'][0]['customerId'] == 'SC-001'
+        assert issued['customers'][0]['customerNo'] == '000042'
         go('platform')
         detail(batch['id'])
         submit_action('审核通过并开卡', '已核对产品授权、采购价格与全部客户资料')
@@ -193,6 +201,33 @@ def verify():
         }""", physical['id'])
         assert all(result.values()), result
         print('platform full payment / named match-create / unique ranges / guards passed', flush=True)
+
+        # 外部编号仅留存：同编号不同客户不合并，编号不同/空不拆分已有客户。
+        identifiers = page.evaluate("""() => {
+          const S=PrototypeSales, p=JSON.parse(localStorage.getItem('chihuitong-prototype-v1-platform'));
+          const run=customers=>{
+            const x=structuredClone(p),o=x.find(r=>r.id==='sales').rows.find(r=>r.id==='SALE-DEMO-FREE');
+            o.customers=customers;o.quantity=customers.length;
+            const result=S.approve(x,o.id,180,'编号边界虚构测试',true);
+            if(result.error)throw Error(result.error);
+            const order=result.pages.find(r=>r.id==='sales').rows.find(r=>r.id===o.id);
+            return {order,customers:result.pages.find(r=>r.id==='salesCustomers').rows};
+          };
+          const item=(customerNo,phone='13800000011',name='客户甲（演示）')=>({customerNo,phone,name,quantity:1});
+          const same=run([item('DIFFERENT')]),empty=run([item('')]);
+          const separate=run([item('SC-001','13800000091','虚构丙'),item('SC-001','13800000092','虚构丁')]);
+          const ids=separate.order.customers.map(r=>r.customerId);
+          return {
+            same:same.order.customers[0].customerId==='SC-001',
+            empty:empty.order.customers[0].customerId==='SC-001',
+            separate:ids[0]!==ids[1]&&ids.every(id=>id!=='SC-001'&&separate.customers.some(c=>c.id===id)),
+            cards:separate.order.cards.every(c=>ids.includes(c.customerId)),
+            retained:separate.order.customers.every(c=>c.customerNo==='SC-001'),
+            conflict:!!S.inspect([item('SC-001','13800000011','错误姓名')],p)[0].error
+          };
+        }""")
+        assert all(identifiers.values()), identifiers
+        print('external customer numbers never link / generated platform IDs / card links passed', flush=True)
 
         # 领取后不能取消；停止申请须平台处理，只停止尚未领取。
         issued['cards'][0]['status'] = '已领取'
