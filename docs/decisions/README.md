@@ -4,6 +4,8 @@
 
 ## 命名
 
+当前决策：[ADR-0021 核销归属与支付分阶段交付](0021-current-rules-and-staged-payment.md)，需求0.32已确认，原型及正式代码状态见TASK-078～080。
+
 本轮决策：[ADR-0020 机构Excel列映射与人工确认](0020-excel-column-mapping.md)。
 
 本轮决策：[ADR-0019 本地Git与公共服务器测试](0019-local-git-remote-testing.md)。
