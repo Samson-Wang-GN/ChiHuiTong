@@ -176,3 +176,12 @@ class FinanceFeedback(Entity):
         Membership, null=True, on_delete=models.PROTECT, related_name="finance_responses"
     )
     responded_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(Q(clinic_bill__isnull=False, partner_bill__isnull=True)
+                           | Q(clinic_bill__isnull=True, partner_bill__isnull=False)),
+                name="feedback_exactly_one_bill",
+            )
+        ]

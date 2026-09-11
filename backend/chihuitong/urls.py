@@ -3,6 +3,7 @@ from django.urls import path
 from . import api
 from . import api_catalog as catalog
 from . import api_sales as sales
+from . import api_finance as finance
 
 urlpatterns = [
     path("health", api.health),
@@ -48,4 +49,20 @@ urlpatterns = [
     path("imports/<uuid:batch_id>/errors.xlsx", sales.import_errors),
     path("imports/<uuid:batch_id>/suggest", sales.import_suggest),
     path("import-formats", sales.import_formats),
+    path("clinic-bills", finance.clinic_bills),
+    path("clinic-bills/<uuid:bill_id>", finance.clinic_bill_detail),
+    path("clinic-bills/<uuid:bill_id>/lines", finance.clinic_bill_lines),
+    path("clinic-bills/<uuid:bill_id>/export.xlsx", finance.clinic_bill_export),
+    path("clinic-bills/<uuid:bill_id>/receipts", finance.clinic_receipts),
+    path("clinic-bills/<uuid:bill_id>/feedback", finance.bill_feedback),
+    path("clinic-receipts/<uuid:receipt_id>/review", finance.receipt_review),
+    path("partner-bills", finance.partner_bills),
+    path("partner-bills/<uuid:bill_id>", finance.partner_bill_detail),
+    path("partner-bills/<uuid:bill_id>/lines", finance.partner_bill_lines),
+    path("partner-bills/<uuid:bill_id>/export.xlsx", finance.partner_bill_export),
+    path("partner-bills/<uuid:bill_id>/feedback", finance.bill_feedback, {"partner": True}),
+    path("partner-bills/<uuid:bill_id>/<str:action>", finance.partner_bill_action),
+    path("settlement-details", finance.partner_bill_lines),
+    path("settlement-details/export.xlsx", finance.own_partner_export),
+    path("finance-feedback/<uuid:feedback_id>/respond", finance.feedback_response),
 ]

@@ -12,6 +12,8 @@ from .services import organizations
 
 class StrictSerializer(serializers.Serializer):
     def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("请求内容必须为对象")
         unknown = set(data) - set(self.fields)
         if unknown:
             raise serializers.ValidationError({"fields": "存在不允许修改的字段"})
