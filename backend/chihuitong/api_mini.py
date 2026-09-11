@@ -56,9 +56,15 @@ def customer_command(request, operation, data, callback):
         with customer_audit_context(request.user):
             result = callback()
             # No field values, QR credentials, or raw request contents in audit metadata.
-            audit(None, request.user, "customer." + operation,
-                  target_id=result.get("id"), fields=sorted(data))
+            audit(
+                None,
+                request.user,
+                "customer." + operation,
+                target_id=result.get("id"),
+                fields=sorted(data),
+            )
             return result
+
     return idempotent(
         request.user.id,
         "customer." + operation,

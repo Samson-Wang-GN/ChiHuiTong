@@ -37,9 +37,18 @@ class NotificationTests(TestCase):
 
     def test_unsafe_production_backend_leaves_explicit_failed_attempt_not_sending(self):
         from chihuitong.models import SmsAttempt
+
         self.enable()
-        appointments.book(self.customer.id, benefit_id=self.benefit.id, clinic_id=self.clinic.id, requested_at=self.scheduled)
-        with override_settings(ENVIRONMENT="production", SMS_BACKEND="chihuitong.tests.test_notifications.MemoryBusinessSMS"):
+        appointments.book(
+            self.customer.id,
+            benefit_id=self.benefit.id,
+            clinic_id=self.clinic.id,
+            requested_at=self.scheduled,
+        )
+        with override_settings(
+            ENVIRONMENT="production",
+            SMS_BACKEND="chihuitong.tests.test_notifications.MemoryBusinessSMS",
+        ):
             jobs.run_one()
         attempt = SmsAttempt.objects.get()
         self.assertEqual(attempt.error_code, "unsafe_sms_backend")

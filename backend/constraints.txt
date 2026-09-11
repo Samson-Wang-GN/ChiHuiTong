@@ -1,0 +1,9 @@
+# Resolved on the authorized Ubuntu/Python3.12 server, 2026-09-12.
+# Direct dependencies remain pinned in requirements*.txt. This pins their transitive dependencies.
+asgiref==3.12.1
+cffi==2.1.1
+et_xmlfile==2.0.0
+pycparser==3.0
+psycopg-binary==3.3.5
+sqlparse==0.6.0
+typing_extensions==4.16.0

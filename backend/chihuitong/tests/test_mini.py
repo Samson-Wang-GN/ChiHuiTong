@@ -36,7 +36,10 @@ def mini_client(audience, phone, *, openid=None, name=None):
     ):
         response = client.post(f"/api/v1/mini/{audience}/login", body, format="json")
     if response.status_code == 200:
-        client.credentials(HTTP_AUTHORIZATION="Bearer " + response.data["token"])
+        headers = {"HTTP_AUTHORIZATION": "Bearer " + response.data["token"]}
+        if audience == "clinic" and len(response.data["memberships"]) == 1:
+            headers["HTTP_X_MEMBERSHIP_ID"] = response.data["memberships"][0]["id"]
+        client.credentials(**headers)
     return client, response
 
 
@@ -202,7 +205,12 @@ class MiniTests(TestCase):
         self.assertEqual(MiniIdentity.objects.count(), 1)
 
     def test_mini_workbench_and_cooperation_links_stay_in_clinic_audience(self):
-        appointments.book(self.customer.id, benefit_id=self.benefit.id, clinic_id=self.clinic.id, requested_at=self.scheduled)
+        appointments.book(
+            self.customer.id,
+            benefit_id=self.benefit.id,
+            clinic_id=self.clinic.id,
+            requested_at=self.scheduled,
+        )
         client, response = mini_client("clinic", self.clinic_actor.account.phone)
         self.assertEqual(response.status_code, 200)
         board = client.get("/api/v1/mini/clinic/workbench")
@@ -210,7 +218,9 @@ class MiniTests(TestCase):
         self.assertTrue(board.data["task_endpoint"].startswith("/api/v1/mini/clinic/"))
         for task in board.data["tasks"]["results"]:
             self.assertEqual(client.get(task["detail_endpoint"]).status_code, 200)
-        cooperation = client.get(f"/api/v1/mini/clinic/organizations/{self.clinic_actor.organization.id}/cooperation")
+        cooperation = client.get(
+            f"/api/v1/mini/clinic/organizations/{self.clinic_actor.organization.id}/cooperation"
+        )
         self.assertEqual(cooperation.status_code, 200, cooperation.data)
         for key in ["history_endpoint", "products_endpoint"]:
             self.assertTrue(cooperation.data[key].startswith("/api/v1/mini/clinic/"))
@@ -219,10 +229,16 @@ class MiniTests(TestCase):
     def test_customer_audit_scoped_context_and_idempotent_no_sensitive_payload(self):
         from chihuitong.models import AuditEvent
         from chihuitong.services.common import audit
+
         client, _ = mini_client("customer", self.customer.phone)
         data = {"name": "合成更新姓名", "occupation": "合成职业"}
         for _ in range(2):
-            response = client.post("/api/v1/mini/customer/profile", data, format="json", HTTP_IDEMPOTENCY_KEY="audit-profile-once")
+            response = client.post(
+                "/api/v1/mini/customer/profile",
+                data,
+                format="json",
+                HTTP_IDEMPOTENCY_KEY="audit-profile-once",
+            )
             self.assertEqual(response.status_code, 200, response.data)
         events = AuditEvent.objects.filter(object_id=self.customer.id, action="customer.profile")
         self.assertEqual(events.count(), 1)
@@ -235,22 +251,38 @@ class MiniTests(TestCase):
 @override_settings(MINI_PROGRAMS=MINI_SETTINGS)
 class MiniPaymentTests(TestCase):
     from .test_finance import FinanceTests
+
     setUp = FinanceTests.setUp
 
     def test_jsapi_uses_verified_identity_not_request_openid(self):
         from types import SimpleNamespace
         from unittest.mock import Mock
-        gateway = SimpleNamespace(config=SimpleNamespace(appid=MINI_SETTINGS["clinic"]["appid"], mchid="1900000001"),
-                                  create=Mock(return_value={"prepay_id": "synthetic-prepay"}),
-                                  client_parameters=Mock(return_value={"package": "prepay_id=synthetic-prepay"}))
-        client, response = mini_client("clinic", self.clinic_actor.account.phone, openid="verified-clinic-openid")
+
+        gateway = SimpleNamespace(
+            config=SimpleNamespace(appid=MINI_SETTINGS["clinic"]["appid"], mchid="1900000001"),
+            create=Mock(return_value={"prepay_id": "synthetic-prepay"}),
+            client_parameters=Mock(return_value={"package": "prepay_id=synthetic-prepay"}),
+        )
+        client, response = mini_client(
+            "clinic", self.clinic_actor.account.phone, openid="verified-clinic-openid"
+        )
         self.assertEqual(response.status_code, 200, response.data)
         url = f"/api/v1/mini/clinic/bills/{self.bill.id}/payment"
         with patch("chihuitong.services.payments.WeChatPay", return_value=gateway):
-            bad = client.post(url, {"version": self.bill.version, "openid": "forged"}, format="json", HTTP_IDEMPOTENCY_KEY="cannot-forge-payer")
+            bad = client.post(
+                url,
+                {"version": self.bill.version, "openid": "forged"},
+                format="json",
+                HTTP_IDEMPOTENCY_KEY="cannot-forge-payer",
+            )
             self.assertEqual(bad.status_code, 400)
             self.assertFalse(gateway.create.called)
-            result = client.post(url, {"version": self.bill.version}, format="json", HTTP_IDEMPOTENCY_KEY="verified-jsapi-payer")
+            result = client.post(
+                url,
+                {"version": self.bill.version},
+                format="json",
+                HTTP_IDEMPOTENCY_KEY="verified-jsapi-payer",
+            )
         self.assertEqual(result.status_code, 200, result.data)
         self.assertEqual(gateway.create.call_args.kwargs["openid"], "verified-clinic-openid")
         self.assertNotIn("verified-clinic-openid", str(result.data))

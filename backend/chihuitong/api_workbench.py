@@ -2,14 +2,16 @@ from rest_framework import serializers
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .identity import request_actor
 from .api import api_prefix
+from .identity import request_actor
 from .services import workbench
 
 
 def task_links(request, data):
     for row in data["results"]:
-        row["detail_endpoint"] = row["detail_endpoint"].replace("/api/v1/", api_prefix(request) + "/", 1)
+        row["detail_endpoint"] = row["detail_endpoint"].replace(
+            "/api/v1/", api_prefix(request) + "/", 1
+        )
     return data
 
 
@@ -21,13 +23,16 @@ def tasks(request):
         request.query_params.get("page_size", 20)
     )
     return Response(
-        task_links(request, workbench.list_tasks(
-            actor,
-            status=request.query_params.get("status", "pending"),
-            category=request.query_params.get("category", "all"),
-            page=page,
-            page_size=size,
-        ))
+        task_links(
+            request,
+            workbench.list_tasks(
+                actor,
+                status=request.query_params.get("status", "pending"),
+                category=request.query_params.get("category", "all"),
+                page=page,
+                page_size=size,
+            ),
+        )
     )
 
 

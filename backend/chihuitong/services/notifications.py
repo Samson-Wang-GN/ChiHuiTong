@@ -220,8 +220,14 @@ def send_business(job):
     try:
         require(
             settings.ENVIRONMENT != "production"
-            or backend in {"chihuitong.integrations.tencent_sms.TencentSMS", "chihuitong.integrations.sms.DisabledSMS"},
-            "unsafe_sms_backend", "生产环境禁止测试短信服务", 503,
+            or backend
+            in {
+                "chihuitong.integrations.tencent_sms.TencentSMS",
+                "chihuitong.integrations.sms.DisabledSMS",
+            },
+            "unsafe_sms_backend",
+            "生产环境禁止测试短信服务",
+            503,
         )
         gateway = import_string(backend)()
         reference = gateway.send_template(

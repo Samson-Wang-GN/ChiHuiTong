@@ -217,7 +217,9 @@ def cooperation(request, org_id):
         ContractVersion.objects.filter(contract__in=accessible).select_related("contract")
     )
     current = (
-        versions.filter(display_status__in=["effective", "expired", "terminated"], starts_at__lte=timezone.now())
+        versions.filter(
+            display_status__in=["effective", "expired", "terminated"], starts_at__lte=timezone.now()
+        )
         .order_by("-starts_at", "-revision")
         .first()
     )
