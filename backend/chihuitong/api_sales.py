@@ -52,10 +52,29 @@ def order_projection(order):
     )
     data["import_batch_id"] = str(order.import_batch_id) if order.import_batch_id else None
     number_range = CardRange.objects.filter(order=order).first()
-    data["number_range"] = {"first": str(number_range.first_number), "last": str(number_range.last_number)} if number_range else None
+    data["number_range"] = (
+        {"first": str(number_range.first_number), "last": str(number_range.last_number)}
+        if number_range
+        else None
+    )
     if order.status in {"issuing", "issue_failed"}:
-        job = Outbox.objects.filter(kind="sales.issue", dedup_key__startswith=f"sales.issue:{order.id}:").order_by("-created_at").first()
-        data["processing"] = {"job_id": str(job.id), "status": job.status, "attempts": job.attempts, "last_error_code": job.last_error_code} if job else None
+        job = (
+            Outbox.objects.filter(
+                kind="sales.issue", dedup_key__startswith=f"sales.issue:{order.id}:"
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        data["processing"] = (
+            {
+                "job_id": str(job.id),
+                "status": job.status,
+                "attempts": job.attempts,
+                "last_error_code": job.last_error_code,
+            }
+            if job
+            else None
+        )
     else:
         data["processing"] = None
     return data

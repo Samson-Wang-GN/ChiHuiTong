@@ -4,3 +4,4 @@ from .finance import *  # noqa: F403
 from .fulfillment import *  # noqa: F403
 from .notifications import *  # noqa: F403
 from .sales import *  # noqa: F403
+from .mini import *  # noqa: F403

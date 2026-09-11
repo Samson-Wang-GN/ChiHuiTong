@@ -71,6 +71,10 @@ if PRIVATE_STORAGE == BASE_DIR or BASE_DIR in PRIVATE_STORAGE.parents:
     raise ImproperlyConfigured("附件必须位于源码目录之外")
 SMS_BACKEND = os.environ.get("CHT_SMS_BACKEND", "chihuitong.integrations.sms.DisabledSMS")
 TENCENT_MAP_KEY = os.environ.get("CHT_TENCENT_MAP_KEY", "")
+MINI_PROGRAMS = {
+    audience: {key: os.environ.get(f"CHT_MINI_{audience.upper()}_{key.upper()}", "") for key in ["appid", "secret"]}
+    for audience in ["customer", "clinic"]
+}
 TENCENT_SMS = {
     key: os.environ.get("CHT_TENCENT_SMS_" + key.upper(), "")
     for key in ["secret_id", "secret_key", "sdk_app_id", "region"]

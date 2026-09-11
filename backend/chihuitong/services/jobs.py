@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from chihuitong.errors import BusinessError
 from chihuitong.models import ImportBatch, Outbox, SalesOrder
+
 from .common import audit
 
 logger = logging.getLogger("chihuitong.jobs")
@@ -95,11 +96,21 @@ def run_one():
                     pk=job.payload["batch_id"], version=job.payload["version"]
                 ).update(status="failed", failure_code=code[:80])
             if terminal and job.kind == "sales.issue":
-                updated = SalesOrder.objects.filter(pk=job.payload["order_id"], status="issuing", version=job.payload["version"]).update(
-                    status="issue_failed", issue_failure_code=code[:80], version=F("version") + 1,
+                updated = SalesOrder.objects.filter(
+                    pk=job.payload["order_id"], status="issuing", version=job.payload["version"]
+                ).update(
+                    status="issue_failed",
+                    issue_failure_code=code[:80],
+                    version=F("version") + 1,
                 )
                 if updated:
-                    audit(None, SalesOrder.objects.get(pk=job.payload["order_id"]), "sales.issuance_failed", error_code=code[:80], job_id=str(job.id))
+                    audit(
+                        None,
+                        SalesOrder.objects.get(pk=job.payload["order_id"]),
+                        "sales.issuance_failed",
+                        error_code=code[:80],
+                        job_id=str(job.id),
+                    )
         return True
     Outbox.objects.filter(pk=job.id, claim_token=job.claim_token, status="running").update(
         status="done", locked_until=None

@@ -244,8 +244,12 @@ def send_business(job):
         )
         raise
     except Exception as exc:
-        SmsAttempt.objects.filter(pk=attempt.id).update(status="unknown", error_code=type(exc).__name__[:80], finished_at=timezone.now())
-        SmsDelivery.objects.filter(pk=delivery.id).update(status="unknown", last_error_code=type(exc).__name__[:80])
+        SmsAttempt.objects.filter(pk=attempt.id).update(
+            status="unknown", error_code=type(exc).__name__[:80], finished_at=timezone.now()
+        )
+        SmsDelivery.objects.filter(pk=delivery.id).update(
+            status="unknown", last_error_code=type(exc).__name__[:80]
+        )
         raise
     SmsAttempt.objects.filter(pk=attempt.id).update(
         status="accepted", provider_reference=reference, finished_at=timezone.now()

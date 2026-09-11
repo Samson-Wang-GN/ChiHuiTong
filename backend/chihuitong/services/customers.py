@@ -95,7 +95,7 @@ def normalize_customer(raw):
 def match_preview(data):
     existing = Customer.objects.filter(phone_index=digest(data["phone"], purpose="phone")).first()
     require(
-        not existing or existing.name == data["name"],
+        not existing or not existing.name or existing.name == data["name"],
         "customer_conflict",
         "手机号与姓名不一致，请核对当前上传资料",
         400,
@@ -108,7 +108,7 @@ def resolve_customer(data, *, order_id):
     advisory_lock("customer", index)
     customer = Customer.objects.select_for_update().filter(phone_index=index).first()
     require(
-        not customer or customer.name == data["name"],
+        not customer or not customer.name or customer.name == data["name"],
         "customer_conflict",
         "手机号与姓名不一致，请核对当前上传资料",
         400,
@@ -118,6 +118,8 @@ def resolve_customer(data, *, order_id):
             phone=data["phone"], phone_index=index, name=data["name"]
         )
     profile = dict(customer.profile)
+    if not customer.name:
+        customer.name = data["name"]
     sources = dict(profile.get("field_sources", {}))
     for field in ["gender", "age", "occupation"]:
         if profile.get(field) in (None, "") and field in data:
@@ -125,7 +127,7 @@ def resolve_customer(data, *, order_id):
             sources[field] = {"order_id": str(order_id), "captured_at": timezone.now().isoformat()}
     profile["field_sources"] = sources
     customer.profile = profile
-    advance(customer, "profile")
+    advance(customer, "profile", "name")
     return customer
 
 
@@ -147,8 +149,8 @@ def register_verified_customer(phone, *, name=None):
     advisory_lock("customer", index)
     customer = Customer.objects.select_for_update().filter(phone_index=index).first()
     if not customer:
-        require(isinstance(name, str) and name.strip(), "name_required", "请填写客户姓名", 400)
-        customer = Customer.objects.create(phone=phone, phone_index=index, name=name.strip())
+        require(name is None or isinstance(name, str) and 0 < len(name.strip()) <= 100, "invalid_name", "客户姓名不合法", 400)
+        customer = Customer.objects.create(phone=phone, phone_index=index, name=name.strip() if name else "")
     if customer.registered_at is None:
         customer.registered_at = timezone.now()
         advance(customer, "registered_at")

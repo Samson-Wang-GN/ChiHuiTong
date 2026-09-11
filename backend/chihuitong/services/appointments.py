@@ -166,12 +166,14 @@ def book(customer_id, *, benefit_id, clinic_id, requested_at):
     )
     require(clinic, "not_found", "门诊不存在", 404)
     benefit = Benefit.objects.select_for_update().select_related("card__order").get(pk=benefit_id)
+    customer = Customer.objects.filter(pk=customer_id, registered_at__isnull=False).first()
     require(
-        Customer.objects.filter(pk=customer_id, registered_at__isnull=False).exists(),
+        customer,
         "customer_unbound",
         "请先授权手机号登录",
         403,
     )
+    require(bool(customer.name), "profile_incomplete", "请先填写就诊人姓名再预约", 400)
     require(
         not card.frozen and card.activated_at and card.status == "active",
         "benefit_unavailable",

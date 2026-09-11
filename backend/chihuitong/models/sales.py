@@ -21,6 +21,10 @@ class Customer(Entity):
     profile = EncryptedJSONField(default=dict)
     registered_at = models.DateTimeField(null=True)
 
+    @property
+    def is_authenticated(self):
+        return True
+
 
 class CustomerSource(Entity):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="sources")

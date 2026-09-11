@@ -205,13 +205,26 @@ def retry_job(actor, job_id, *, reason):
     )
     if job.kind == "sales.issue":
         require(order.status == "issue_failed", "invalid_state", "订单已被其他业务处理，请刷新")
-        order.status, order.issue_failure_code, order.reviewed_by, order.reason = "issuing", "", actor.membership, reason
+        order.status, order.issue_failure_code, order.reviewed_by, order.reason = (
+            "issuing",
+            "",
+            actor.membership,
+            reason,
+        )
         advance(order, "status", "issue_failure_code", "reviewed_by", "reason")
-        job.payload = {**job.payload, "membership_id": str(actor.membership.id), "version": order.version}
+        job.payload = {
+            **job.payload,
+            "membership_id": str(actor.membership.id),
+            "version": order.version,
+        }
         job.save(update_fields=["payload"])
         audit(actor, order, "sales.issuance_reaffirmed", reason=reason, job_id=str(job.id))
     if batch:
-        require(batch.status == "failed" and batch.version == job.payload["version"], "stale_import_job", "导入资料已更新，请处理新任务")
+        require(
+            batch.status == "failed" and batch.version == job.payload["version"],
+            "stale_import_job",
+            "导入资料已更新，请处理新任务",
+        )
         batch.status = "queued" if job.kind == "excel.inspect" else "validating"
         batch.failure_code = ""
         advance(batch, "status", "failure_code")
