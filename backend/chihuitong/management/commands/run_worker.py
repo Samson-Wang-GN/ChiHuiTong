@@ -15,6 +15,7 @@ class Command(BaseCommand):
         limit = options["limit"]
         if limit < 1 or limit > 10000:
             from django.core.management.base import CommandError
+
             raise CommandError("单轮数量须在1～10000之间")
         if not options["no_tick"]:
             result = tick()

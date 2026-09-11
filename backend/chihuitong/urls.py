@@ -4,8 +4,10 @@ from . import api
 from . import api_appointments as appointments
 from . import api_catalog as catalog
 from . import api_finance as finance
-from . import api_payments as payments
 from . import api_notifications as notifications
+from . import api_workbench as workbench
+from . import api_audit as audit
+from . import api_payments as payments
 from . import api_sales as sales
 
 urlpatterns = [
@@ -15,6 +17,9 @@ urlpatterns = [
     path("auth/logout", api.logout),
     path("auth/me", api.me),
     path("organizations", api.organization_list),
+    path("organizations/<uuid:org_id>", api.organization_detail),
+    path("organizations/<uuid:org_id>/review", api.organization_review),
+    path("organizations/<uuid:org_id>/resubmit", api.organization_resubmit),
     path("organizations/<uuid:org_id>/status", api.organization_status),
     path("organizations/<uuid:org_id>/members", api.member_list),
     path("members/<uuid:member_id>", api.member_update),
@@ -25,6 +30,8 @@ urlpatterns = [
     path("files/<uuid:asset_id>", catalog.download),
     path("organizations/<uuid:org_id>/contracts", catalog.contract_list),
     path("contract-versions/<uuid:version_id>/submit", catalog.contract_submit),
+    path("contract-versions/<uuid:version_id>", catalog.contract_detail),
+    path("contract-versions/<uuid:version_id>/terminate", catalog.contract_terminate),
     path("contract-versions/<uuid:version_id>/review", catalog.contract_review),
     path("contract-versions/<uuid:version_id>/products", catalog.contract_products),
     path("clinics", catalog.clinic_list),
@@ -58,6 +65,7 @@ urlpatterns = [
     path("clinic-bills/<uuid:bill_id>/export.xlsx", finance.clinic_bill_export),
     path("clinic-bills/<uuid:bill_id>/receipts", finance.clinic_receipts),
     path("clinic-bills/<uuid:bill_id>/feedback", finance.bill_feedback),
+    path("clinic-bills/<uuid:bill_id>/collection-note", finance.collection_note),
     path("clinic-receipts/<uuid:receipt_id>/review", finance.receipt_review),
     path("partner-bills", finance.partner_bills),
     path("partner-bills/<uuid:bill_id>", finance.partner_bill_detail),
@@ -93,4 +101,8 @@ urlpatterns = [
     path("jobs/<uuid:job_id>/retry", notifications.retry_job),
     path("calendar", notifications.calendar_list),
     path("calendar/<str:date>", notifications.calendar_day),
+    path("workbench", workbench.overview),
+    path("workbench/tasks", workbench.tasks),
+    path("workbench/tasks/<str:category>/<uuid:object_id>", workbench.task_detail),
+    path("objects/<str:object_type>/<uuid:object_id>/logs", audit.object_log),
 ]

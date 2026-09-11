@@ -46,6 +46,9 @@ def audit(actor, obj, action, *, reason="", **metadata):
         reason=reason,
         metadata=metadata,
         request_id=actor.request_id if actor else None,
+        actor_role=actor.membership.role if actor else "",
+        actor_name=actor.account.name if actor else "",
+        organization_name=actor.organization.name if actor else "",
     )
 
 

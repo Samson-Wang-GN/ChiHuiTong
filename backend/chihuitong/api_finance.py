@@ -358,6 +358,18 @@ class ResponseInput(VersionInput):
     response = serializers.CharField(max_length=2000)
 
 
+class CollectionInput(VersionInput):
+    reason = serializers.CharField(max_length=1000)
+
+
+@api_view(["POST"])
+def collection_note(request, bill_id):
+    actor = request_actor(request)
+    data = validated(CollectionInput, request)
+    return Response(command(request, actor, "bill.collection", {"bill_id": str(bill_id), **data},
+        lambda: queries.clinic_bill_projection(finance.collection_note(actor, bill_id, **data))))
+
+
 @api_view(["POST"])
 def bill_feedback(request, bill_id, partner=False):
     actor = request_actor(request)

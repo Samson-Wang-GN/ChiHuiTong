@@ -101,6 +101,8 @@ class OrganizationInput(StrictSerializer):
     kind = serializers.ChoiceField(choices=["insurance", "bank", "broker", "channel"])
     admin_name = serializers.CharField(max_length=100)
     admin_phone = serializers.CharField(max_length=40)
+    contact_name = serializers.CharField(max_length=100, required=False)
+    contact_phone = serializers.CharField(max_length=40, required=False)
 
 
 class MemberInput(StrictSerializer):
@@ -189,7 +191,48 @@ def organization_list(request):
     search = request.query_params.get("search", "").strip()
     if search:
         qs = qs.filter(name__icontains=search[:200])
-    return paginated(request, qs, org_projection, states=["active", "disabled"])
+    return paginated(request, qs, org_projection, states=["active", "disabled", "pending", "rejected"])
+
+
+class OrganizationDetailsInput(StrictSerializer):
+    name = serializers.CharField(max_length=200)
+    contact_name = serializers.CharField(max_length=100)
+    contact_phone = serializers.CharField(max_length=40)
+    version = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(max_length=500)
+
+
+class OrganizationReviewInput(StrictSerializer):
+    approved = serializers.BooleanField()
+    version = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(max_length=500)
+
+
+class OrganizationResubmitInput(StrictSerializer):
+    version = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(max_length=500)
+
+
+@api_view(["GET", "POST"])
+def organization_detail(request, org_id):
+    actor = request_actor(request)
+    if request.method == "POST":
+        org = organizations.update_organization(actor, org_id, **validated(OrganizationDetailsInput, request))
+    else:
+        org = organizations.managed_org(actor, org_id)
+    return Response({**org_projection(org), "details": org.details})
+
+
+@api_view(["POST"])
+def organization_review(request, org_id):
+    return Response(org_projection(organizations.review_organization(request_actor(request), org_id,
+        **validated(OrganizationReviewInput, request))))
+
+
+@api_view(["POST"])
+def organization_resubmit(request, org_id):
+    return Response(org_projection(organizations.resubmit_organization(request_actor(request), org_id,
+        **validated(OrganizationResubmitInput, request))))
 
 
 @api_view(["POST"])

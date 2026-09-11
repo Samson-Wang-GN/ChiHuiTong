@@ -25,7 +25,7 @@ def account_for(phone, name):
 
 
 @transaction.atomic
-def create_organization(actor, *, name, kind, admin_name, admin_phone):
+def create_organization(actor, *, name, kind, admin_name, admin_phone, contact_name=None, contact_phone=None):
     actor.require_platform()
     require(
         kind in RESOURCE_KINDS | {"channel"}, "invalid_kind", "请选择客户资源方或渠道机构类型", 400
@@ -36,7 +36,12 @@ def create_organization(actor, *, name, kind, admin_name, admin_phone):
         "请输入机构名称",
         400,
     )
-    org = Organization.objects.create(name=name.strip(), kind=kind)
+    contact = contact_name if contact_name is not None else admin_name
+    require(isinstance(contact, str) and 1 <= len(contact.strip()) <= 100,
+            "invalid_contact", "请填写机构联系人", 400)
+    phone = normalize_phone(contact_phone if contact_phone is not None else admin_phone)
+    org = Organization.objects.create(name=name.strip(), kind=kind, status="pending",
+                                      details={"contact_name": contact.strip(), "contact_phone": phone})
     account = account_for(admin_phone, admin_name)
     member = Membership.objects.create(
         organization=org, account=account, role="admin", platform_created=True
@@ -125,6 +130,8 @@ def set_organization_status(actor, org_id, *, status, version, reason):
     require(org, "not_found", "机构不存在", 404)
     check_version(org, version)
     require(org.kind != "platform", "protected_platform", "不能停用平台机构")
+    require(org.kind != "clinic", "clinic_status_flow", "门诊服务状态请从门诊管理操作")
+    require(org.status in {"active", "disabled"}, "review_required", "机构必须先完成审核，不可通过启用绕过审核")
     require(
         status in {"active", "disabled"} and reason.strip(),
         "invalid_status",
@@ -134,6 +141,50 @@ def set_organization_status(actor, org_id, *, status, version, reason):
     org.status = status
     advance(org, "status")
     audit(actor, org, "organization.status", reason=reason, status=status)
+    return org
+
+
+@transaction.atomic
+def update_organization(actor, org_id, *, name, contact_name, contact_phone, version, reason):
+    actor.require_platform()
+    org = Organization.objects.select_for_update().filter(pk=org_id, kind__in=RESOURCE_KINDS | {"channel"}).first()
+    require(org, "not_found", "合作机构不存在", 404)
+    check_version(org, version)
+    require(isinstance(name, str) and 1 <= len(name.strip()) <= 200
+            and isinstance(contact_name, str) and 1 <= len(contact_name.strip()) <= 100
+            and isinstance(reason, str) and reason.strip(), "invalid_organization", "请补齐名称、联系人及修改原因", 400)
+    org.name = name.strip()
+    org.details = {**org.details, "contact_name": contact_name.strip(), "contact_phone": normalize_phone(contact_phone)}
+    advance(org, "name", "details")
+    audit(actor, org, "organization.updated", reason=reason, fields=["name", "contact_name", "contact_phone"])
+    return org
+
+
+@transaction.atomic
+def review_organization(actor, org_id, *, approved, version, reason):
+    actor.require_platform()
+    org = Organization.objects.select_for_update().filter(pk=org_id, kind__in=RESOURCE_KINDS | {"channel"}).first()
+    require(org, "not_found", "合作机构不存在", 404)
+    check_version(org, version)
+    require(org.status == "pending" and type(approved) is bool and isinstance(reason, str) and reason.strip(),
+            "invalid_review", "请选择待审机构并填写审核意见", 400)
+    org.status = "active" if approved else "rejected"
+    advance(org, "status")
+    audit(actor, org, "organization.reviewed", reason=reason, status=org.status)
+    return org
+
+
+@transaction.atomic
+def resubmit_organization(actor, org_id, *, version, reason):
+    actor.require_platform()
+    org = Organization.objects.select_for_update().filter(pk=org_id, kind__in=RESOURCE_KINDS | {"channel"}).first()
+    require(org, "not_found", "合作机构不存在", 404)
+    check_version(org, version)
+    require(org.status == "rejected" and isinstance(reason, str) and reason.strip(),
+            "invalid_state", "仅退回机构可以重新提交，请填写原因", 400)
+    org.status = "pending"
+    advance(org, "status")
+    audit(actor, org, "organization.resubmitted", reason=reason)
     return org
 
 

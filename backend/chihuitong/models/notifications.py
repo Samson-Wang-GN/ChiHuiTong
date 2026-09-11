@@ -16,7 +16,11 @@ class Notification(Entity):
     read_at = models.DateTimeField(null=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["recipient", "dedup_key"], name="notification_recipient_once")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recipient", "dedup_key"], name="notification_recipient_once"
+            )
+        ]
 
 
 class SmsTemplate(Entity):

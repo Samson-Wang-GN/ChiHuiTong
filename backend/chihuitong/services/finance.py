@@ -552,3 +552,14 @@ def respond_feedback(actor, feedback_id, *, response, version):
         bill.save(update_fields=["dispute", "updated_at"])
     audit(actor, bill, "bill.feedback_responded", feedback_id=str(feedback.id))
     return feedback
+
+
+@transaction.atomic
+def collection_note(actor, bill_id, *, reason, version):
+    require(actor.platform or actor.organization.kind == "channel", "forbidden", "仅平台或负责渠道可登记催收", 403)
+    bill = get_bill(actor, bill_id, lock=True)
+    check_version(bill, version)
+    require(bill.status == "open" and isinstance(reason, str) and 1 <= len(reason.strip()) <= 1000,
+            "invalid_collection", "请填写未结清账单的催收记录", 400)
+    audit(actor, bill, "bill.collection_contacted", reason=reason)
+    return bill

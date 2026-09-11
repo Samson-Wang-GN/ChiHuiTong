@@ -182,7 +182,35 @@ def contract_projection(item):
         "contact": item.contact,
         "attachment_ids": item.attachment_ids,
         "reason": item.reason,
+        "submitted_at": item.submitted_at.isoformat() if item.submitted_at else None,
+        "due_at": item.due_at.isoformat() if item.due_at else None,
+        "reviewed_at": item.reviewed_at.isoformat() if item.reviewed_at else None,
     }
+
+
+class ContractEditInput(VersionInput):
+    data = ContractData()
+    reason = serializers.CharField(max_length=500)
+
+
+class ContractTerminationInput(VersionInput):
+    reason = serializers.CharField(max_length=500)
+
+
+@api_view(["GET", "POST"])
+def contract_detail(request, version_id):
+    actor = request_actor(request)
+    item = ContractVersion.objects.filter(pk=version_id, contract__in=contracts.accessible_contracts(actor)).first()
+    require(item, "not_found", "合同版本不存在", 404)
+    if request.method == "POST":
+        item = contracts.edit_draft(actor, version_id, **validated(ContractEditInput, request))
+    return Response({**contract_projection(item), "products": [contracts.term_snapshot(term) for term in item.products.all()]})
+
+
+@api_view(["POST"])
+def contract_terminate(request, version_id):
+    return Response(contract_projection(contracts.terminate(request_actor(request), version_id,
+        **validated(ContractTerminationInput, request))))
 
 
 @api_view(["GET", "POST"])

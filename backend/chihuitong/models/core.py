@@ -36,7 +36,7 @@ class Organization(Entity):
                 fields=["kind"], condition=Q(kind="platform"), name="one_platform"
             ),
             models.CheckConstraint(
-                condition=Q(status__in=["active", "disabled"]), name="organization_state"
+                condition=Q(status__in=["active", "disabled", "pending", "rejected"]), name="organization_state"
             ),
         ]
 
@@ -105,6 +105,9 @@ class AuditEvent(models.Model):
     reason = EncryptedTextField(default="")
     metadata = models.JSONField(default=dict)
     request_id = models.UUIDField(null=True)
+    actor_role = models.CharField(max_length=16, blank=True)
+    actor_name = EncryptedTextField(default="")
+    organization_name = models.CharField(max_length=200, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=["object_type", "object_id", "id"])]
