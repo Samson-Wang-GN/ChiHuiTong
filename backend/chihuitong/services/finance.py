@@ -201,7 +201,7 @@ def settle_if_full(bill):
     return False
 
 
-def record_funds(bill, *, reference_index, amount_cents, received_at, kind, source_id):
+def record_funds(bill, *, reference_index, amount_cents, received_at, kind, source_id, force_anomaly=""):
     """Caller holds bill lock. Real extra money is persisted as an anomaly, never discarded."""
     advisory_lock("receipt", reference_index)
     old = ReceiptLedger.objects.filter(reference_index=reference_index).first()
@@ -212,7 +212,7 @@ def record_funds(bill, *, reference_index, amount_cents, received_at, kind, sour
             "该资金流水已用于其他收款记录",
         )
         return old
-    anomaly = (
+    anomaly = force_anomaly or (
         ""
         if bill.status == "open" and amount_cents <= bill.total_cents - bill.received_cents
         else "excess_or_closed"

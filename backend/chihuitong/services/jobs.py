@@ -30,14 +30,23 @@ def run_one():
     try:
         from .imports import inspect_import, validate_import
 
-        handlers = {"excel.inspect": inspect_import, "excel.validate": validate_import}
-        if job.kind not in handlers:
+        if job.kind in {"excel.inspect", "excel.validate"}:
+            handler = inspect_import if job.kind == "excel.inspect" else validate_import
+            handler(job.payload["batch_id"], job.payload["version"])
+        elif job.kind == "payment.notification":
+            from .payments import process_notification
+            process_notification(job.payload["notification_id"])
+        elif job.kind == "payment.reconcile":
+            from .payments import reconcile
+            payment = reconcile(job.payload["attempt_id"])
+            if payment.status not in {"success", "closed"}:
+                raise BusinessError("payment_unresolved", "支付等待查单", 503)
+        else:
             raise BusinessError("unknown_job_kind", "任务类型尚未配置", 409)
-        handlers[job.kind](job.payload["batch_id"], job.payload["version"])
     except Exception as exc:
         code = exc.code if isinstance(exc, BusinessError) else type(exc).__name__
         logger.warning("job_failed id=%s code=%s attempt=%s", job.id, code, attempt)
-        terminal = isinstance(exc, BusinessError) or attempt >= 5
+        terminal = (isinstance(exc, BusinessError) and exc.status < 500) or attempt >= 5
         with transaction.atomic():
             current = Outbox.objects.select_for_update().get(pk=job.id)
             if current.attempts != attempt:

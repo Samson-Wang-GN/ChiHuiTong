@@ -87,15 +87,29 @@ class PaymentAttempt(Entity):
     gateway_payload = EncryptedJSONField(default=dict)
     created_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
     error_code = models.CharField(max_length=80, blank=True)
+    appid = models.CharField(max_length=32, blank=True)
+    mchid = models.CharField(max_length=32, blank=True)
+    expires_at = models.DateTimeField(null=True)
+    request_key = models.CharField(max_length=128, blank=True)
 
     class Meta:
         constraints = [
+            models.UniqueConstraint(fields=["created_by", "request_key"], condition=~Q(request_key=""), name="payment_request_once"),
             models.UniqueConstraint(
                 fields=["bill"],
                 condition=Q(status__in=["creating", "pending", "unknown"]),
                 name="one_unresolved_payment",
             )
         ]
+
+
+class PaymentNotification(Entity):
+    notification_id = models.CharField(max_length=100, unique=True)
+    attempt = models.ForeignKey(PaymentAttempt, on_delete=models.PROTECT)
+    payload = EncryptedJSONField()
+    body_digest = models.CharField(max_length=64)
+    status = models.CharField(max_length=16, default="pending")
+    processed_at = models.DateTimeField(null=True)
 
 
 class ReceiptLedger(Entity):

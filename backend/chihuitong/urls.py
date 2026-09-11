@@ -1,9 +1,10 @@
 from django.urls import path
 
 from . import api
+from . import api_appointments as appointments
+from . import api_payments as payments
 from . import api_catalog as catalog
 from . import api_finance as finance
-from . import api_appointments as appointments
 from . import api_sales as sales
 
 urlpatterns = [
@@ -78,4 +79,8 @@ urlpatterns = [
     path("redemptions", appointments.redeem),
     path("redemptions/<uuid:redemption_id>/reverse", appointments.reverse_redemption),
     path("fulfillment-tasks", appointments.fulfillment_tasks),
+    path("clinic-bills/<uuid:bill_id>/payments", payments.bill_payments),
+    path("payments/configuration", payments.payment_configuration),
+    path("payments/<uuid:attempt_id>/<str:action>", payments.payment_action),
+    path("payments/wechat/notify", payments.notification),
 ]

@@ -74,6 +74,10 @@ OTP_SECONDS = 300
 OTP_COOLDOWN_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 SESSION_SECONDS = 8 * 60 * 60
+WECHAT_PAY_ENABLED = os.environ.get("CHT_WECHAT_PAY_ENABLED", "false").lower() == "true"
+WECHAT_PAY = {key: os.environ.get("CHT_WXPAY_" + key.upper(), "") for key in [
+    "mchid", "appid", "certificate_serial", "private_key_path", "public_key_id", "public_keys", "api_v3_key", "notify_url",
+]}
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

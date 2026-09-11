@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
-from django.db import transaction
 from django.core import signing
+from django.db import transaction
 from django.utils import timezone
 
 from chihuitong.crypto import digest
@@ -497,15 +497,29 @@ def fee_fingerprint(snapshot):
 def redemption_quote(actor, appointment_id, *, credential):
     appointment, benefit = locked_appointment(appointment_id)
     clinic_actor(actor, appointment)
-    require(isinstance(credential, str) and digest(credential, purpose="card") == benefit.card.credential_digest,
-            "invalid_credential", "二维码与预约不一致", 400)
+    require(
+        isinstance(credential, str)
+        and digest(credential, purpose="card") == benefit.card.credential_digest,
+        "invalid_credential",
+        "二维码与预约不一致",
+        400,
+    )
     can_redeem(appointment, benefit)
     product = Product.objects.select_for_update().get(pk=benefit.product_id)
     fees = resolve_fees(benefit.source.organization_id, appointment.clinic, product)
-    data = {"appointment_id": str(appointment.id), "version": appointment.version,
-            "fee_cents": fees["fee_cents"], "fingerprint": fee_fingerprint(fees)}
-    return {"quote": signing.dumps(data, salt="redemption-quote"), "expires_in": 300,
-            "fee_cents": fees["fee_cents"], "units": appointment.units, "version": appointment.version}
+    data = {
+        "appointment_id": str(appointment.id),
+        "version": appointment.version,
+        "fee_cents": fees["fee_cents"],
+        "fingerprint": fee_fingerprint(fees),
+    }
+    return {
+        "quote": signing.dumps(data, salt="redemption-quote"),
+        "expires_in": 300,
+        "fee_cents": fees["fee_cents"],
+        "units": appointment.units,
+        "version": appointment.version,
+    }
 
 
 @transaction.atomic
@@ -532,9 +546,17 @@ def redeem(actor, appointment_id, *, credential, confirmed, version, quote=None)
             quoted = signing.loads(quote, salt="redemption-quote", max_age=300)
         except signing.BadSignature:
             require(False, "quote_expired", "费用确认已失效，请重新扫码核对", 409)
-        require(quoted == {"appointment_id": str(appointment.id), "version": appointment.version,
-                           "fee_cents": snapshot["fee_cents"], "fingerprint": fee_fingerprint(snapshot)},
-                "fee_changed", "预约或计费条款已变化，请重新核对费用")
+        require(
+            quoted
+            == {
+                "appointment_id": str(appointment.id),
+                "version": appointment.version,
+                "fee_cents": snapshot["fee_cents"],
+                "fingerprint": fee_fingerprint(snapshot),
+            },
+            "fee_changed",
+            "预约或计费条款已变化，请重新核对费用",
+        )
     snapshot.update(
         {
             "internal_name": product.internal_name,
