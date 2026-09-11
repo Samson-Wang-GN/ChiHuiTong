@@ -2,6 +2,7 @@ from django.urls import path
 
 from . import api
 from . import api_catalog as catalog
+from . import api_sales as sales
 
 urlpatterns = [
     path("health", api.health),
@@ -30,4 +31,21 @@ urlpatterns = [
     path("clinics/<uuid:clinic_id>/confirmation-hours", catalog.clinic_hours),
     path("clinics/<uuid:clinic_id>/channel", catalog.clinic_channel),
     path("clinics/<uuid:clinic_id>/products", catalog.clinic_products),
+    path("sales-orders", sales.orders),
+    path("sales-orders/<uuid:order_id>", sales.order_detail),
+    path("sales-orders/<uuid:order_id>/rows", sales.order_rows),
+    path("sales-orders/<uuid:order_id>/receipts", sales.receipts),
+    path("purchase-receipts/<uuid:receipt_id>/review", sales.receipt_review),
+    path("sales-orders/<uuid:order_id>/cards", sales.cards),
+    path("sales-orders/<uuid:order_id>/cards/export", sales.export_cards),
+    path("sales-orders/<uuid:order_id>/<str:action>", sales.order_action),
+    path("cards/<uuid:card_id>/freeze", sales.freeze_card),
+    path("imports", sales.import_list),
+    path("imports/<uuid:batch_id>", sales.import_detail),
+    path("imports/<uuid:batch_id>/mapping", sales.import_mapping),
+    path("imports/<uuid:batch_id>/confirm", sales.import_confirm),
+    path("imports/<uuid:batch_id>/rows", sales.import_rows),
+    path("imports/<uuid:batch_id>/errors.xlsx", sales.import_errors),
+    path("imports/<uuid:batch_id>/suggest", sales.import_suggest),
+    path("import-formats", sales.import_formats),
 ]

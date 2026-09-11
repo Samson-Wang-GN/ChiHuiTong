@@ -259,6 +259,7 @@ def submit_profile(actor, clinic_id, *, profile, version):
     current = dict(clinic.profile)
     # Allow callers to reuse approved location metadata, but never to forge the audit metadata.
     if clinic.profile_version > 0:
+
         def comparable(profile):
             return {
                 **profile,
@@ -268,6 +269,7 @@ def submit_profile(actor, clinic_id, *, profile, version):
                     if k not in {"confirmed_by", "confirmed_at"}
                 },
             }
+
         require(comparable(current) != comparable(normalized), "unchanged_profile", "资料没有变更")
     change = ClinicProfileChange.objects.create(
         clinic=clinic,
