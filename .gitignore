@@ -19,6 +19,11 @@ debug.log
 __pycache__/
 *.py[cod]
 .venv/
+.venv-backend/
+.coverage
+coverage.json
+.ruff_cache/
+runtime/
 venv/
 node_modules/
 test-results/
