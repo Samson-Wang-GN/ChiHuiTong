@@ -35,9 +35,25 @@ def run_one():
             handler(job.payload["batch_id"], job.payload["version"])
         elif job.kind == "payment.notification":
             from .payments import process_notification
+
             process_notification(job.payload["notification_id"])
+        elif job.kind == "sms.business":
+            from .notifications import send_business
+            send_business(job)
+        elif job.kind == "appointment.deadline":
+            from .appointments import process_deadline
+            process_deadline(job.payload["appointment_id"])
+        elif job.kind == "billing.clinic":
+            from datetime import date
+            from .finance import generate_clinic_bill
+            generate_clinic_bill(job.payload["clinic_id"], issued_on=date.fromisoformat(job.payload["issued_on"]))
+        elif job.kind == "billing.partner":
+            from datetime import date
+            from .finance import generate_partner_bills
+            generate_partner_bills(issued_on=date.fromisoformat(job.payload["issued_on"]))
         elif job.kind == "payment.reconcile":
             from .payments import reconcile
+
             payment = reconcile(job.payload["attempt_id"])
             if payment.status not in {"success", "closed"}:
                 raise BusinessError("payment_unresolved", "支付等待查单", 503)

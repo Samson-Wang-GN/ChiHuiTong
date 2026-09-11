@@ -201,7 +201,9 @@ def settle_if_full(bill):
     return False
 
 
-def record_funds(bill, *, reference_index, amount_cents, received_at, kind, source_id, force_anomaly=""):
+def record_funds(
+    bill, *, reference_index, amount_cents, received_at, kind, source_id, force_anomaly=""
+):
     """Caller holds bill lock. Real extra money is persisted as an anomaly, never discarded."""
     advisory_lock("receipt", reference_index)
     old = ReceiptLedger.objects.filter(reference_index=reference_index).first()

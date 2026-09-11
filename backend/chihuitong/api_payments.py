@@ -24,15 +24,23 @@ def bill_payments(request, bill_id):
     if request.method == "POST":
         data = validated(PaymentInput, request)
         rate_limit(f"payment:{actor.membership.id}", seconds=60, maximum=10)
-        attempt = payments.create_payment(actor, bill_id, **data, key=request.headers.get("Idempotency-Key", ""))
+        attempt = payments.create_payment(
+            actor, bill_id, **data, key=request.headers.get("Idempotency-Key", "")
+        )
         return Response(payments.projection(attempt), status=202)
+
     def projection(item):
         result = payments.projection(item)
         if actor.organization.kind != "clinic":
             result.pop("payment_parameters", None)
         return result
-    return paginated(request, bill.payment_attempts.all(), projection,
-                     states=["creating", "pending", "unknown", "success", "closed"])
+
+    return paginated(
+        request,
+        bill.payment_attempts.all(),
+        projection,
+        states=["creating", "pending", "unknown", "success", "closed"],
+    )
 
 
 class PaymentActionInput(StrictSerializer):
@@ -55,17 +63,22 @@ def payment_action(request, attempt_id, action):
 def payment_configuration(request):
     request_actor(request)
     # Never return keys, certificate paths or merchant secrets.
-    return Response({"wechat_enabled": settings.WECHAT_PAY_ENABLED,
-                     "offline_receipt_enabled": True})
+    return Response(
+        {"wechat_enabled": settings.WECHAT_PAY_ENABLED, "offline_receipt_enabled": True}
+    )
 
 
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def notification(request):
-    require(request.content_type == "application/json", "invalid_content_type", "需要JSON支付通知", 415)
+    require(
+        request.content_type == "application/json", "invalid_content_type", "需要JSON支付通知", 415
+    )
     length = request.META.get("CONTENT_LENGTH", "0")
-    require(length.isdigit() and int(length) <= MAX_MESSAGE, "wechat_message_size", "支付报文过大", 413)
+    require(
+        length.isdigit() and int(length) <= MAX_MESSAGE, "wechat_message_size", "支付报文过大", 413
+    )
     raw = request.body
     require(len(raw) <= MAX_MESSAGE, "wechat_message_size", "支付报文过大", 413)
     payments.capture_notification(request.headers, raw)

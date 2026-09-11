@@ -2,9 +2,10 @@ from django.urls import path
 
 from . import api
 from . import api_appointments as appointments
-from . import api_payments as payments
 from . import api_catalog as catalog
 from . import api_finance as finance
+from . import api_payments as payments
+from . import api_notifications as notifications
 from . import api_sales as sales
 
 urlpatterns = [
@@ -83,4 +84,13 @@ urlpatterns = [
     path("payments/configuration", payments.payment_configuration),
     path("payments/<uuid:attempt_id>/<str:action>", payments.payment_action),
     path("payments/wechat/notify", payments.notification),
+    path("notifications", notifications.notification_list),
+    path("notifications/<uuid:notification_id>/read", notifications.notification_read),
+    path("sms-templates", notifications.templates),
+    path("sms-templates/<str:code>", notifications.configure_template),
+    path("sms-deliveries", notifications.sms_deliveries),
+    path("jobs", notifications.jobs),
+    path("jobs/<uuid:job_id>/retry", notifications.retry_job),
+    path("calendar", notifications.calendar_list),
+    path("calendar/<str:date>", notifications.calendar_day),
 ]

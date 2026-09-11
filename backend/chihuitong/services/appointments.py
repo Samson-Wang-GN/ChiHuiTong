@@ -99,6 +99,8 @@ def locked_appointment(appointment_id):
 
 
 def notify_clinic(appointment, kind):
+    from .notifications import clinic_message
+    clinic_message(appointment, kind)
     Outbox.objects.get_or_create(
         kind="sms.business",
         dedup_key=f"{kind}:{appointment.id}:{appointment.version}",

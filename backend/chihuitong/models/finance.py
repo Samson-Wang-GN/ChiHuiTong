@@ -94,12 +94,16 @@ class PaymentAttempt(Entity):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["created_by", "request_key"], condition=~Q(request_key=""), name="payment_request_once"),
+            models.UniqueConstraint(
+                fields=["created_by", "request_key"],
+                condition=~Q(request_key=""),
+                name="payment_request_once",
+            ),
             models.UniqueConstraint(
                 fields=["bill"],
                 condition=Q(status__in=["creating", "pending", "unknown"]),
                 name="one_unresolved_payment",
-            )
+            ),
         ]
 
 
