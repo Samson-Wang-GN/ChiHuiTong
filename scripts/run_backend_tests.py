@@ -19,7 +19,7 @@ SERVICES = ["chihui-public.service", "study-system-web.service", "study-system-s
 
 
 def checked(command, **kwargs):
-    return subprocess.run(command, check=True, text=True, **kwargs)
+    return subprocess.run(command, check=True, text=True, timeout=60, **kwargs)
 
 
 def hashes(root):
@@ -44,6 +44,13 @@ def main():
     if (release / ".git").exists():
         raise SystemExit("服务器不能有本项目Git仓库")
     os.umask(0o077)
+    import fcntl
+    (ROOT / "runtime").mkdir(exist_ok=True)
+    lock = (ROOT / "runtime" / "backend-tests.lock").open("a")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise SystemExit("已有后端测试运行，禁止并发重建同一个测试库") from None
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     result_dir = ROOT / "test-results" / f"{stamp}-{release.name[:12]}-backend"
     result_dir.mkdir(parents=True)
@@ -65,7 +72,11 @@ def main():
     def step(name, command, *, cwd=workspace, acceptable=(0,)):
         logfile = result_dir / f"{name}.log"
         with logfile.open("w") as output:
-            completed = subprocess.run([str(c) for c in command], cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT, text=True)
+            try:
+                completed = subprocess.run([str(c) for c in command], cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT, text=True, timeout=900)
+            except subprocess.TimeoutExpired:
+                summary["steps"].append({"name": name, "exit_code": "timeout", "log": str(logfile)})
+                raise RuntimeError(f"{name} exceeded 15 minute safety deadline") from None
         summary["steps"].append({"name": name, "exit_code": completed.returncode, "log": str(logfile)})
         print(f"{name}: exit={completed.returncode}", flush=True)
         if completed.returncode not in acceptable:
@@ -110,6 +121,7 @@ def main():
         step("migration-check", [python, "manage.py", "makemigrations", "--check", "--dry-run"])
         step("migrate", [python, "manage.py", "migrate", "--noinput"])
         step("django-check", [python, "manage.py", "check"])
+        step("http-smoke", [python, workspace / "smoke_http.py"])
         step("tests", [python, "-m", "coverage", "run", "manage.py", "test", *args.labels, "--noinput", "--verbosity", "2"])
         step("coverage", [python, "-m", "coverage", "report"])
         step("coverage-json", [python, "-m", "coverage", "json", "-o", result_dir / "coverage.json"])

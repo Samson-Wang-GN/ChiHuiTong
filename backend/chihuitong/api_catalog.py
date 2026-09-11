@@ -1,4 +1,5 @@
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -200,6 +201,9 @@ class ContractEditInput(VersionInput):
 
 @api_view(["GET"])
 def cooperation(request, org_id):
+    from .api import api_prefix
+
+    prefix = api_prefix(request)
     actor = request_actor(request)
     if actor.organization.kind == "clinic":
         actor.require_admin()
@@ -213,7 +217,7 @@ def cooperation(request, org_id):
         ContractVersion.objects.filter(contract__in=accessible).select_related("contract")
     )
     current = (
-        versions.filter(display_status__in=["effective", "expired", "terminated"])
+        versions.filter(display_status__in=["effective", "expired", "terminated"], starts_at__lte=timezone.now())
         .order_by("-starts_at", "-revision")
         .first()
     )
@@ -229,10 +233,10 @@ def cooperation(request, org_id):
             "read_only": not actor.platform,
             "can_submit_clinic_contract": org.kind == "clinic"
             and (actor.platform or actor.organization.kind == "channel"),
-            "history_endpoint": f"/api/v1/organizations/{org.id}/contracts",
-            "products_endpoint": f"/api/v1/contracts/{current.id}/products"
+            "history_endpoint": f"{prefix}/organizations/{org.id}/contracts",
+            "products_endpoint": f"{prefix}/contracts/{current.id}/products"
             if current and org.kind != "clinic"
-            else f"/api/v1/clinics/{org.clinic.id}/products"
+            else f"{prefix}/clinics/{org.clinic.id}/products"
             if org.kind == "clinic"
             else None,
         }

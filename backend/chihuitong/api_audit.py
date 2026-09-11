@@ -86,7 +86,7 @@ def object_log(request, object_type, object_id):
                     "id": str(item.id),
                     "occurred_at": item.occurred_at.isoformat(),
                     "action": item.action,
-                    "actor": item.actor_name or ("系统" if not item.actor_id else "历史未记录"),
+                    "actor": item.actor_name or ("客户本人" if item.actor_role == "customer" else "系统" if not item.actor_id else "历史未记录"),
                     "organization": item.organization_name
                     or ("系统" if not item.organization_id else "历史未记录"),
                     "role": item.actor_role or None,

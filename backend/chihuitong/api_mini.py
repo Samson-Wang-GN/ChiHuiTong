@@ -13,7 +13,7 @@ from .identity import rate_limit, request_actor
 from .mini_identity import login, session_profile
 from .models import Appointment, Benefit, CustomerMessage, FileAsset, MiniSession
 from .services import appointments, customers, discovery, files, payments
-from .services.common import idempotent
+from .services.common import audit, customer_audit_context, idempotent
 from .services.finance_queries import iso
 
 
@@ -52,12 +52,19 @@ def me(request):
 
 
 def customer_command(request, operation, data, callback):
+    def execute():
+        with customer_audit_context(request.user):
+            result = callback()
+            # No field values, QR credentials, or raw request contents in audit metadata.
+            audit(None, request.user, "customer." + operation,
+                  target_id=result.get("id"), fields=sorted(data))
+            return result
     return idempotent(
         request.user.id,
         "customer." + operation,
         request.headers.get("Idempotency-Key", ""),
         data,
-        callback,
+        execute,
     )
 
 
@@ -313,7 +320,9 @@ def message_projection(item):
         "status": item.status,
         "read_at": iso(item.read_at),
         "resolved_at": iso(item.resolved_at),
-        "title": "补核销已撤销，请确认是否申请恢复权益" if item.kind == "reversal_restoration" else "请确认是否到诊；确实未到诊可申请恢复权益",
+        "title": "补核销已撤销，请确认是否申请恢复权益"
+        if item.kind == "reversal_restoration"
+        else "请确认是否到诊；确实未到诊可申请恢复权益",
         "action": "restore" if item.kind == "reversal_restoration" else "feedback",
         "appointment": appointment_projection(item.appointment),
     }
@@ -368,8 +377,12 @@ def clinic_payment(request, bill_id):
 
 class DiscoveryInput(StrictSerializer):
     benefit_id = serializers.UUIDField()
-    longitude = serializers.DecimalField(max_digits=10, decimal_places=6, min_value=-180, max_value=180, required=False)
-    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, min_value=-90, max_value=90, required=False)
+    longitude = serializers.DecimalField(
+        max_digits=10, decimal_places=6, min_value=-180, max_value=180, required=False
+    )
+    latitude = serializers.DecimalField(
+        max_digits=9, decimal_places=6, min_value=-90, max_value=90, required=False
+    )
     query = serializers.CharField(max_length=100, required=False, allow_blank=True)
     page = serializers.IntegerField(min_value=1, default=1)
     page_size = serializers.IntegerField(min_value=1, max_value=100, default=20)
@@ -380,11 +393,22 @@ def clinic_search(request):
     form = DiscoveryInput(data=request.query_params.dict())
     form.is_valid(raise_exception=True)
     data = dict(form.validated_data)
-    require(("longitude" in data) == ("latitude" in data), "coordinates_required", "请同时提供经纬度", 400)
+    require(
+        ("longitude" in data) == ("latitude" in data),
+        "coordinates_required",
+        "请同时提供经纬度",
+        400,
+    )
     page, size = data.pop("page"), data.pop("page_size")
     qs = discovery.listing(request.user, **data)
-    return Response({"results": [discovery.projection(row) for row in qs[(page - 1) * size:page * size]],
-                     "total": qs.count(), "page": page, "page_size": size})
+    return Response(
+        {
+            "results": [discovery.projection(row) for row in qs[(page - 1) * size : page * size]],
+            "total": qs.count(),
+            "page": page,
+            "page_size": size,
+        }
+    )
 
 
 def customer_clinic(request, clinic_id):
@@ -401,7 +425,12 @@ def clinic_detail(request, clinic_id):
 @api_view(["GET"])
 def clinic_cover(request, clinic_id):
     clinic = customer_clinic(request, clinic_id)
-    asset = FileAsset.objects.filter(pk=clinic.profile.get("cover_id"), status="ready", purpose="cover", content_type="image/jpeg").first()
+    asset = FileAsset.objects.filter(
+        pk=clinic.profile.get("cover_id"),
+        status="ready",
+        purpose="cover",
+        content_type="image/jpeg",
+    ).first()
     require(asset, "not_found", "门诊尚未设置展示图片", 404)
     response = HttpResponse(files.file_bytes(asset), content_type="image/jpeg")
     response["Cache-Control"] = "private, no-store"

@@ -53,10 +53,17 @@ class DiscoveryTests(TestCase):
 
     def test_distance_order_pagination_and_unconfirmed_last(self):
         actor = actor_fixture("clinic", "13900000882")
-        near = Clinic.objects.create(organization=actor.organization, channel=self.channel.organization,
-                                    responsible=self.channel.membership, profile=self.clinic.profile,
-                                    review_status="approved", profile_version=1, service_status="online",
-                                    longitude=Decimal("116.300000"), latitude=Decimal("39.900000"))
+        near = Clinic.objects.create(
+            organization=actor.organization,
+            channel=self.channel.organization,
+            responsible=self.channel.membership,
+            profile=self.clinic.profile,
+            review_status="approved",
+            profile_version=1,
+            service_status="online",
+            longitude=Decimal("116.300000"),
+            latitude=Decimal("39.900000"),
+        )
         contract_fixture(self.platform, actor.organization, submitter=self.channel)
         ClinicProduct.objects.create(clinic=near, product=self.product, status="online")
         result = self.search(longitude="116.300000", latitude="39.900000", page_size=1)
@@ -68,7 +75,9 @@ class DiscoveryTests(TestCase):
         self.assertIsNone(second.data["results"][0]["distance_m"])
 
     def test_published_cover_only_and_existing_appointment_can_contact_offline_clinic(self):
-        asset = files.upload_file(self.channel, data=image_bytes(), filename="合成封面.png", purpose="cover")
+        asset = files.upload_file(
+            self.channel, data=image_bytes(), filename="合成封面.png", purpose="cover"
+        )
         self.clinic.profile = {**self.clinic.profile, "cover_id": str(asset.id)}
         self.clinic.save(update_fields=["profile"])
         url = f"/api/v1/mini/customer/clinics/{self.clinic.id}"

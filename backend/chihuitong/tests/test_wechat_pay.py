@@ -246,9 +246,11 @@ class PaymentTests(TestCase):
         attempt.status, attempt.gateway_payload = "unknown", {}
         attempt.save(update_fields=["status", "gateway_payload"])
         gateway = self.gateway()
+
         def create_after_success(item, openid=None):
             payments.observe(item.id, self.success(item))
             return {"code_url": "weixin://wxpay/late"}
+
         gateway.create = create_after_success
         with patch("chihuitong.services.payments.WeChatPay", return_value=gateway):
             result = payments.retry_preparation(self.clinic_actor, attempt.id)
@@ -258,10 +260,18 @@ class PaymentTests(TestCase):
 
     def test_nonfinancial_feedback_does_not_invalidate_inflight_payment(self):
         from chihuitong.services import finance
+
         attempt = self.create()
-        feedback = finance.submit_feedback(self.clinic_actor, self.bill.id, partner=False,
-                                           message="合成核对说明", version=self.bill.version)
-        finance.respond_feedback(self.platform, feedback.id, response="合成回复", version=feedback.version)
+        feedback = finance.submit_feedback(
+            self.clinic_actor,
+            self.bill.id,
+            partner=False,
+            message="合成核对说明",
+            version=self.bill.version,
+        )
+        finance.respond_feedback(
+            self.platform, feedback.id, response="合成回复", version=feedback.version
+        )
         payments.observe(attempt.id, self.success(attempt))
         self.bill.refresh_from_db()
         self.assertEqual(self.bill.status, "settled")

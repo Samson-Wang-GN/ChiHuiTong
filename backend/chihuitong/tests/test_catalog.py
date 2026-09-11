@@ -338,6 +338,17 @@ class CatalogTests(TestCase):
             self.channel, {**self.profile, "location": location}, self.channel.organization
         )
         self.assertEqual(data["location"]["confirmed_by"], str(self.channel.membership.id))
+        self.profile["location"] = location
+        self.approve_clinic()
+        self.assertEqual(str(self.clinic.longitude), "116.300000")
+        self.assertEqual(str(self.clinic.latitude), "40.000000")
+        revised = {**self.profile, "address": "合成新地址", "location": {"status": "unconfirmed"}}
+        change = clinics.submit_profile(self.channel, self.clinic.id, profile=revised, version=self.clinic.version)
+        self.clinic.refresh_from_db()
+        self.assertEqual(str(self.clinic.longitude), "116.300000")
+        clinics.review_profile(self.platform, change.id, approved=False, version=change.version, reason="合成退回")
+        self.clinic.refresh_from_db()
+        self.assertEqual(str(self.clinic.longitude), "116.300000")
         with self.assertRaises(BusinessError):
             clinics.validate_profile(
                 self.channel,

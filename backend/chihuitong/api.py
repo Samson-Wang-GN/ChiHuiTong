@@ -34,6 +34,10 @@ def validated(serializer, request):
     return form.validated_data
 
 
+def api_prefix(request):
+    return "/api/v1/mini/clinic" if request.path.startswith("/api/v1/mini/clinic/") else "/api/v1"
+
+
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])

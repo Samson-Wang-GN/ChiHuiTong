@@ -334,14 +334,26 @@ def review_profile(actor, change_id, *, approved, version, reason):
         _, responsible = validate_profile(actor, data, clinic.channel)
         clinic.profile = change.after
         location = change.after.get("location", {})
-        clinic.longitude = location.get("longitude") if location.get("status") == "confirmed" else None
-        clinic.latitude = location.get("latitude") if location.get("status") == "confirmed" else None
+        clinic.longitude = (
+            location.get("longitude") if location.get("status") == "confirmed" else None
+        )
+        clinic.latitude = (
+            location.get("latitude") if location.get("status") == "confirmed" else None
+        )
         clinic.profile_version += 1
         clinic.responsible = responsible
         clinic.review_status = "approved"
         clinic.organization.name = change.after["name"]
         clinic.organization.save(update_fields=["name", "updated_at"])
-        advance(clinic, "profile", "profile_version", "responsible", "review_status", "longitude", "latitude")
+        advance(
+            clinic,
+            "profile",
+            "profile_version",
+            "responsible",
+            "review_status",
+            "longitude",
+            "latitude",
+        )
     elif clinic.profile_version == 0:
         clinic.review_status = "rejected"
         advance(clinic, "review_status")

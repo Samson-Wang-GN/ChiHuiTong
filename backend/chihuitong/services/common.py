@@ -1,6 +1,8 @@
 import hashlib
 import json
 from dataclasses import dataclass
+from contextvars import ContextVar
+from contextlib import contextmanager
 
 from django.db import connection, transaction
 
@@ -8,6 +10,16 @@ from chihuitong.errors import require
 from chihuitong.models import AuditEvent, IdempotencyRecord, Membership
 
 RESOURCE_KINDS = {"insurance", "bank", "broker"}
+_customer_actor = ContextVar("customer_audit_actor", default=None)
+
+
+@contextmanager
+def customer_audit_context(customer):
+    token = _customer_actor.set(customer)
+    try:
+        yield
+    finally:
+        _customer_actor.reset(token)
 
 
 @dataclass(frozen=True)
@@ -36,6 +48,9 @@ class Actor:
 
 def audit(actor, obj, action, *, reason="", **metadata):
     # Metadata deliberately contains only identifiers/statuses/field names, never form contents.
+    customer = _customer_actor.get() if actor is None else None
+    if customer:
+        metadata = {**metadata, "customer_id": str(customer.id)}
     return AuditEvent.objects.create(
         actor=actor.account if actor else None,
         membership=actor.membership if actor else None,
@@ -46,9 +61,9 @@ def audit(actor, obj, action, *, reason="", **metadata):
         reason=reason,
         metadata=metadata,
         request_id=actor.request_id if actor else None,
-        actor_role=actor.membership.role if actor else "",
-        actor_name=actor.account.name if actor else "",
-        organization_name=actor.organization.name if actor else "",
+        actor_role=actor.membership.role if actor else "customer" if customer else "",
+        actor_name=actor.account.name if actor else customer.name if customer else "",
+        organization_name=actor.organization.name if actor else "客户本人" if customer else "",
     )
 
 
