@@ -15,7 +15,7 @@
 
 代码位于`backend/chihuitong/models`、`services`、`integrations`；HTTP层为`api*.py`。所有外部调用固定适配边界，资金调用不持有账单锁等待网络。详细请求/状态见[API说明](backend-api.md)，环境及备份见[后端运维](operations/backend.md)，逐需求验证见[实施清单](backend-plan.md)。以下原型时期的“尚未实现”只描述历史阶段，不覆盖本节。
 
-2026-09-12进入正式后端实施：采用Django5.2 LTS/DRF/PostgreSQL16模块化单体，见[ADR-0022](decisions/0022-backend-monolith-and-isolated-validation.md)及[实施清单](backend-plan.md)。以下“未选型/只有原型”为早期阶段记录，不再代表技术决定；实际完成度以任务及服务器证据为准，尚未完成全部后端。
+2026-09-12本期后端代码与指定服务器测试完成：Django5.2 LTS/DRF/PostgreSQL16模块化单体，见[ADR-0022](decisions/0022-backend-monolith-and-isolated-validation.md)及[实施清单](backend-plan.md)。以下“未选型/只有原型”为早期阶段记录，不再代表当前技术决定；真实外部联调、前端接入与生产验收仍独立跟踪。
 
 0.32当前需求见REQ-042及[ADR-0021](decisions/0021-current-rules-and-staged-payment.md)。正式实现按ADR-0022～0026执行，已经包含数据库迁移及支付适配。核销事务按当前渠道及适用合同计算、保存不可变分配快照；存量优先新合同，无新合同回溯最近有效历史版本。新业务授权校验与存量履约合同回溯分开，不能利用过期合同开展新业务。
 
