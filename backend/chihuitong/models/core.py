@@ -36,7 +36,8 @@ class Organization(Entity):
                 fields=["kind"], condition=Q(kind="platform"), name="one_platform"
             ),
             models.CheckConstraint(
-                condition=Q(status__in=["active", "disabled", "pending", "rejected"]), name="organization_state"
+                condition=Q(status__in=["active", "disabled", "pending", "rejected"]),
+                name="organization_state",
             ),
         ]
 

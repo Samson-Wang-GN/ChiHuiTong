@@ -122,9 +122,13 @@ def tick():
     for bill in PartnerBill.objects.exclude(status__in=["completed", "no_payment"]).iterator(
         chunk_size=200
     ):
-        if bill.status == "pending_payment":
+        if bill.status in {"pending_payment", "disputed"}:
             members = Membership.objects.filter(organization__kind="platform", role="admin")
-            title = "合作方已确认结算单，请登记线下付款"
+            title = (
+                "请处理合作方对账反馈"
+                if bill.status == "disputed"
+                else "合作方已确认结算单，请登记线下付款"
+            )
         else:
             members = Membership.objects.filter(organization_id=bill.organization_id, role="admin")
             title = (

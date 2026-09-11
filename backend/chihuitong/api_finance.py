@@ -210,6 +210,7 @@ def partner_bills(request):
         queries.partner_bill_projection,
         states=[
             "pending_confirmation",
+            "disputed",
             "pending_payment",
             "pending_receipt",
             "completed",
@@ -269,6 +270,7 @@ def partner_bill_lines(request, bill_id=None):
         status_field="bill__status",
         states=[
             "pending_confirmation",
+            "disputed",
             "pending_payment",
             "pending_receipt",
             "completed",
@@ -296,6 +298,7 @@ def own_partner_export(request):
         in {
             "all",
             "pending_confirmation",
+            "disputed",
             "pending_payment",
             "pending_receipt",
             "completed",
@@ -366,8 +369,15 @@ class CollectionInput(VersionInput):
 def collection_note(request, bill_id):
     actor = request_actor(request)
     data = validated(CollectionInput, request)
-    return Response(command(request, actor, "bill.collection", {"bill_id": str(bill_id), **data},
-        lambda: queries.clinic_bill_projection(finance.collection_note(actor, bill_id, **data))))
+    return Response(
+        command(
+            request,
+            actor,
+            "bill.collection",
+            {"bill_id": str(bill_id), **data},
+            lambda: queries.clinic_bill_projection(finance.collection_note(actor, bill_id, **data)),
+        )
+    )
 
 
 @api_view(["POST"])

@@ -191,7 +191,9 @@ def organization_list(request):
     search = request.query_params.get("search", "").strip()
     if search:
         qs = qs.filter(name__icontains=search[:200])
-    return paginated(request, qs, org_projection, states=["active", "disabled", "pending", "rejected"])
+    return paginated(
+        request, qs, org_projection, states=["active", "disabled", "pending", "rejected"]
+    )
 
 
 class OrganizationDetailsInput(StrictSerializer):
@@ -217,7 +219,9 @@ class OrganizationResubmitInput(StrictSerializer):
 def organization_detail(request, org_id):
     actor = request_actor(request)
     if request.method == "POST":
-        org = organizations.update_organization(actor, org_id, **validated(OrganizationDetailsInput, request))
+        org = organizations.update_organization(
+            actor, org_id, **validated(OrganizationDetailsInput, request)
+        )
     else:
         org = organizations.managed_org(actor, org_id)
     return Response({**org_projection(org), "details": org.details})
@@ -225,14 +229,24 @@ def organization_detail(request, org_id):
 
 @api_view(["POST"])
 def organization_review(request, org_id):
-    return Response(org_projection(organizations.review_organization(request_actor(request), org_id,
-        **validated(OrganizationReviewInput, request))))
+    return Response(
+        org_projection(
+            organizations.review_organization(
+                request_actor(request), org_id, **validated(OrganizationReviewInput, request)
+            )
+        )
+    )
 
 
 @api_view(["POST"])
 def organization_resubmit(request, org_id):
-    return Response(org_projection(organizations.resubmit_organization(request_actor(request), org_id,
-        **validated(OrganizationResubmitInput, request))))
+    return Response(
+        org_projection(
+            organizations.resubmit_organization(
+                request_actor(request), org_id, **validated(OrganizationResubmitInput, request)
+            )
+        )
+    )
 
 
 @api_view(["POST"])

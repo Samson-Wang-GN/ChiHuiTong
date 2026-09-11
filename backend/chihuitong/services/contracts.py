@@ -244,12 +244,19 @@ def review_version(actor, version_id, *, approved, version, reason):
     if approved:
         from .files import validate_attachment_ids
 
-        require(item.contract.organization.status == "active", "organization_unapproved", "合同主体尚未审核通过或已停用")
+        require(
+            item.contract.organization.status == "active",
+            "organization_unapproved",
+            "合同主体尚未审核通过或已停用",
+        )
         validate_attachment_ids(actor, item.attachment_ids, purposes={"contract"})
         if item.contract.kind == "clinic":
             clinic = Clinic.objects.get(organization=item.contract.organization)
-            require(clinic.review_status == "approved" and clinic.channel.status == "active",
-                    "clinic_unapproved", "门诊或渠道主体尚未审核通过")
+            require(
+                clinic.review_status == "approved" and clinic.channel.status == "active",
+                "clinic_unapproved",
+                "门诊或渠道主体尚未审核通过",
+            )
             require(
                 item.channel_id == clinic.channel_id,
                 "channel_changed",
@@ -291,18 +298,33 @@ def review_version(actor, version_id, *, approved, version, reason):
 
 @transaction.atomic
 def edit_draft(actor, version_id, *, data, version, reason):
-    item = ContractVersion.objects.select_for_update().filter(pk=version_id,
-        contract__in=accessible_contracts(actor)).first()
+    item = (
+        ContractVersion.objects.select_for_update()
+        .filter(pk=version_id, contract__in=accessible_contracts(actor))
+        .first()
+    )
     require(item, "not_found", "合同版本不存在", 404)
-    require(actor.platform or (actor.organization.kind == "channel" and item.contract.kind == "clinic"),
-            "forbidden", "无权维护此合同", 403)
+    require(
+        actor.platform or (actor.organization.kind == "channel" and item.contract.kind == "clinic"),
+        "forbidden",
+        "无权维护此合同",
+        403,
+    )
     check_version(item, version)
-    require(item.status == "draft" and isinstance(reason, str) and reason.strip(),
-            "invalid_state", "仅草稿可修改，请填写原因")
+    require(
+        item.status == "draft" and isinstance(reason, str) and reason.strip(),
+        "invalid_state",
+        "仅草稿可修改，请填写原因",
+    )
     validate_contract_data(data)
-    require(item.contract.kind == "clinic" or data["settlement_cycle"] == "monthly",
-            "partner_monthly", "合作方统一月结", 400)
-    from .files import validate_attachment_ids, link_files
+    require(
+        item.contract.kind == "clinic" or data["settlement_cycle"] == "monthly",
+        "partner_monthly",
+        "合作方统一月结",
+        400,
+    )
+    from .files import link_files, validate_attachment_ids
+
     validate_attachment_ids(actor, data["attachment_ids"], purposes={"contract"})
     for key, value in data.items():
         setattr(item, key, value)
@@ -318,14 +340,22 @@ def terminate(actor, version_id, *, version, reason):
     item = ContractVersion.objects.select_for_update().filter(pk=version_id).first()
     require(item, "not_found", "合同版本不存在", 404)
     check_version(item, version)
-    require(item.status == "approved" and isinstance(reason, str) and reason.strip(),
-            "invalid_state", "仅已审核合同可终止，请填写原因")
+    require(
+        item.status == "approved" and isinstance(reason, str) and reason.strip(),
+        "invalid_state",
+        "仅已审核合同可终止，请填写原因",
+    )
     item.status, item.reason = "terminated", reason
     advance(item, "status", "reason")
     audit(actor, item.contract, "contract.terminated", reason=reason, version_id=str(item.id))
     if item.contract.kind == "clinic":
-        audit(actor, Clinic.objects.get(organization=item.contract.organization), "clinic.contract_terminated",
-              reason=reason, version_id=str(item.id))
+        audit(
+            actor,
+            Clinic.objects.get(organization=item.contract.organization),
+            "clinic.contract_terminated",
+            reason=reason,
+            version_id=str(item.id),
+        )
     return item
 
 

@@ -218,4 +218,7 @@ class DomainEvent(models.Model):
     payload = models.JSONField(default=dict)
 
     class Meta:
-        indexes = [models.Index(fields=["card", "occurred_at", "id"])]
+        indexes = [
+            models.Index(fields=["card", "occurred_at", "id"]),
+            models.Index(fields=["object_id", "kind", "occurred_at"]),
+        ]

@@ -517,10 +517,13 @@ def submit_feedback(actor, bill_id, *, partner, message, version):
         message=message.strip(),
         actor=actor.membership,
     )
-    if not partner:
+    if partner and bill.status == "pending_confirmation":
+        bill.status = "disputed"
+        advance(bill, "status")
+    elif not partner:
         # Feedback never changes the statement amount, issue date or payment deadline.
         bill.dispute = True
-        bill.save(update_fields=["dispute", "updated_at"])
+        advance(bill, "dispute")
     audit(actor, bill, "bill.feedback_submitted", feedback_id=str(feedback.id))
     return feedback
 
@@ -549,17 +552,29 @@ def respond_feedback(actor, feedback_id, *, response, version):
     advance(feedback, "response", "status", "responded_by", "responded_at")
     if feedback.clinic_bill_id:
         bill.dispute = bill.feedback.filter(status="open").exists()
-        bill.save(update_fields=["dispute", "updated_at"])
+        advance(bill, "dispute")
+    elif bill.status == "disputed":
+        bill.status = "pending_confirmation"
+        advance(bill, "status")
     audit(actor, bill, "bill.feedback_responded", feedback_id=str(feedback.id))
     return feedback
 
 
 @transaction.atomic
 def collection_note(actor, bill_id, *, reason, version):
-    require(actor.platform or actor.organization.kind == "channel", "forbidden", "仅平台或负责渠道可登记催收", 403)
+    require(
+        actor.platform or actor.organization.kind == "channel",
+        "forbidden",
+        "仅平台或负责渠道可登记催收",
+        403,
+    )
     bill = get_bill(actor, bill_id, lock=True)
     check_version(bill, version)
-    require(bill.status == "open" and isinstance(reason, str) and 1 <= len(reason.strip()) <= 1000,
-            "invalid_collection", "请填写未结清账单的催收记录", 400)
+    require(
+        bill.status == "open" and isinstance(reason, str) and 1 <= len(reason.strip()) <= 1000,
+        "invalid_collection",
+        "请填写未结清账单的催收记录",
+        400,
+    )
     audit(actor, bill, "bill.collection_contacted", reason=reason)
     return bill

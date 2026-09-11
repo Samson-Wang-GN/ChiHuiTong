@@ -2,13 +2,14 @@ from django.urls import path
 
 from . import api
 from . import api_appointments as appointments
+from . import api_audit as audit
 from . import api_catalog as catalog
 from . import api_finance as finance
+from . import api_metrics as metrics
 from . import api_notifications as notifications
-from . import api_workbench as workbench
-from . import api_audit as audit
 from . import api_payments as payments
 from . import api_sales as sales
+from . import api_workbench as workbench
 
 urlpatterns = [
     path("health", api.health),
@@ -105,4 +106,10 @@ urlpatterns = [
     path("workbench/tasks", workbench.tasks),
     path("workbench/tasks/<str:category>/<uuid:object_id>", workbench.task_detail),
     path("objects/<str:object_type>/<uuid:object_id>/logs", audit.object_log),
+    path("customer-overview", metrics.overview),
+    path("customer-overview/products", metrics.products),
+    path("customer-overview/trend", metrics.trend),
+    path("customer-overview/details", metrics.details),
+    path("customer-overview/customer-cards", metrics.details, {"customer_cards": True}),
+    path("customer-overview/export.xlsx", metrics.export),
 ]

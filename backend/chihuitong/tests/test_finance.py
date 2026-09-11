@@ -71,6 +71,28 @@ class FinanceTests(TestCase):
         )
         self.assertEqual(self.bill.lines.count(), 1)
 
+    def test_partner_feedback_suspends_confirmation_until_platform_response(self):
+        with patch("django.utils.timezone.now", return_value=self.clock):
+            self.pay_clinic()
+            next_month = (self.issue_date.replace(day=28) + timedelta(days=4)).replace(day=1)
+            finance.generate_partner_bills(issued_on=next_month)
+            bill = PartnerBill.objects.get(organization=self.resource.organization)
+            original = (bill.total_cents, bill.due_at)
+            feedback = finance.submit_feedback(
+                self.resource, bill.id, partner=True, message="请复核这笔合成交易", version=bill.version
+            )
+            bill.refresh_from_db()
+            self.assertEqual(bill.status, "disputed")
+            with self.assertRaises(BusinessError):
+                finance.confirm_partner_bill(self.resource, bill.id, version=bill.version, confirmed=True)
+            finance.respond_feedback(
+                self.platform, feedback.id, response="已核对原始交易", version=feedback.version
+            )
+            bill.refresh_from_db()
+            self.assertEqual(bill.status, "pending_confirmation")
+            self.assertEqual((bill.total_cents, bill.due_at), original)
+            finance.confirm_partner_bill(self.resource, bill.id, version=bill.version, confirmed=True)
+
     def test_partial_receipt_does_not_settle_and_blocks_partner_pool(self):
         with patch("django.utils.timezone.now", return_value=self.clock):
             self.pay_clinic(1000)

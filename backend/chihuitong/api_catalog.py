@@ -200,17 +200,29 @@ class ContractTerminationInput(VersionInput):
 @api_view(["GET", "POST"])
 def contract_detail(request, version_id):
     actor = request_actor(request)
-    item = ContractVersion.objects.filter(pk=version_id, contract__in=contracts.accessible_contracts(actor)).first()
+    item = ContractVersion.objects.filter(
+        pk=version_id, contract__in=contracts.accessible_contracts(actor)
+    ).first()
     require(item, "not_found", "合同版本不存在", 404)
     if request.method == "POST":
         item = contracts.edit_draft(actor, version_id, **validated(ContractEditInput, request))
-    return Response({**contract_projection(item), "products": [contracts.term_snapshot(term) for term in item.products.all()]})
+    return Response(
+        {
+            **contract_projection(item),
+            "products": [contracts.term_snapshot(term) for term in item.products.all()],
+        }
+    )
 
 
 @api_view(["POST"])
 def contract_terminate(request, version_id):
-    return Response(contract_projection(contracts.terminate(request_actor(request), version_id,
-        **validated(ContractTerminationInput, request))))
+    return Response(
+        contract_projection(
+            contracts.terminate(
+                request_actor(request), version_id, **validated(ContractTerminationInput, request)
+            )
+        )
+    )
 
 
 @api_view(["GET", "POST"])
