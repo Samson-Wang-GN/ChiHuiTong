@@ -41,7 +41,12 @@ def normalize_customer(raw):
         400,
     )
     external_number = raw.get("resource_customer_no")
-    require(external_number is None or type(external_number) in {str, int}, "invalid_external_number", "资源方客户编号须为文本或整数", 400)
+    require(
+        external_number is None or type(external_number) in {str, int},
+        "invalid_external_number",
+        "资源方客户编号须为文本或整数",
+        400,
+    )
     result = {
         "name": name.strip(),
         "phone": phone,

@@ -85,16 +85,24 @@ def display_versions(queryset, *, at=None):
 
     at = at or timezone.now()
     newer = ContractVersion.objects.filter(
-        contract_id=OuterRef("contract_id"), status__in=["approved", "terminated"],
-        starts_at__lte=at, reviewed_at__lte=at,
-    ).filter(Q(starts_at__gt=OuterRef("starts_at")) | Q(starts_at=OuterRef("starts_at"), revision__gt=OuterRef("revision")))
-    return queryset.annotate(superseded=Exists(newer)).annotate(display_status=Case(
-        When(~Q(status="approved"), then="status"),
-        When(starts_at__gt=at, then=Value("not_started")),
-        When(superseded=True, then=Value("superseded")),
-        When(ends_at__lt=at, then=Value("expired")),
-        default=Value("effective"), output_field=CharField(),
-    ))
+        contract_id=OuterRef("contract_id"),
+        status__in=["approved", "terminated"],
+        starts_at__lte=at,
+        reviewed_at__lte=at,
+    ).filter(
+        Q(starts_at__gt=OuterRef("starts_at"))
+        | Q(starts_at=OuterRef("starts_at"), revision__gt=OuterRef("revision"))
+    )
+    return queryset.annotate(superseded=Exists(newer)).annotate(
+        display_status=Case(
+            When(~Q(status="approved"), then="status"),
+            When(starts_at__gt=at, then=Value("not_started")),
+            When(superseded=True, then=Value("superseded")),
+            When(ends_at__lt=at, then=Value("expired")),
+            default=Value("effective"),
+            output_field=CharField(),
+        )
+    )
 
 
 def validate_contract_data(data):
@@ -291,7 +299,15 @@ def review_version(actor, version_id, *, approved, version, reason):
         )
         # Earlier approved revisions remain immutable history. Selection picks the latest effective revision.
     # Serialize fee-rule activation with redemption and product-price changes.
-    products = list(Product.objects.select_for_update().filter(contractproduct__contract_version=item).order_by("id")) if approved else []
+    products = (
+        list(
+            Product.objects.select_for_update()
+            .filter(contractproduct__contract_version=item)
+            .order_by("id")
+        )
+        if approved
+        else []
+    )
     item.status = "approved" if approved else "rejected"
     item.reviewed_by, item.reviewed_at, item.reason = actor.membership, timezone.now(), reason
     advance(item, "status", "reviewed_by", "reviewed_at", "reason")
@@ -413,19 +429,30 @@ def validate_allocations(product):
     """
     now = timezone.now()
     terms = ContractProduct.objects.select_related("contract_version__contract").filter(
-        product=product, contract_version__status__in=["approved", "terminated"],
+        product=product,
+        contract_version__status__in=["approved", "terminated"],
         contract_version__reviewed_at__isnull=False,
     )
-    latest = terms.filter(contract_version__starts_at__lte=now).order_by(
-        "contract_version__contract_id", "-contract_version__starts_at", "-contract_version__revision"
-    ).distinct("contract_version__contract_id")
+    latest = (
+        terms.filter(contract_version__starts_at__lte=now)
+        .order_by(
+            "contract_version__contract_id",
+            "-contract_version__starts_at",
+            "-contract_version__revision",
+        )
+        .distinct("contract_version__contract_id")
+    )
     future = terms.filter(contract_version__starts_at__gt=now, contract_version__status="approved")
     maxima = {"resource": 0, "channel": 0}
     for term in [*latest, *future]:
         kind = term.contract_version.contract.kind
         if kind in maxima:
             maxima[kind] = max(maxima[kind], split_cents(product.fee_cents, term.mode, term.value))
-    require(sum(maxima.values()) <= product.fee_cents, "overallocated", "当前或已审核未来合同的分配组合超过获客费，请先调整分配配置")
+    require(
+        sum(maxima.values()) <= product.fee_cents,
+        "overallocated",
+        "当前或已审核未来合同的分配组合超过获客费，请先调整分配配置",
+    )
 
 
 @transaction.atomic

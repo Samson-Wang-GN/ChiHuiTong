@@ -97,6 +97,7 @@ class SalesOrder(Entity):
     reason = EncryptedTextField(default="")
     shipment = EncryptedJSONField(default=dict)
     refund = EncryptedJSONField(default=dict)
+    issue_failure_code = models.CharField(max_length=80, blank=True)
 
     class Meta:
         constraints = [

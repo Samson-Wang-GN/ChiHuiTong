@@ -7,7 +7,7 @@ from .api_catalog import VersionInput
 from .errors import require
 from .exports import excel_response
 from .identity import request_actor
-from .models import Card, ImportFormat, ImportRow, PurchaseReceipt
+from .models import Card, CardRange, ImportFormat, ImportRow, Outbox, PurchaseReceipt
 from .services import imports, sales
 from .services.common import RESOURCE_KINDS, audit, idempotent
 
@@ -41,6 +41,7 @@ def order_projection(order):
             "reason",
             "shipment",
             "refund",
+            "issue_failure_code",
         ]
     }
     data.update(
@@ -50,6 +51,13 @@ def order_projection(order):
         }
     )
     data["import_batch_id"] = str(order.import_batch_id) if order.import_batch_id else None
+    number_range = CardRange.objects.filter(order=order).first()
+    data["number_range"] = {"first": str(number_range.first_number), "last": str(number_range.last_number)} if number_range else None
+    if order.status in {"issuing", "issue_failed"}:
+        job = Outbox.objects.filter(kind="sales.issue", dedup_key__startswith=f"sales.issue:{order.id}:").order_by("-created_at").first()
+        data["processing"] = {"job_id": str(job.id), "status": job.status, "attempts": job.attempts, "last_error_code": job.last_error_code} if job else None
+    else:
+        data["processing"] = None
     return data
 
 
@@ -153,6 +161,8 @@ def orders(request):
             "pending_payment",
             "payment_review",
             "pending_approval",
+            "issuing",
+            "issue_failed",
             "issued",
             "rejected",
             "cancel_pending",
@@ -191,7 +201,7 @@ def order_action(request, order_id, action):
     actor = request_actor(request)
     sales.get_order(actor, order_id)
     operations = {
-        "review": (SalesReview, sales.approve_order, True),
+        "review": (SalesReview, sales.request_approval, True),
         "stop": (StopInput, sales.request_stop, False),
         "stop-review": (ReviewInput, sales.review_stop, True),
         "refund": (RefundInput, sales.register_refund, True),

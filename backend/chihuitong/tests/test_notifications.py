@@ -1,5 +1,6 @@
 import io
 import json
+import uuid
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -169,6 +170,19 @@ class NotificationTests(TestCase):
         self.assertNotIn("13900000999", str(response.data))
         retried = scheduler.retry_job(self.platform, job.id, reason="配置已补齐")
         self.assertEqual(retried.status, "pending")
+
+    def test_expired_worker_cannot_overwrite_a_new_claim_with_same_attempt_number(self):
+        job = Outbox.objects.create(kind="appointment.deadline", dedup_key="claim-fence-test", payload={"appointment_id": str(uuid.uuid4())}, available_at=timezone.now())
+        new_token = uuid.uuid4()
+        def stale_handler(*args, **kwargs):
+            Outbox.objects.filter(pk=job.id).update(claim_token=new_token, attempts=1, status="running")
+            raise BusinessError("stale_worker", "旧执行器返回失败", 409)
+        with patch("chihuitong.services.appointments.process_deadline", side_effect=stale_handler):
+            jobs.run_one()
+        job.refresh_from_db()
+        self.assertEqual(job.status, "running")
+        self.assertEqual(job.claim_token, new_token)
+        self.assertEqual(job.last_error_code, "")
 
     def test_calendar_override_platform_only(self):
         client = api_client(self.platform)

@@ -22,12 +22,29 @@ def unique_pairs(pairs):
 
 
 def request_json(host, path, *, query=None, data=None):
-    require(host in {"apis.map.qq.com", "api.weixin.qq.com"} and path.startswith("/") and not path.startswith("//") and "?" not in path, "provider_origin", "外部服务配置错误", 503)
+    require(
+        host in {"apis.map.qq.com", "api.weixin.qq.com"}
+        and path.startswith("/")
+        and not path.startswith("//")
+        and "?" not in path,
+        "provider_origin",
+        "外部服务配置错误",
+        503,
+    )
     url = "https://" + host + path
     if query:
         url += "?" + urllib.parse.urlencode(query)
-    payload = None if data is None else json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode()
-    request = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json", "Accept": "application/json"}, method="GET" if data is None else "POST")
+    payload = (
+        None
+        if data is None
+        else json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode()
+    )
+    request = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="GET" if data is None else "POST",
+    )
     try:
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         with opener.open(request, timeout=8) as response:

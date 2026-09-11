@@ -103,9 +103,9 @@ def sources(actor):
                     "sales_review",
                     "推广产品开卡审核",
                     SalesOrder.objects.filter(
-                        status__in=["pending_approval", "issued", "rejected"]
+                        status__in=["pending_approval", "issue_failed", "issued", "rejected"]
                     ),
-                    Q(status="pending_approval"),
+                    Q(status__in=["pending_approval", "issue_failed"]),
                     ("review",),
                 ),
                 TaskSource(

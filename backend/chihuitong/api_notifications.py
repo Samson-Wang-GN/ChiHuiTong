@@ -138,11 +138,21 @@ def sms_history(request, delivery_id):
     actor.require_platform()
     delivery = SmsDelivery.objects.filter(pk=delivery_id).first()
     require(delivery, "not_found", "短信发送记录不存在", 404)
-    return paginated(request, delivery.history.all(), lambda item: {
-        "id": str(item.id), "attempt": item.number, "template_version": item.template_version,
-        "template": item.template_snapshot, "status": item.status, "error_code": item.error_code,
-        "created_at": iso(item.created_at), "finished_at": iso(item.finished_at),
-    }, states=["sending", "unknown", "failed", "accepted"])
+    return paginated(
+        request,
+        delivery.history.all(),
+        lambda item: {
+            "id": str(item.id),
+            "attempt": item.number,
+            "template_version": item.template_version,
+            "template": item.template_snapshot,
+            "status": item.status,
+            "error_code": item.error_code,
+            "created_at": iso(item.created_at),
+            "finished_at": iso(item.finished_at),
+        },
+        states=["sending", "unknown", "failed", "accepted"],
+    )
 
 
 @api_view(["GET"])

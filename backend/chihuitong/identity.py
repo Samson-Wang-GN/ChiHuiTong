@@ -34,7 +34,8 @@ def request_code(phone, remote_address):
     rate_limit(f"otp-phone:{index}", seconds=3600, maximum=10)
     gateway = import_string(settings.SMS_BACKEND)()
     if settings.ENVIRONMENT == "production" and settings.SMS_BACKEND not in {
-        "chihuitong.integrations.tencent_sms.TencentSMS", "chihuitong.integrations.sms.DisabledSMS"
+        "chihuitong.integrations.tencent_sms.TencentSMS",
+        "chihuitong.integrations.sms.DisabledSMS",
     }:
         raise BusinessError("unsafe_sms_backend", "生产环境禁止测试短信服务", 503)
     now = timezone.now()

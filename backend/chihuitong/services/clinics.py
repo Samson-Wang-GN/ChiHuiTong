@@ -177,7 +177,8 @@ def validate_profile(actor, profile, channel, *, complete=True):
             400,
         )
         require(
-            isinstance(location.get("source"), str) and location.get("source") in {"map_manual", "tencent"},
+            isinstance(location.get("source"), str)
+            and location.get("source") in {"map_manual", "tencent"},
             "invalid_location",
             "定位来源不合法",
             400,

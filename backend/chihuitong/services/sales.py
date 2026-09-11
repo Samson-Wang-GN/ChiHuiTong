@@ -13,6 +13,7 @@ from chihuitong.models import (
     CustomerSource,
     ImportBatch,
     Membership,
+    Outbox,
     Product,
     PurchaseReceipt,
     SalesOrder,
@@ -21,7 +22,7 @@ from chihuitong.models import (
 )
 
 from .catalog import product_snapshot
-from .common import RESOURCE_KINDS, advance, advisory_lock, audit, check_version
+from .common import RESOURCE_KINDS, Actor, advance, advisory_lock, audit, check_version
 from .contracts import current_contract
 from .customers import event, match_preview, new_credential, normalize_customer, resolve_customer
 from .files import link_files, validate_attachment_ids
@@ -338,14 +339,14 @@ def review_receipt(actor, receipt_id, *, approved, version, reason):
 
 
 @transaction.atomic
-def approve_order(actor, order_id, *, approved, version, reason, validity_days=None):
+def approve_order(actor, order_id, *, approved, version, reason, validity_days=None, queued=False):
     actor.require_platform()
     order = get_order(actor, order_id, lock=True)
     if order.status == "issued" and approved:
         return order
     check_version(order, version)
     require(
-        order.status == "pending_approval", "invalid_state", "请先确认采购款全额到账，再审核开卡"
+        order.status == ("issuing" if queued else "pending_approval"), "invalid_state", "请先确认采购款全额到账，再审核开卡"
     )
     require(type(approved) is bool and reason.strip(), "reason_required", "请填写审核意见", 400)
     if not approved:
@@ -454,6 +455,47 @@ def approve_order(actor, order_id, *, approved, version, reason, validity_days=N
 
 
 @transaction.atomic
+def request_approval(actor, order_id, *, approved, version, reason, validity_days=None):
+    actor.require_platform()
+    order = get_order(actor, order_id, lock=True)
+    check_version(order, version)
+    require(order.status in {"pending_approval", "issue_failed"}, "invalid_state", "订单不处于可审核状态")
+    require(type(approved) is bool and isinstance(reason, str) and reason.strip(), "reason_required", "请填写审核意见", 400)
+    if order.status == "issue_failed":
+        order.status, order.issue_failure_code = "pending_approval", ""
+        advance(order, "status", "issue_failure_code")
+        # Retain old failed attempts but remove their obsolete retry action.
+        Outbox.objects.filter(kind="sales.issue", dedup_key__startswith=f"sales.issue:{order.id}:", status="failed").update(status="done", last_error_code="superseded_by_review")
+    if not approved or order.quantity <= 500:
+        return approve_order(actor, order.id, approved=approved, version=order.version, reason=reason, validity_days=validity_days)
+    validate_authorization(order)
+    require(order.received_cents == order.total_cents, "payment_required", "采购款未全额到账")
+    days = order.validity_days if validity_days is None else validity_days
+    require(type(days) is int and 1 <= days <= 36500, "invalid_validity", "有效期须为1～36500天", 400)
+    order.status, order.reason, order.validity_days, order.reviewed_by = "issuing", reason.strip(), days, actor.membership
+    advance(order, "status", "reason", "validity_days", "reviewed_by")
+    Outbox.objects.create(
+        kind="sales.issue", dedup_key=f"sales.issue:{order.id}:{order.version}", available_at=timezone.now(),
+        payload={"order_id": str(order.id), "version": order.version, "membership_id": str(actor.membership.id)},
+    )
+    audit(actor, order, "sales.issuance_queued", quantity=order.quantity, reason=reason)
+    return order
+
+
+def process_issuance(payload):
+    """One atomic business transaction, outside HTTP. A crash creates no partial card batch."""
+    membership = Membership.objects.select_related("organization", "account").filter(
+        pk=payload["membership_id"], active=True, account__active=True,
+        organization__status="active", organization__kind="platform", role="admin",
+    ).first()
+    require(membership, "approval_authority_expired", "审核人权限已失效，请平台管理员复核后重试", 409)
+    order = SalesOrder.objects.get(pk=payload["order_id"])
+    if order.status in {"issued", "cancel_pending", "cancelled", "rejected"}:
+        return
+    approve_order(Actor(membership), order.id, approved=True, version=payload["version"], reason=order.reason, validity_days=order.validity_days, queued=True)
+
+
+@transaction.atomic
 def request_stop(actor, order_id, *, action, version, reason):
     order = get_order(actor, order_id, lock=True)
     require(not actor.platform, "forbidden", "由资源方申请，平台审核", 403)
@@ -465,7 +507,7 @@ def request_stop(actor, order_id, *, action, version, reason):
         400,
     )
     require(
-        order.status in {"issued", "pending_payment", "pending_approval"},
+        order.status in {"issued", "pending_payment", "pending_approval", "issue_failed"},
         "invalid_state",
         "当前存在未决收款或处理流程，请先核对",
     )

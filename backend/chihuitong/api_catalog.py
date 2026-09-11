@@ -176,7 +176,10 @@ def contract_projection(item):
         "revision": item.revision,
         "version": item.version,
         "status": item.status,
-        "display_status": getattr(item, "display_status", None) or contracts.display_versions(ContractVersion.objects.filter(pk=item.pk)).values_list("display_status", flat=True).get(),
+        "display_status": getattr(item, "display_status", None)
+        or contracts.display_versions(ContractVersion.objects.filter(pk=item.pk))
+        .values_list("display_status", flat=True)
+        .get(),
         "starts_at": item.starts_at.isoformat(),
         "ends_at": item.ends_at.isoformat(),
         "settlement_cycle": item.settlement_cycle,
@@ -206,20 +209,34 @@ def cooperation(request, org_id):
     require(actor.platform or own or managed, "not_found", "机构不存在或无权访问", 404)
     org = Organization.objects.filter(pk=org_id).first()
     require(org, "not_found", "机构不存在", 404)
-    versions = contracts.display_versions(ContractVersion.objects.filter(contract__in=accessible).select_related("contract"))
-    current = versions.filter(display_status__in=["effective", "expired", "terminated"]).order_by("-starts_at", "-revision").first()
+    versions = contracts.display_versions(
+        ContractVersion.objects.filter(contract__in=accessible).select_related("contract")
+    )
+    current = (
+        versions.filter(display_status__in=["effective", "expired", "terminated"])
+        .order_by("-starts_at", "-revision")
+        .first()
+    )
     future = versions.filter(display_status="not_started").order_by("starts_at", "revision").first()
     pending = versions.filter(status="pending").order_by("-revision").first()
-    return Response({
-        "organization_id": str(org.id), "organization_name": org.name,
-        "current_contract": contract_projection(current) if current else None,
-        "next_contract": contract_projection(future) if future else None,
-        "pending_contract": contract_projection(pending) if pending else None,
-        "read_only": not actor.platform,
-        "can_submit_clinic_contract": org.kind == "clinic" and (actor.platform or actor.organization.kind == "channel"),
-        "history_endpoint": f"/api/v1/organizations/{org.id}/contracts",
-        "products_endpoint": f"/api/v1/contracts/{current.id}/products" if current and org.kind != "clinic" else f"/api/v1/clinics/{org.clinic.id}/products" if org.kind == "clinic" else None,
-    })
+    return Response(
+        {
+            "organization_id": str(org.id),
+            "organization_name": org.name,
+            "current_contract": contract_projection(current) if current else None,
+            "next_contract": contract_projection(future) if future else None,
+            "pending_contract": contract_projection(pending) if pending else None,
+            "read_only": not actor.platform,
+            "can_submit_clinic_contract": org.kind == "clinic"
+            and (actor.platform or actor.organization.kind == "channel"),
+            "history_endpoint": f"/api/v1/organizations/{org.id}/contracts",
+            "products_endpoint": f"/api/v1/contracts/{current.id}/products"
+            if current and org.kind != "clinic"
+            else f"/api/v1/clinics/{org.clinic.id}/products"
+            if org.kind == "clinic"
+            else None,
+        }
+    )
 
 
 class ContractTerminationInput(VersionInput):
@@ -269,15 +286,26 @@ def contract_list(request, org_id):
         owned = actor.organization.id == org_id
         managed = clinics.visible_clinics(actor).filter(organization_id=org_id).exists()
         require(owned or managed, "not_found", "机构不存在或无权访问", 404)
-    qs = contracts.display_versions(ContractVersion.objects.select_related("contract").filter(
-        contract__in=contracts.accessible_contracts(actor), contract__organization_id=org_id
-    ))
+    qs = contracts.display_versions(
+        ContractVersion.objects.select_related("contract").filter(
+            contract__in=contracts.accessible_contracts(actor), contract__organization_id=org_id
+        )
+    )
     return paginated(
         request,
         qs,
         contract_projection,
         status_field="display_status",
-        states=["draft", "pending", "effective", "not_started", "expired", "superseded", "rejected", "terminated"],
+        states=[
+            "draft",
+            "pending",
+            "effective",
+            "not_started",
+            "expired",
+            "superseded",
+            "rejected",
+            "terminated",
+        ],
     )
 
 

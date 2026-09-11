@@ -5,8 +5,8 @@ from . import api_appointments as appointments
 from . import api_audit as audit
 from . import api_catalog as catalog
 from . import api_finance as finance
-from . import api_metrics as metrics
 from . import api_location as location
+from . import api_metrics as metrics
 from . import api_notifications as notifications
 from . import api_payments as payments
 from . import api_sales as sales

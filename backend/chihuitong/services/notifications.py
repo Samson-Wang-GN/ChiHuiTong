@@ -6,7 +6,14 @@ from django.utils import timezone
 from django.utils.module_loading import import_string
 
 from chihuitong.errors import BusinessError, require
-from chihuitong.models import Appointment, Membership, Notification, SmsAttempt, SmsDelivery, SmsTemplate
+from chihuitong.models import (
+    Appointment,
+    Membership,
+    Notification,
+    SmsAttempt,
+    SmsDelivery,
+    SmsTemplate,
+)
 
 from .common import advance, advisory_lock, audit, check_version
 
@@ -195,8 +202,19 @@ def send_business(job):
         delivery.template_version = template.version
         advance(delivery, "attempts", "status", "template_version")
         attempt = SmsAttempt.objects.create(
-            delivery=delivery, number=delivery.attempts, template_version=template.version,
-            template_snapshot={key: getattr(template, key) for key in ["code", "content", "parameter_names", "provider_template_id", "sign_name"]},
+            delivery=delivery,
+            number=delivery.attempts,
+            template_version=template.version,
+            template_snapshot={
+                key: getattr(template, key)
+                for key in [
+                    "code",
+                    "content",
+                    "parameter_names",
+                    "provider_template_id",
+                    "sign_name",
+                ]
+            },
         )
     backend = settings.SMS_BACKEND
     require(
@@ -217,13 +235,21 @@ def send_business(job):
         )
     except BusinessError as exc:
         SmsAttempt.objects.filter(pk=attempt.id).update(
-            status="unknown" if exc.status >= 500 else "failed", error_code=exc.code, finished_at=timezone.now()
+            status="unknown" if exc.status >= 500 else "failed",
+            error_code=exc.code,
+            finished_at=timezone.now(),
         )
         SmsDelivery.objects.filter(pk=delivery.id).update(
             status="unknown" if exc.status >= 500 else "failed", last_error_code=exc.code
         )
         raise
-    SmsAttempt.objects.filter(pk=attempt.id).update(status="accepted", provider_reference=reference, finished_at=timezone.now())
+    except Exception as exc:
+        SmsAttempt.objects.filter(pk=attempt.id).update(status="unknown", error_code=type(exc).__name__[:80], finished_at=timezone.now())
+        SmsDelivery.objects.filter(pk=delivery.id).update(status="unknown", last_error_code=type(exc).__name__[:80])
+        raise
+    SmsAttempt.objects.filter(pk=attempt.id).update(
+        status="accepted", provider_reference=reference, finished_at=timezone.now()
+    )
     delivery.status, delivery.provider_reference, delivery.accepted_at = (
         "accepted",
         reference,

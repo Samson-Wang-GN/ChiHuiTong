@@ -181,6 +181,19 @@ def retry_job(actor, job_id, *, reason):
     from .common import advance, audit
 
     actor.require_platform()
+    reference = Outbox.objects.filter(pk=job_id).first()
+    require(reference, "not_found", "任务不存在", 404)
+    order = None
+    if reference.kind == "sales.issue":
+        from chihuitong.models import SalesOrder
+
+        # Business object precedes its outbox lock, matching review and failure handling.
+        order = SalesOrder.objects.select_for_update().get(pk=reference.payload["order_id"])
+    batch = None
+    if reference.kind in {"excel.inspect", "excel.validate"}:
+        from chihuitong.models import ImportBatch
+
+        batch = ImportBatch.objects.select_for_update().get(pk=reference.payload["batch_id"])
     advisory_lock("job_retry", str(job_id))
     job = Outbox.objects.select_for_update().filter(pk=job_id).first()
     require(job, "not_found", "任务不存在", 404)
@@ -190,12 +203,28 @@ def retry_job(actor, job_id, *, reason):
         "仅失败任务可以重试，请填写原因",
         400,
     )
+    if job.kind == "sales.issue":
+        require(order.status == "issue_failed", "invalid_state", "订单已被其他业务处理，请刷新")
+        order.status, order.issue_failure_code, order.reviewed_by, order.reason = "issuing", "", actor.membership, reason
+        advance(order, "status", "issue_failure_code", "reviewed_by", "reason")
+        job.payload = {**job.payload, "membership_id": str(actor.membership.id), "version": order.version}
+        job.save(update_fields=["payload"])
+        audit(actor, order, "sales.issuance_reaffirmed", reason=reason, job_id=str(job.id))
+    if batch:
+        require(batch.status == "failed" and batch.version == job.payload["version"], "stale_import_job", "导入资料已更新，请处理新任务")
+        batch.status = "queued" if job.kind == "excel.inspect" else "validating"
+        batch.failure_code = ""
+        advance(batch, "status", "failure_code")
+        job.payload = {**job.payload, "version": batch.version}
+        job.save(update_fields=["payload"])
+        audit(actor, batch, "import.retry_requested", reason=reason, job_id=str(job.id))
     job.status, job.available_at, job.locked_until, job.attempts = (
         "pending",
         timezone.now(),
         None,
         0,
     )
-    advance(job, "status", "available_at", "locked_until", "attempts")
+    job.claim_token = None
+    advance(job, "status", "available_at", "locked_until", "attempts", "claim_token")
     audit(actor, job, "job.retried", reason=reason)
     return job

@@ -58,4 +58,6 @@ class SmsAttempt(Entity):
     finished_at = models.DateTimeField(null=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["delivery", "number"], name="sms_attempt_number")]
+        constraints = [
+            models.UniqueConstraint(fields=["delivery", "number"], name="sms_attempt_number")
+        ]

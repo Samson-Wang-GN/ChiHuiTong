@@ -1,12 +1,14 @@
 import logging
+import uuid
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 
 from chihuitong.errors import BusinessError
-from chihuitong.models import ImportBatch, Outbox
+from chihuitong.models import ImportBatch, Outbox, SalesOrder
+from .common import audit
 
 logger = logging.getLogger("chihuitong.jobs")
 
@@ -24,8 +26,9 @@ def run_one():
         if not job:
             return False
         job.status, job.locked_until = "running", now + timedelta(minutes=10)
+        job.claim_token = uuid.uuid4()
         job.attempts += 1
-        job.save(update_fields=["status", "locked_until", "attempts"])
+        job.save(update_fields=["status", "locked_until", "attempts", "claim_token"])
         attempt = job.attempts
     try:
         from .imports import inspect_import, validate_import
@@ -41,6 +44,10 @@ def run_one():
             from .notifications import send_business
 
             send_business(job)
+        elif job.kind == "sales.issue":
+            from .sales import process_issuance
+
+            process_issuance(job.payload)
         elif job.kind == "appointment.deadline":
             from .appointments import process_deadline
 
@@ -72,8 +79,12 @@ def run_one():
         logger.warning("job_failed id=%s code=%s attempt=%s", job.id, code, attempt)
         terminal = (isinstance(exc, BusinessError) and exc.status < 500) or attempt >= 5
         with transaction.atomic():
+            if job.kind == "sales.issue":
+                SalesOrder.objects.select_for_update().get(pk=job.payload["order_id"])
+            if job.kind in {"excel.inspect", "excel.validate"}:
+                ImportBatch.objects.select_for_update().get(pk=job.payload["batch_id"])
             current = Outbox.objects.select_for_update().get(pk=job.id)
-            if current.attempts != attempt:
+            if current.claim_token != job.claim_token:
                 return True
             current.status = "failed" if terminal else "pending"
             current.last_error_code = code[:80]
@@ -83,8 +94,14 @@ def run_one():
                 ImportBatch.objects.filter(
                     pk=job.payload["batch_id"], version=job.payload["version"]
                 ).update(status="failed", failure_code=code[:80])
+            if terminal and job.kind == "sales.issue":
+                updated = SalesOrder.objects.filter(pk=job.payload["order_id"], status="issuing", version=job.payload["version"]).update(
+                    status="issue_failed", issue_failure_code=code[:80], version=F("version") + 1,
+                )
+                if updated:
+                    audit(None, SalesOrder.objects.get(pk=job.payload["order_id"]), "sales.issuance_failed", error_code=code[:80], job_id=str(job.id))
         return True
-    Outbox.objects.filter(pk=job.id, attempts=attempt, status="running").update(
+    Outbox.objects.filter(pk=job.id, claim_token=job.claim_token, status="running").update(
         status="done", locked_until=None
     )
     return True

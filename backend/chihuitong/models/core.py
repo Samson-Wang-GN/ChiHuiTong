@@ -137,6 +137,7 @@ class Outbox(Entity):
     attempts = models.PositiveIntegerField(default=0)
     available_at = models.DateTimeField()
     locked_until = models.DateTimeField(null=True)
+    claim_token = models.UUIDField(null=True)
     last_error_code = models.CharField(max_length=80, blank=True)
 
     class Meta:
