@@ -22,7 +22,9 @@ class ClinicBill(Entity):
     contract_version = models.UUIDField()
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["clinic", "issued_on"], name="clinic_bill_issue_date")]
+        constraints = [
+            models.UniqueConstraint(fields=["clinic", "issued_on"], name="clinic_bill_issue_date")
+        ]
 
 
 class ClinicBillLine(Entity):
@@ -33,7 +35,11 @@ class ClinicBillLine(Entity):
     removed_at = models.DateTimeField(null=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["redemption"], condition=Q(active=True), name="one_active_clinic_bill_line")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["redemption"], condition=Q(active=True), name="one_active_clinic_bill_line"
+            )
+        ]
 
 
 class BillRevision(Entity):
@@ -56,12 +62,18 @@ class ClinicReceipt(Entity):
     attachment_ids = models.JSONField(default=list)
     status = models.CharField(max_length=16, default="pending")
     submitted_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
-    reviewed_by = models.ForeignKey(Membership, null=True, on_delete=models.PROTECT, related_name="clinic_receipt_reviews")
+    reviewed_by = models.ForeignKey(
+        Membership, null=True, on_delete=models.PROTECT, related_name="clinic_receipt_reviews"
+    )
     reviewed_at = models.DateTimeField(null=True)
     reason = EncryptedTextField(default="")
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["bill"], condition=Q(status="pending"), name="one_pending_clinic_receipt")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["bill"], condition=Q(status="pending"), name="one_pending_clinic_receipt"
+            )
+        ]
 
 
 class PaymentAttempt(Entity):
@@ -77,7 +89,13 @@ class PaymentAttempt(Entity):
     error_code = models.CharField(max_length=80, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["bill"], condition=Q(status__in=["creating", "pending", "unknown"]), name="one_unresolved_payment")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["bill"],
+                condition=Q(status__in=["creating", "pending", "unknown"]),
+                name="one_unresolved_payment",
+            )
+        ]
 
 
 class ReceiptLedger(Entity):
@@ -97,25 +115,38 @@ class PartnerBill(Entity):
     due_at = models.DateTimeField()
     total_cents = models.PositiveBigIntegerField()
     status = models.CharField(max_length=24, default="pending_confirmation")
-    confirmed_by = models.ForeignKey(Membership, null=True, on_delete=models.PROTECT, related_name="partner_bill_confirmations")
+    confirmed_by = models.ForeignKey(
+        Membership, null=True, on_delete=models.PROTECT, related_name="partner_bill_confirmations"
+    )
     confirmed_at = models.DateTimeField(null=True)
     confirmed_version = models.PositiveIntegerField(null=True)
-    received_by = models.ForeignKey(Membership, null=True, on_delete=models.PROTECT, related_name="partner_receipt_confirmations")
+    received_by = models.ForeignKey(
+        Membership,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="partner_receipt_confirmations",
+    )
     received_at = models.DateTimeField(null=True)
     actual_received_on = models.DateField(null=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["organization", "month"], name="partner_month_unique")]
+        constraints = [
+            models.UniqueConstraint(fields=["organization", "month"], name="partner_month_unique")
+        ]
 
 
 class PartnerBillLine(Entity):
     bill = models.ForeignKey(PartnerBill, on_delete=models.PROTECT, related_name="lines")
-    redemption = models.ForeignKey(Redemption, on_delete=models.PROTECT, related_name="partner_lines")
+    redemption = models.ForeignKey(
+        Redemption, on_delete=models.PROTECT, related_name="partner_lines"
+    )
     kind = models.CharField(max_length=16)
     amount_cents = models.PositiveBigIntegerField()
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["redemption", "kind"], name="partner_share_once")]
+        constraints = [
+            models.UniqueConstraint(fields=["redemption", "kind"], name="partner_share_once")
+        ]
 
 
 class PartnerPayment(Entity):
@@ -130,12 +161,18 @@ class PartnerPayment(Entity):
 
 
 class FinanceFeedback(Entity):
-    clinic_bill = models.ForeignKey(ClinicBill, null=True, on_delete=models.PROTECT, related_name="feedback")
-    partner_bill = models.ForeignKey(PartnerBill, null=True, on_delete=models.PROTECT, related_name="feedback")
+    clinic_bill = models.ForeignKey(
+        ClinicBill, null=True, on_delete=models.PROTECT, related_name="feedback"
+    )
+    partner_bill = models.ForeignKey(
+        PartnerBill, null=True, on_delete=models.PROTECT, related_name="feedback"
+    )
     kind = models.CharField(max_length=24)
     message = EncryptedTextField()
     response = EncryptedTextField(default="")
     status = models.CharField(max_length=16, default="open")
     actor = models.ForeignKey(Membership, on_delete=models.PROTECT)
-    responded_by = models.ForeignKey(Membership, null=True, on_delete=models.PROTECT, related_name="finance_responses")
+    responded_by = models.ForeignKey(
+        Membership, null=True, on_delete=models.PROTECT, related_name="finance_responses"
+    )
     responded_at = models.DateTimeField(null=True)

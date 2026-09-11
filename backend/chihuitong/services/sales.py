@@ -296,6 +296,7 @@ def review_receipt(actor, receipt_id, *, approved, version, reason):
     if approved:
         validate_attachment_ids(actor, receipt.attachment_ids, purposes={"payment"})
         from chihuitong.models import ReceiptLedger
+
         advisory_lock("receipt", receipt.reference_index)
         require(
             not PurchaseReceipt.objects.filter(
@@ -304,8 +305,18 @@ def review_receipt(actor, receipt_id, *, approved, version, reason):
             "duplicate_receipt",
             "该采购款流水已确认，不可重复入账",
         )
-        require(not ReceiptLedger.objects.filter(reference_index=receipt.reference_index).exists(), "duplicate_receipt", "此资金流水已用于其他收款记录")
-        ReceiptLedger.objects.create(reference_index=receipt.reference_index, kind="purchase", source_id=receipt.id, amount_cents=receipt.amount_cents, received_at=receipt.paid_at)
+        require(
+            not ReceiptLedger.objects.filter(reference_index=receipt.reference_index).exists(),
+            "duplicate_receipt",
+            "此资金流水已用于其他收款记录",
+        )
+        ReceiptLedger.objects.create(
+            reference_index=receipt.reference_index,
+            kind="purchase",
+            source_id=receipt.id,
+            amount_cents=receipt.amount_cents,
+            received_at=receipt.paid_at,
+        )
         order.received_cents += receipt.amount_cents
     receipt.status, receipt.reason = ("approved" if approved else "rejected"), reason
     receipt.reviewed_by, receipt.reviewed_at = actor.membership, timezone.now()
