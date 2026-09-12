@@ -79,7 +79,7 @@ def check_browser(report, release):
                 if page.get_by_text('页面暂时无法显示', exact=True).count():
                     raise AssertionError(f'{role}/{title}: render boundary failure')
             if role == 'platform':
-                page.locator('.sidebar .arco-menu-item').filter(has_text='推广产品').click()
+                page.locator('.sidebar .arco-menu-item').filter(has_text=re.compile('^推广产品$')).click()
                 page.get_by_role('button', name='新建推广产品', exact=True).click()
                 drawer = page.locator('.arco-drawer-wrapper').last
                 def fill(label, value):

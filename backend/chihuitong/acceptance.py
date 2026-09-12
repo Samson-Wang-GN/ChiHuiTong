@@ -141,6 +141,8 @@ def asset(request, name):
         "appointments.js",
         "finance.js",
         "operations.js",
+        "sales.js",
+        "imports.js",
     }:
         path = Path(__file__).resolve().parent / "acceptance_assets" / name
     elif name in {"react.min.js", "react-dom.min.js", "arco.min.js", "arco.min.css"}:
