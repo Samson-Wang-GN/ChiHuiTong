@@ -1,11 +1,21 @@
 """Real Document Picture-in-Picture in server Chromium under Xvfb, no browser API stubs."""
 
 from web_workflows import menu, dialog, close, read
+import time
+
+
+def poll(page, expression):
+    deadline = time.monotonic()+15
+    while time.monotonic() < deadline:
+        if page.evaluate(expression):
+            return
+        page.wait_for_timeout(100)
+    raise AssertionError('Expected native reminder state was not reached')
 
 
 def exercise_reminder(page, fixture, report):
     menu(page, '工作台')
-    page.wait_for_function('!!window.documentPictureInPicture?.window')
+    poll(page, '() => !!window.documentPictureInPicture?.window')
     pip = next(item for item in page.context.pages if item != page)
     page.context.new_cdp_session(pip).send('Emulation.clearDeviceMetricsOverride')
     pip.get_by_text('暂无待处理预约', exact=True).wait_for(timeout=15000)
@@ -16,7 +26,7 @@ def exercise_reminder(page, fixture, report):
     pip.get_by_role('button', name='展开', exact=True).click()
     page.wait_for_timeout(500)
     (report/'reminder-dimensions.json').write_text(__import__('json').dumps({'compact_height':compact_height, 'expanded':pip.evaluate('({width:innerWidth,height:innerHeight,outerWidth,outerHeight})'), 'text':pip.locator('body').inner_text()}))
-    pip.wait_for_function('innerHeight > '+str(compact_height))
+    poll(pip, '() => innerHeight > '+str(compact_height))
     pip.get_by_role('button', name='去处理', exact=True).click()
     page.get_by_role('button', name='确认预约', exact=True).click()
     dialog(page).get_by_role('button', name='确认预约', exact=True).click()
@@ -24,7 +34,7 @@ def exercise_reminder(page, fixture, report):
     assert read(page, '/api/v1/appointments/'+created['appointment_id'])['status'] == 'success'
     close(page)
     pip.get_by_role('button', name='收起', exact=True).click()
-    pip.wait_for_function('innerHeight <= '+str(compact_height))
+    poll(pip, '() => innerHeight <= '+str(compact_height))
     assert not pip.is_closed()
     pip.screenshot(path=str(report/'clinic-pip-compact.png'))
     pip.close()

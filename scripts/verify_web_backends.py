@@ -54,7 +54,7 @@ def serve(release):
 
 
 def check_browser(report, release, worker, fixture, headed=False):
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
     result = []
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=not headed)
@@ -83,8 +83,9 @@ def check_browser(report, release, worker, fixture, headed=False):
             page.get_by_role('button', name='登录', exact=True).click()
             page.get_by_role('button', name='退出登录', exact=True).wait_for()
             if role == 'clinic' and headed:
-                page.wait_for_function('!!window.documentPictureInPicture?.window')
-            page.wait_for_function("!document.querySelector('.workspace .arco-spin-loading')")
+                from web_reminder import poll
+                poll(page, '() => !!window.documentPictureInPicture?.window')
+            expect(page.locator('.workspace .arco-spin-loading')).to_have_count(0)
             menu = page.locator('.sidebar .arco-menu-item')
             titles = menu.all_text_contents()
             for title in titles:
