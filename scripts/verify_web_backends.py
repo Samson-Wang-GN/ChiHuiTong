@@ -51,9 +51,13 @@ def check_browser(report, release):
     result = []
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
+        pages = {}
+        contexts = []
         for role, phone in [('platform', '13800000001'), ('resource', '13800000002'), ('channel', '13800000003'), ('clinic', '13800000004')]:
             context = browser.new_context(viewport={'width':1440, 'height':1000})
             page = context.new_page()
+            pages[role] = page
+            contexts.append(context)
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{PORT}/chihuitong/{role}/')
@@ -98,10 +102,15 @@ def check_browser(report, release):
             page.screenshot(path=str(report/f'{role}.png'), full_page=True, animations='disabled')
             page.set_viewport_size({'width':768, 'height':1000})
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), role+' narrow overflow'
-            page.get_by_role('button', name='退出登录', exact=True).click()
-            page.get_by_role('button', name='登录', exact=True).wait_for()
             assert not errors, f'{role}: {errors}'
             result.append({'role':role, 'menus':titles, 'errors':errors})
+            page.set_viewport_size({'width':1440, 'height':1000})
+        from web_workflows import exercise
+        exercise(pages, report)
+        for page in pages.values():
+            page.get_by_role('button', name='退出登录', exact=True).click()
+            page.get_by_role('button', name='登录', exact=True).wait_for()
+        for context in contexts:
             context.close()
         browser.close()
     return result
