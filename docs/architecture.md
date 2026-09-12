@@ -6,7 +6,7 @@
 
 显式模拟支付/SMS适配器位于`integrations/simulated.py`与验收短信边界，仅允许独立非生产模拟模式。地图图片经固定源服务端代理，不加载第三方地图脚本或暴露Key；认证后授权获取附件及元数据，静态PDF Blob预览保持下载替代。详细模块、决定及当前验证见[完整Web实施清单](web-backend-plan.md)、[ADR-0028](decisions/0028-complete-web-backends.md)。以下条目按历史阶段保留，不能用历史“尚未接入”否定当前已实现模块。
 
-## 当前状态
+## REQ-044历史状态（完整Web已由上方REQ-045替代）
 
 REQ-044增加独立合成验收部署：`chihuitong_acceptance`库及源码外私有附件、Nginx专属HTTPS路径、应用127.0.0.1:18243、独立systemd服务/任务timer。额外入口口令与业务会话分层，只有非生产验收模式开放代理令牌保护的随机验证码短信箱；原业务API鉴权不变。轻量Arco验收页真实查询服务端，正式四后台前端接入仍单独实施。细节见[ADR-0027](decisions/0027-protected-backend-acceptance.md)与[验收运维](operations/acceptance.md)。
 

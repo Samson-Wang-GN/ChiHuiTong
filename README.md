@@ -2,7 +2,7 @@
 
 “齿慧通”是连接客户资源方、口腔门诊渠道公司、口腔门诊和终端客户的口腔福利履约与门诊获客平台。客户资源方可以购买并投放不记名权益卡，或通过记名非实体卡销售以Excel批量/后台单客录入客户及数量；客户扫码激活不记名卡，或注册绑定后领取 Excel 已分配权益，再通过“附近门诊—意向预约—门诊确认—到诊扫码—核销”闭环使用福利。每笔权益保留独立来源归属，当前不判断或统计“新客”。
 
-当前正在完成正式后端及四角色完整Web业务界面的联合验证。本地维护Git并与[GitHub仓库](https://github.com/Samson-Wang-GN/ChiHuiTong)同步；公共开发服务器只接收文件、不运行GitHub同步。所有测试只能在公共开发服务器140.143.125.233执行，详见[开发环境与同步流程](docs/operations/development.md)。
+正式后端及四角色完整Web业务界面已完成本期开发、服务器自动验证并部署至受保护验收入口，待用户验收。本地维护Git并与[GitHub仓库](https://github.com/Samson-Wang-GN/ChiHuiTong)同步；公共开发服务器只接收文件、不运行GitHub同步。所有测试只能在公共开发服务器140.143.125.233执行，详见[开发环境与同步流程](docs/operations/development.md)。
 
 历史交互原型分别位于 `prototypes/platform/index.html`、`prototypes/resource/index.html`、`prototypes/channel/index.html`、`prototypes/clinic/index.html`。正式Web业务模块位于`backend/chihuitong/acceptance_assets/`，复用固定版本官方React/Arco组件，直接调用真实后端API；不读取原型localStorage数据。依赖已随项目保存；仅在指定服务器运行和验证。原型基线说明见 [后台原型说明](docs/prototype-review.md)。
 
@@ -14,7 +14,7 @@
 
 ## 当前状态
 
-REQ-045 / TASK-090：四角色业务界面、机构内合同及推广产品配置、资料审核、销售/Excel、预约核销、双向账单、账号与待办、概览趋势和真实预约提醒窗已接入。当前正执行完整操作回归和保留数据升级；准确完成状态、外部条件及逐项证据见[完整Web实施清单](docs/web-backend-plan.md)，自主决定见[ADR-0028](docs/decisions/0028-complete-web-backends.md)。
+REQ-045 / TASK-090：四角色业务界面、机构内合同及推广产品配置、资料审核、销售/Excel、预约核销、双向账单、账号与待办、概览趋势和真实预约提醒窗已接入并部署（应用01475e0）。160项后端测试、88%覆盖率、跨角色页面流程及真实HTTPS回归通过，原账号/数据/口令保留。入口与操作步骤见[验收指引](docs/web-acceptance-guide.md)；准确覆盖边界及证据见[完整Web实施清单](docs/web-backend-plan.md)，自主决定见[ADR-0028](docs/decisions/0028-complete-web-backends.md)。
 
 本期按用户要求启用显式非生产模拟支付/短信：`CHT_ACCEPTANCE_SIMULATED_EXTERNALS=true`仅在独立验收环境有效；支付通过真实业务账本返回模拟成功，短信记录模拟受理，不发起实际微信付款或短信发送。生产和真实支付启用时拒绝此开关，不能自动降级模拟。地图仍须本项目腾讯地图Key才能验证真实底图。
 
