@@ -103,7 +103,7 @@ location ^~ /chihuitong/ {
     add_header X-Robots-Tag "noindex, nofollow" always;
     add_header Content-Security-Policy "{CSP}" always;
 }
-'''.replace('PROXY_TOKEN',cfg['CHT_ACCEPTANCE_PROXY_TOKEN'])
+'''.replace('PROXY_TOKEN',cfg['CHT_ACCEPTANCE_PROXY_TOKEN']).replace('{CSP}', CSP)
     old_site=run(['sudo','-n','cat',SITE],capture_output=True).stdout
     needle='    server_name dev-public.chihui-ai.com;'
     directive=f'    include {INCLUDE};'

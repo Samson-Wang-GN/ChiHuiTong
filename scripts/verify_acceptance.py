@@ -42,7 +42,10 @@ def main():
                 page=context.new_page()
                 errors=[]
                 page.on('pageerror',lambda error, captured=errors: captured.append(type(error).__name__))
-                page.goto(BASE+'/'+role+'/',wait_until='networkidle')
+                response=page.goto(BASE+'/'+role+'/',wait_until='networkidle')
+                policy=response.headers.get('content-security-policy', '')
+                assert "frame-src blob:" in policy and "object-src 'none'" in policy
+                assert '{CSP}' not in policy and 'unsafe-eval' not in policy
                 page.get_by_role('button',name='获取验证码',exact=True).click()
                 page.get_by_role('button',name='查看测试短信箱',exact=True).click()
                 message=page.get_by_text('本次验证码：',exact=False)
