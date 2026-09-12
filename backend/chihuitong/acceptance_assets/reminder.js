@@ -105,7 +105,7 @@
   }
   function process(id) {
     window.focus();
-    C.navigate('tasks');
+    C.showTasks('appointment_confirmation');
     if (id) C.open('appointment', { id });
   }
   function resize(value) {

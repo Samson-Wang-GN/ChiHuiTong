@@ -2,9 +2,9 @@
 
 “齿慧通”是连接客户资源方、口腔门诊渠道公司、口腔门诊和终端客户的口腔福利履约与门诊获客平台。客户资源方可以购买并投放不记名权益卡，或通过记名非实体卡销售以Excel批量/后台单客录入客户及数量；客户扫码激活不记名卡，或注册绑定后领取 Excel 已分配权益，再通过“附近门诊—意向预约—门诊确认—到诊扫码—核销”闭环使用福利。每笔权益保留独立来源归属，当前不判断或统计“新客”。
 
-当前已进入正式后端开发及服务器验证阶段。本地维护Git并与[GitHub仓库](https://github.com/Samson-Wang-GN/ChiHuiTong)同步；公共开发服务器只接收文件、不运行GitHub同步。所有测试只能在公共开发服务器140.143.125.233执行，详见[开发环境与同步流程](docs/operations/development.md)。
+当前正在完成正式后端及四角色完整Web业务界面的联合验证。本地维护Git并与[GitHub仓库](https://github.com/Samson-Wang-GN/ChiHuiTong)同步；公共开发服务器只接收文件、不运行GitHub同步。所有测试只能在公共开发服务器140.143.125.233执行，详见[开发环境与同步流程](docs/operations/development.md)。
 
-已进入后台原型评审阶段：四组原型分别位于 `prototypes/platform/index.html`、`prototypes/resource/index.html`、`prototypes/channel/index.html`、`prototypes/clinic/index.html`。所有依赖已随项目保存；只在指定服务器上运行和验证。详细入口和评审说明见 [后台原型说明](docs/prototype-review.md)。
+历史交互原型分别位于 `prototypes/platform/index.html`、`prototypes/resource/index.html`、`prototypes/channel/index.html`、`prototypes/clinic/index.html`。正式Web业务模块位于`backend/chihuitong/acceptance_assets/`，复用固定版本官方React/Arco组件，直接调用真实后端API；不读取原型localStorage数据。依赖已随项目保存；仅在指定服务器运行和验证。原型基线说明见 [后台原型说明](docs/prototype-review.md)。
 
 服务器测试入口由 `scripts/run_remote_tests.py` 在服务器本机127.0.0.1:8765临时启动，测试结束关闭。以下历史localhost链接表示测试服务器内的页面地址；不再在本地电脑启动原型或运行浏览器测试，也不开放新的公网端口。
 
@@ -13,6 +13,14 @@
 两个移动交互原型已独立交付：[客户端](prototypes/customer-mini/index.html)、[门诊端](prototypes/clinic-mini/index.html)。启动上述服务后分别访问 `http://127.0.0.1:8765/customer-mini/` 和 `http://127.0.0.1:8765/clinic-mini/`。这是浏览器原型，不是已发布的微信小程序；当前各组演示数据和登录态独立，不进行跨端同步。页面清单、演示卡号及操作步骤见 [小程序原型评审](docs/mini-program-prototype-review.md)。
 
 ## 当前状态
+
+REQ-045 / TASK-090：四角色业务界面、机构内合同及推广产品配置、资料审核、销售/Excel、预约核销、双向账单、账号与待办、概览趋势和真实预约提醒窗已接入。当前正执行完整操作回归和保留数据升级；准确完成状态、外部条件及逐项证据见[完整Web实施清单](docs/web-backend-plan.md)，自主决定见[ADR-0028](docs/decisions/0028-complete-web-backends.md)。
+
+本期按用户要求启用显式非生产模拟支付/短信：`CHT_ACCEPTANCE_SIMULATED_EXTERNALS=true`仅在独立验收环境有效；支付通过真实业务账本返回模拟成功，短信记录模拟受理，不发起实际微信付款或短信发送。生产和真实支付启用时拒绝此开关，不能自动降级模拟。地图仍须本项目腾讯地图Key才能验证真实底图。
+
+服务器页面操作回归：`/home/ubuntu/ChiHuiTong/.venv/bin/python /home/ubuntu/ChiHuiTong/current/scripts/verify_web_backends.py`。真实画中画使用`xvfb-run -a`加`--headed`；每次新建、最后仅删除随机命名的隔离Web测试库，不修改持久验收库。`scripts/verify_acceptance.py`用于部署后的真实受保护HTTPS与数据保留验证。
+
+### 历史阶段记录（以下不代表REQ-045当前完成范围）
 
 2026-09-12新增受保护的[后端验收入口](https://dev-public.chihui-ai.com/chihuitong/)，四角色独立账号、随机验证码测试短信箱及独立合成数据已部署。入口口令单独私下交付、不在Git中；使用说明和范围见[验收环境](docs/operations/acceptance.md)。这是实际API的轻量验收台，不是全部正式Web业务页面，不能将它与静态原型或生产上线混淆。小程序不改，真实短信和支付未开启。
 
