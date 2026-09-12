@@ -117,12 +117,11 @@ def check_browser(report, release, worker, fixture, headed=False, imports_only=F
             assert not errors, f'{role}: {errors}'
             result.append({'role':role, 'menus':titles, 'errors':errors})
             page.set_viewport_size({'width':1440, 'height':1000})
-        if imports_only:
-            from web_import_flow import exercise
-            exercise(pages['resource'], worker, report)
-        else:
+        if not imports_only:
             from web_workflows import exercise
             exercise(pages, report, worker, fixture)
+        from web_import_flow import exercise as exercise_imports
+        exercise_imports(pages['resource'], worker, report)
         if headed:
             from web_reminder import exercise_reminder
             exercise_reminder(pages['clinic'], fixture, report)
