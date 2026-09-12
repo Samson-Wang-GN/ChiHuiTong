@@ -35,6 +35,16 @@ class NotificationTests(TestCase):
         MemoryBusinessSMS.sent = []
         MemoryBusinessSMS.fail = False
 
+    def test_contract_notice_links_latest_version_without_cross_recipient_access(self):
+        from chihuitong.models import ContractVersion
+        version = ContractVersion.objects.filter(contract__organization=self.resource.organization).first()
+        notice = Notification.objects.create(recipient=self.resource.membership, dedup_key="synthetic-contract-link", kind="contract.expiring", object_type="contract", object_id=version.contract_id, title="合成合同到期提醒")
+        response = api_client(self.resource).get("/api/v1/notifications")
+        row = next(item for item in response.data['results'] if item['id']==str(notice.id))
+        self.assertEqual(row['contract_version_id'], str(version.id))
+        others = api_client(self.channel).get("/api/v1/notifications")
+        self.assertNotIn(str(notice.id), [item['id'] for item in others.data['results']])
+
     def test_unsafe_production_backend_leaves_explicit_failed_attempt_not_sending(self):
         from chihuitong.models import SmsAttempt
 

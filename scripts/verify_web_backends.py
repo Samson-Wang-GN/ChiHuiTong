@@ -79,7 +79,7 @@ def check_browser(report, release, worker, fixture, headed=False):
             page.get_by_role('button', name='退出登录', exact=True).wait_for()
             if role == 'clinic' and headed:
                 page.wait_for_function('!!window.documentPictureInPicture?.window')
-            page.locator('.workspace .arco-spin-loading').wait_for(state='hidden')
+            page.wait_for_function("!document.querySelector('.workspace .arco-spin-loading')")
             menu = page.locator('.sidebar .arco-menu-item')
             titles = menu.all_text_contents()
             for title in titles:
