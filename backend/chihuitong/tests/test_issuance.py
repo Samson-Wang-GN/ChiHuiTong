@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+from django.utils import timezone
+
 from django.test import TestCase
 
 from chihuitong.errors import BusinessError
@@ -145,7 +147,15 @@ class IssuanceTests(TestCase):
             purpose="sales_excel",
         )
         batch = imports.create_import(self.resource, asset.id)
-        job = Outbox.objects.get(kind="excel.inspect")
+        # Simulate a queued batch left by the previous deployment.
+        batch.status = "queued"
+        batch.save(update_fields=["status"])
+        job = Outbox.objects.create(
+            kind="excel.inspect",
+            dedup_key=f"legacy.inspect:{batch.id}",
+            payload={"batch_id": str(batch.id), "version": batch.version},
+            available_at=timezone.now(),
+        )
         with patch(
             "chihuitong.services.imports.open_book",
             side_effect=BusinessError("synthetic_failure", "合成读取失败", 409),

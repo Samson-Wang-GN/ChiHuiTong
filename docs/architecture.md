@@ -2,6 +2,8 @@
 
 ## REQ-046 Excel自动匹配边界
 
+TASK-094：新Excel请求同步识别和全表校验，不再新建Outbox任务。`create_import`与`configure_import`在已有事务/幂等边界中调用读取器与校验器；保留旧队列处理函数用于过渡。客户匹配每500个HMAC索引查询一次，不暴露已有姓名。正常前端不再等待worker，旧批次仍可恢复，详见[ADR-0029](decisions/0029-synchronous-excel-processing.md)。以下inspect/validate表示业务阶段而非新任务排队。
+
 TASK-092：文件行列范围以实际worksheet XML结构计算，不能信任可选dimension元数据。`open_book`封装实际范围与读取器维度重置；预览和校验共同使用范围。仅旧未提交0×0缓存允许在映射POST事务中重建元数据，不在GET中偷偷修复，不重写历史订单依据。
 
 复用ImportBatch/ImportFormat及现有inspect→mapping→validate→confirm状态机，无迁移。读取任务仅保存前30个原始行，以支持前20行内表头后的10行预览；全表校验仍重新读取完整原文件。鉴权详情接口按本机构格式与明确列名别名给出工作表/表头建议，未知/冲突不推断客户字段。前端在上传回调自动创建读取任务，销售“下一步”串联映射提交、校验等待和摘要确认；修改/卸载用代次守卫拒绝旧请求结果。不使用外部AI、不更改销售审核、客户关联或权益入账。

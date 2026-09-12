@@ -158,7 +158,7 @@
     );
     React.useEffect(() => {
       if (!q.data || q.data.id !== id) return;
-      setCurrent(q.data);
+      setCurrent((previous) => previous?.id === q.data.id && previous.version > q.data.version ? previous : q.data);
       if (initial.current !== id && q.data.sheets.length) {
         const config = q.data.configuration?.sheet ? q.data.configuration : q.data.recommendation;
         setSheet(config?.sheet || q.data.sheets[0].name);
@@ -172,7 +172,8 @@
       }
     }, [q.data, id]);
     React.useEffect(() => {
-      if (!id || !['queued', 'validating'].includes(current?.status)) return;
+      // Only legacy queued uploads need background refresh; new imports are synchronous.
+      if (!id || current?.status !== 'queued') return;
       const timer = setInterval(q.reload, 1500);
       return () => clearInterval(timer);
     }, [id, current?.status]);

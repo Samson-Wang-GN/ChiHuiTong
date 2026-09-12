@@ -12,10 +12,11 @@ from openpyxl.utils.cell import column_index_from_string
 from openpyxl.utils.exceptions import InvalidFileException
 
 from chihuitong.errors import BusinessError, require
-from chihuitong.models import ImportBatch, ImportFormat, ImportRow, Outbox, SalesOrder
+from chihuitong.crypto import digest
+from chihuitong.models import Customer, ImportBatch, ImportFormat, ImportRow, SalesOrder
 
 from .common import RESOURCE_KINDS, advance, audit, check_version
-from .customers import match_preview, normalize_customer
+from .customers import normalize_customer
 from .files import checked_xlsx, file_bytes, validate_attachment_ids
 
 ALIASES = {
@@ -99,12 +100,8 @@ def create_import(actor, asset_id):
     batch = ImportBatch.objects.create(
         organization=actor.organization, created_by=actor.membership, asset=asset, status="queued"
     )
-    Outbox.objects.create(
-        kind="excel.inspect",
-        dedup_key=f"excel.inspect:{batch.id}:1",
-        payload={"batch_id": str(batch.id), "version": batch.version},
-        available_at=timezone.now(),
-    )
+    inspect_import(batch.id, batch.version)
+    batch.refresh_from_db()
     audit(actor, batch, "import.uploaded")
     return batch
 
@@ -320,12 +317,8 @@ def configure_import(
         "total_cards",
         "failure_code",
     )
-    Outbox.objects.create(
-        kind="excel.validate",
-        dedup_key=f"excel.validate:{batch.id}:{batch.version}",
-        payload={"batch_id": str(batch.id), "version": batch.version},
-        available_at=timezone.now(),
-    )
+    validate_import(batch.id, batch.version)
+    batch.refresh_from_db()
     audit(actor, batch, "import.mapping_changed", version=batch.version)
     return batch
 
@@ -361,7 +354,6 @@ def validate_import(batch_id, expected_version):
                     400,
                 )
                 normalized = normalize_customer(raw)
-                match_preview(normalized)
                 if normalized["phone"] in seen:
                     duplicate_phones.add(normalized["phone"])
                 seen[normalized["phone"]] = number
@@ -379,7 +371,24 @@ def validate_import(batch_id, expected_version):
             )
     finally:
         book.close()
+    # Identity is platform-wide; only compare names internally, never expose matches.
+    # Bounded queries preserve cross-resource conflict detection without N+1 lookups.
+    indexes = list({digest(row.normalized["phone"], purpose="phone") for row in values if not row.errors})
+    existing_names = {}
+    for offset in range(0, len(indexes), 500):
+        existing_names.update(
+            Customer.objects.filter(phone_index__in=indexes[offset : offset + 500]).values_list(
+                "phone_index", "name"
+            )
+        )
     for row in values:
+        if not row.errors:
+            existing_name = existing_names.get(digest(row.normalized["phone"], purpose="phone"))
+            if existing_name and existing_name != row.normalized["name"]:
+                row.errors.append(
+                    {"code": "customer_conflict", "message": "手机号与姓名不一致，请核对当前上传资料"}
+                )
+                row.status = "invalid"
         if row.normalized.get("phone") in duplicate_phones:
             row.errors.append(
                 {"code": "duplicate_phone", "message": "同一名单存在重复手机号，请核对"}

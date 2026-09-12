@@ -351,7 +351,7 @@ class ImportTests(TestCase):
             self.resource, data=xlsx_bytes(data), filename="合成客户.xlsx", purpose="sales_excel"
         )
         batch = imports.create_import(self.resource, asset.id)
-        self.assertTrue(jobs.run_one())
+        self.assertEqual(batch.status, "mapping")
         batch.refresh_from_db()
         batch = imports.configure_import(
             self.resource,
@@ -363,11 +363,11 @@ class ImportTests(TestCase):
             uniform_quantity=uniform,
             version=batch.version,
         )
-        self.assertTrue(jobs.run_one())
+        self.assertEqual(batch.status, "validated")
         batch.refresh_from_db()
         return batch
 
-    def test_async_inspection_validation_confirmation_and_order(self):
+    def test_sync_inspection_validation_confirmation_and_order(self):
         batch = self.prepare(
             [
                 ["姓名", "手机号", "开卡数量", "客户编号"],
@@ -483,7 +483,7 @@ class ImportTests(TestCase):
         )
         imports.validate_import(batch.id, old_version)
         batch.refresh_from_db()
-        self.assertEqual(batch.status, "validating")
+        self.assertEqual(batch.status, "validated")
         self.assertIsNone(batch.confirmed_at)
         jobs.run_one()
         batch.refresh_from_db()

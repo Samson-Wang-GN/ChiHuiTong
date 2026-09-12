@@ -54,7 +54,7 @@ REQ-045补充：完整Web界面位于`backend/chihuitong/acceptance_assets/`，�
 1. `POST /sales-orders`选择`physical/named`、产品、来源、数量、单卡采购价、负责人；记名单客或关联已确认Excel。创建者默认负责人。零价待审核；有价先上传采购付款凭证、平台确认足额到账。
 2. `GET /sales-orders/{id}`含流程、号段、任务错误/重试状态、来源及产品快照。`rows/cards`子路径分页；`cards/export`导出权限范围卡明细。卡凭证与患者身份不进入日志。
 3. `POST /sales-orders/{id}/receipts`提交真实线下凭证；`POST /purchase-receipts/{id}/review`平台审核。`POST /sales-orders/{id}/review`平台开卡审核，超过500张返回处理中，后台事务开卡，失败不产生半批权益。`stop/stop-review/refund/shipment`执行申请、平台处理、线下退款登记和寄送登记；取消/停止类型由请求明确，已激活整批不取消。
-4. Excel先`POST /files`上传，`POST /imports`发起解析；轮询`GET /imports/{id}`。`suggest`给列建议，`mapping`保存人工确认列及数量策略，异步逐行校验，`rows/errors.xlsx`查异常/下载，`confirm`冻结通过的导入依据供销售订单使用。格式模板`/import-formats`只存列结构，不存客户样本。
+4. Excel先`POST /files`上传，`POST /imports`同步解析并返回mapping状态；`GET /imports/{id}`取得预览/自动建议。`suggest`给纠正后的列建议，`mapping`同步保存列/数量策略并返回validated及错误计数，`rows/errors.xlsx`查异常/下载，`confirm`冻结通过的导入依据供销售订单使用。新流程不需要worker或轮询；仅兼容旧queued/validating任务。POST沿用幂等编号，丢失响应时使用相同编号和内容重试。格式模板`/import-formats`只存列结构，不存客户样本。
 5. 只认可姓名、规范化手机号和数量，性别/年龄/职业可选且只补空；资源方客户编号保留原值。姓名冲突及重复行有明确异常，开卡审核再次检查当前数据库，不按导入预览强制覆盖。
 6. `POST /cards/{id}/freeze`平台冻结/解除冻结；已激活卡不转让。停止仅失效未领取部分，已领取不伪回滚。所有卡号段全局唯一，取消后不复用。
 

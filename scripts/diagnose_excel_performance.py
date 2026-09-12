@@ -48,7 +48,7 @@ def main():
         PYTHONDONTWRITEBYTECODE='1',
     )
     summary = {'source_commit': release.name, 'passed': False, 'cases': [],
-               'scope': 'APIClient server processing and real worker; excludes network, browser and timer wait'}
+               'scope': 'APIClient synchronous processing; no worker, network or browser'}
     run([PG / 'createdb', *dbargs, dbname])
     print('REPORT=' + str(report / 'summary.json'), flush=True)
     try:
@@ -61,7 +61,6 @@ def main():
         from django.db import connection
         from openpyxl import Workbook
         from chihuitong.models import ImportBatch, Outbox
-        from chihuitong.services import jobs
         from chihuitong.tests.support import actor_fixture, api_client
 
         actor = actor_fixture('broker', '13900000002')
@@ -105,8 +104,7 @@ def main():
                     'file': SimpleUploadedFile('synthetic.xlsx', data), 'purpose': 'sales_excel'}, format='multipart'))
                 batch, case['enqueue_api'] = timed(lambda: client.post('/api/v1/imports', {
                     'asset_id': uploaded['id']}, format='json', HTTP_IDEMPOTENCY_KEY=secrets.token_hex(16)))
-                assert batch['status'] == 'queued'
-                _, case['inspect_worker'] = timed(jobs.run_one)
+                assert batch['status'] == 'mapping'
                 detail, case['preview_api'] = timed(lambda: client.get('/api/v1/imports/' + batch['id']))
                 assert detail['status'] == 'mapping'
                 suggestion = detail['recommendation']
@@ -114,14 +112,13 @@ def main():
                     'version': detail['version'], 'sheet': suggestion['sheet'], 'header_row': suggestion['header_row'],
                     'mapping': suggestion['mapping'], 'quantity_mode': 'column',
                 }, format='json', HTTP_IDEMPOTENCY_KEY=secrets.token_hex(16)))
-                assert mapped['status'] == 'validating'
-                _, case['validate_worker'] = timed(jobs.run_one)
+                assert mapped['status'] == 'validated'
                 validated, case['result_api'] = timed(lambda: client.get('/api/v1/imports/' + batch['id']))
                 assert (validated['status'], validated['total_rows'], validated['error_rows']) == ('validated', row_count, 0)
                 assert ImportBatch.objects.get(pk=batch['id']).rows.count() == row_count
                 summary['cases'].append(case)
                 print(json.dumps(case), flush=True)
-        assert not Outbox.objects.exclude(status='done').exists()
+        assert not Outbox.objects.filter(kind__in=['excel.inspect', 'excel.validate']).exists()
         summary['passed'] = True
     finally:
         if 'django.db' in sys.modules:

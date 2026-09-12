@@ -7,7 +7,7 @@ from openpyxl import Workbook
 
 from chihuitong.errors import BusinessError
 from chihuitong.models import Card, Customer, ImportFormat
-from chihuitong.services import files, imports, jobs
+from chihuitong.services import files, imports
 
 from .support import api_client
 from .test_sales import sales_setup
@@ -60,7 +60,7 @@ class ImportRecommendationTests(TestCase):
             self.resource, data=data, filename="自动匹配.xlsx", purpose="sales_excel"
         )
         batch = imports.create_import(self.resource, asset.id)
-        jobs.run_one()
+        self.assertEqual(batch.status, "mapping")
         batch.refresh_from_db()
         return batch
 
@@ -88,7 +88,7 @@ class ImportRecommendationTests(TestCase):
                     HTTP_IDEMPOTENCY_KEY=f"dimension-{batch.id}",
                 )
                 self.assertEqual(response.status_code, 200, response.content)
-                jobs.run_one()
+                self.assertEqual(response.json()["status"], "validated")
                 batch.refresh_from_db()
                 self.assertEqual(
                     (batch.status, batch.total_rows, batch.total_cards, batch.error_rows),
@@ -109,7 +109,7 @@ class ImportRecommendationTests(TestCase):
             quantity_mode="column",
         )
         self.assertEqual(batch.sheets[0]["rows"], 2)
-        jobs.run_one()
+        self.assertEqual(batch.status, "validated")
         batch.refresh_from_db()
         self.assertEqual(batch.total_cards, 2)
         self.assertEqual(Customer.objects.count(), 0)

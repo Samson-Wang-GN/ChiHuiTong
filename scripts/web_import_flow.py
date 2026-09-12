@@ -19,14 +19,14 @@ def exercise(page, worker, report):
         with page.expect_response(lambda response: response.url.endswith('/api/v1/imports') and response.request.method=='POST') as created:
             dialog(page).locator('input[type=file]').set_input_files(report/filename)
         assert created.value.status == 201
-        worker()
+        assert created.value.json()['status'] == 'mapping'
         page.get_by_text('原文件预览 · 前10条数据', exact=True).wait_for(timeout=15000)
 
     def next_validated():
         with page.expect_response(lambda response: '/imports/' in response.url and response.url.endswith('/mapping')) as configured:
             page.get_by_role('button', name='下一步', exact=True).click()
         assert configured.value.status == 200
-        worker()
+        assert configured.value.json()['status'] == 'validated'
         page.get_by_role('button', name='提交开卡订单', exact=True).wait_for(timeout=15000)
 
     def finish(expected):
@@ -94,7 +94,6 @@ def exercise(page, worker, report):
         load('synthetic-invalid.xlsx')
         with page.expect_response(lambda response: response.url.endswith('/mapping')):
             page.get_by_role('button', name='下一步', exact=True).click()
-        worker()
         page.get_by_role('button', name='下载错误 Excel', exact=True).wait_for(timeout=15000)
         assert page.get_by_role('button', name='提交开卡订单', exact=True).count() == 0
         page.locator('.arco-upload-list-remove-icon').click()
