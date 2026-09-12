@@ -67,6 +67,7 @@ def main():
                 page.get_by_text('业务详情（真实接口结果）',exact=True).wait_for()
                 page.screenshot(path=str(output/(role+'-details.png')),full_page=True)
                 page.keyboard.press('Escape')
+                page.locator('.arco-drawer-wrapper').wait_for(state='hidden')
                 page.set_viewport_size({'width':768,'height':900})
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),role+' overflow'
                 page.get_by_role('button',name='退出账号',exact=True).click()
