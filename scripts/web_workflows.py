@@ -239,6 +239,43 @@ def exercise(pages, report, worker):
         restored = platform.evaluate('() => CHT.mapPoint(CHT.mapPoint({latitude:39.9,longitude:116.3},17,100,-100),17,-100,100)')
         assert abs(float(restored['latitude'])-39.9) < 0.000002
         assert abs(float(restored['longitude'])-116.3) < 0.000002
+
+        # Platform configures another product on the same partner contract; rejected input survives.
+        menu(platform, '机构管理')
+        platform.locator('.arco-table-tr').filter(has_text='演示客户资源机构').get_by_role('button', name='详情', exact=True).click()
+        platform.get_by_role('tab', name='合作合同', exact=True).click()
+        dialog(platform).get_by_role('button', name='详情', exact=True).first.click()
+        dialog(platform).get_by_role('tab', name='推广产品配置', exact=True).click()
+        platform.get_by_role('button', name='添加推广产品', exact=True).click()
+        select(platform, '推广产品', '自动回归专用产品 · 60.00 元')
+        fill(platform, '分配比例（%）', 105)
+        fill(platform, '操作原因', '合成回归新增产品授权')
+        dialog(platform).get_by_role('button', name='保存', exact=True).click()
+        platform.wait_for_timeout(400)
+        assert field(platform, '分配比例（%）').locator('input').input_value() == '105'
+        fill(platform, '分配比例（%）', 20)
+        dialog(platform).get_by_text('本方分配 12.00 元', exact=False).wait_for()
+        dialog(platform).get_by_role('button', name='保存', exact=True).click()
+        platform.wait_for_timeout(400)
+        dialog(platform).get_by_text('自动回归专用产品', exact=True).wait_for()
+        close(platform)
+        completed.append('platform multi-product contract configuration live allocation and invalid-input preservation')
+
+        # Source administrators create a real staff account; the platform-created admin role stays locked.
+        menu(resource, '账号管理')
+        resource.get_by_role('button', name='创建账号', exact=True).click()
+        fill(resource, '账号姓名', '合成业务员回归')
+        fill(resource, '登录手机号', '13800000991')
+        select(resource, '身份', '业务员')
+        dialog(resource).get_by_role('button', name='保存', exact=True).click()
+        resource.get_by_text('合成业务员回归', exact=True).wait_for()
+        members = read(resource, '/api/v1/organizations/'+resource.evaluate('CHT.actor.organization_id')+'/members')['results']
+        assert any(row['name']=='合成业务员回归' and row['role']=='staff' for row in members)
+        initial = next(row for row in members if row['platform_created'])
+        resource.locator('.arco-table-tr').filter(has_text=initial['name']).get_by_role('button', name='管理', exact=True).click()
+        assert field(resource, '身份').locator('.arco-select-disabled').count() == 1
+        dialog(resource).get_by_role('button', name='取消', exact=True).click()
+        completed.append('resource administrator creates staff and cannot change protected administrator role')
         for role, page in pages.items():
             page.screenshot(path=str(report/f'{role}-workflow.png'), full_page=True, animations='disabled')
     except Exception:

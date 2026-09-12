@@ -48,11 +48,12 @@
   C.useChoices = path => C.useQuery(path,{allPages:true});
   C.Panel = ({title,extra,children}) => h('section',{className:'panel'},(title||extra)&&h('div',{className:'toolbar'},h('h2',null,title),extra),children);
   C.Facts = ({data={},fields}) => h(A.Descriptions,{column:1,border:true,size:'small',data:(fields||Object.keys(data).filter(k=>C.names[k])).filter(k=>data[k]!==undefined).map(k=>({label:C.names[k]||k,value:typeof data[k]==='object'&&data[k]!==null?h(C.Facts,{data:data[k]}):C.text(k,data[k])}))});
-  C.column = (key,title,width=160) => ({title:title||C.names[key]||key,dataIndex:key,width,align:key.endsWith('_cents')?'right':undefined,render:v=>['status','display_status','service_status','review_status'].includes(key)?h(C.Tag,{value:v}):C.text(key,v)});
+  const sortable=new Set(['created_at','scheduled_at','requested_at','amount_cents','fee_cents','quantity','total_cents','received_cents','due_at','issued_on','starts_at','ends_at','validity_days','redemption_units','unit_price_cents']);
+  C.column = (key,title,width=160) => ({title:title||C.names[key]||key,dataIndex:key,width,sorter:sortable.has(key)||undefined,align:key.endsWith('_cents')?'right':undefined,render:v=>['status','display_status','service_status','review_status'].includes(key)?h(C.Tag,{value:v}):C.text(key,v)});
   C.List = function({path,columns,actions,toolbar,search=false,initialStatus='all',params={},rowKey='id',empty='暂无符合条件的记录',exportPath,exportName='明细.xlsx',statusLabels={}}) {
-    const [status,setStatus]=React.useState(initialStatus),[page,setPage]=React.useState(1),[size,setSize]=React.useState(20),[searchText,setSearchText]=React.useState(''),[keyword,setKeyword]=React.useState('');
+    const [ordering,setOrdering]=React.useState(''),[status,setStatus]=React.useState(initialStatus),[page,setPage]=React.useState(1),[size,setSize]=React.useState(20),[searchText,setSearchText]=React.useState(''),[keyword,setKeyword]=React.useState('');
     const filters={...params,status,search:keyword};
-    const q=C.useQuery(path+(path.includes('?')?'&':'?')+C.query({...filters,page,page_size:size}));
+    const q=C.useQuery(path+(path.includes('?')?'&':'?')+C.query({...filters,page,page_size:size,ordering}));
     const cols=[...columns];if(actions)cols.push({title:'操作',width:180,fixed:'right',render:(_,r)=>h(A.Space,{wrap:true,size:4},actions(r))});
     return h('div',{className:'business-list'},
       h(C.Error,{error:q.error,retry:q.reload}),
@@ -63,23 +64,26 @@
         typeof toolbar==='function'?toolbar(filters):toolbar,
         exportPath&&h(A.Button,{onClick:()=>C.download(exportPath+(exportPath.includes('?')?'&':'?')+C.query(filters),exportName).catch(e=>A.Message.error(e.message))},'下载 Excel')),
         h(A.Button,{onClick:q.reload,loading:q.loading},'刷新')),
-      h(A.Table,{rowKey,columns:cols,data:q.data?.results||[],loading:q.loading,scroll:{x:Math.max(700,cols.reduce((n,c)=>n+(c.width||160),0))},noDataElement:h(A.Empty,{description:q.error?'加载失败，请重试':empty}),
+      h(A.Table,{rowKey,columns:cols,onChange:(_pagination,sorter)=>{setOrdering(sorter?.direction?(sorter.direction==='descend'?'-':'')+sorter.field:'');setPage(1);},data:q.data?.results||[],loading:q.loading,scroll:{x:Math.max(700,cols.reduce((n,c)=>n+(c.width||160),0))},noDataElement:h(A.Empty,{description:q.error?'加载失败，请重试':empty}),
         pagination:{current:page,pageSize:size,total:q.data?.total||0,onChange:setPage,sizeCanChange:true,sizeOptions:[10,20,50,100],onPageSizeChange:v=>{setSize(v);setPage(1);},showTotal:true}}));
   };
   C.Drawer = function({title,children,onClose,width=1000,footer}) {
     return h(A.Drawer,{title,visible:true,width:Math.min(width,window.innerWidth-24),onCancel:onClose,maskClosable:false,escToExit:true,autoFocus:true,focusLock:true,tabIndex:-1,footer:footer||h(A.Button,{onClick:onClose},'关闭详情')},children);
   };
+  C.UploadContext=React.createContext(()=>{});
   C.FormShell = function(props){return props.compact?h(A.Modal,{title:props.title,visible:true,onCancel:props.onClose,footer:props.footer,maskClosable:false,autoFocus:true,focusLock:true,style:{width:Math.min(520,window.innerWidth-24)}},props.children):h(C.Drawer,props);};
   C.FormDialog = function({title,fields,initial={},hint,onSubmit,onClose,submitText='保存',width=760}) {
-    const [form]=A.Form.useForm(),[busy,setBusy]=React.useState(false),[error,setError]=React.useState(null);
+    const [form]=A.Form.useForm(),[busy,setBusy]=React.useState(false),[uploading,setUploading]=React.useState(0),[error,setError]=React.useState(null);
     const retry=React.useRef({key:crypto.randomUUID(),payload:null});
-    async function submit(){let values;try{const validated=await form.validate();values=Object.fromEntries(fields.filter(f=>validated[f.name]!==undefined).map(f=>[f.name,validated[f.name]]));}catch{return;}const payload=JSON.stringify(values);if(retry.current.payload && retry.current.payload!==payload)retry.current.key=crypto.randomUUID();retry.current.payload=payload;setBusy(true);setError(null);try{const result=await onSubmit(values,retry.current.key);if(result===false)return;C.refresh();A.Message.success('操作已完成');onClose();}catch(e){setError(e);}finally{setBusy(false);}}
+    async function submit(){if(uploading){setError(new Error('附件正在上传，请等待完成后提交'));return;}let values;try{const validated=await form.validate();values=Object.fromEntries(fields.filter(f=>validated[f.name]!==undefined).map(f=>[f.name,validated[f.name]]));}catch{return;}const payload=JSON.stringify(values);if(retry.current.payload && retry.current.payload!==payload)retry.current.key=crypto.randomUUID();retry.current.payload=payload;setBusy(true);setError(null);try{const result=await onSubmit(values,retry.current.key);if(result===false)return;C.refresh();A.Message.success('操作已完成');onClose();}catch(e){setError(e);}finally{setBusy(false);}}
     function close(){if(busy)return;const values=form.getFieldsValue();if(fields.some(f=>JSON.stringify(values[f.name]??'')!==JSON.stringify(initial[f.name]??'')))A.Modal.confirm({title:'放弃未保存的内容？',content:'关闭后，本次尚未提交的输入不会保存。',onOk:onClose});else onClose();}
-    return h(C.FormShell,{title,onClose:close,width,compact:width<=760&&fields.length<=4&&!fields.some(f=>f.type==='files'||f.render),footer:h(A.Space,null,h(A.Button,{disabled:busy,onClick:close},'取消'),h(A.Button,{type:'primary',loading:busy,onClick:submit},submitText))},hint&&h(A.Alert,{type:'info',content:hint}),h(C.Error,{error}),h(A.Form,{form,layout:'vertical',initialValues:initial,disabled:busy,className:'business-form'},fields.map(f=>h(A.Form.Item,{key:f.name,field:f.name,label:f.label||C.names[f.name]||f.name,extra:f.hint,rules:f.rules||[{required:!f.optional,message:'请填写'+(f.label||C.names[f.name]||f.name)}]},f.render?f.render(form):f.type==='select'?h(A.Select,{options:f.options,allowClear:!!f.optional,disabled:f.disabled,'aria-label':f.label||C.names[f.name]}):f.type==='number'?h(A.InputNumber,{min:f.min??0,max:f.max,precision:f.precision??0,style:{width:'100%'},suffix:f.suffix,disabled:f.disabled}):f.type==='date'?h(A.DatePicker,{showTime:!!f.time,style:{width:'100%'},format:f.time?'YYYY-MM-DD HH:mm':'YYYY-MM-DD'}):f.type==='textarea'?h(A.Input.TextArea,{maxLength:f.max||10000,autoSize:{minRows:3,maxRows:10}}):f.type==='boolean'?h(A.Select,{options:[{label:'是',value:true},{label:'否',value:false}],disabled:f.disabled}):f.type==='files'?h(C.FileInput,{purpose:f.purpose,multiple:f.multiple!==false}):h(A.Input,{maxLength:f.max||200,disabled:f.disabled,autoComplete:'off'})))));
+    return h(C.FormShell,{title,onClose:close,width,compact:width<=760&&fields.length<=4&&!fields.some(f=>f.type==='files'||f.render),footer:h(A.Space,null,h(A.Button,{disabled:busy||uploading>0,onClick:close},'取消'),h(A.Button,{type:'primary',loading:busy,disabled:uploading>0,onClick:submit},submitText))},hint&&h(A.Alert,{type:'info',content:hint}),h(C.Error,{error}),h(C.UploadContext.Provider,{value:delta=>setUploading(v=>Math.max(0,v+delta))},h(A.Form,{form,layout:'vertical',initialValues:initial,disabled:busy,className:'business-form'},fields.map(f=>h(A.Form.Item,{key:f.name,field:f.name,label:f.label||C.names[f.name]||f.name,extra:f.hint,rules:f.rules||[{required:!f.optional,message:'请填写'+(f.label||C.names[f.name]||f.name)}]},f.render?f.render(form):f.type==='select'?h(A.Select,{options:f.options,allowClear:!!f.optional,disabled:f.disabled,'aria-label':f.label||C.names[f.name]}):f.type==='number'?h(A.InputNumber,{min:f.min??0,max:f.max,precision:f.precision??0,style:{width:'100%'},suffix:f.suffix,disabled:f.disabled}):f.type==='date'?h(A.DatePicker,{showTime:!!f.time,style:{width:'100%'},format:f.time?'YYYY-MM-DD HH:mm':'YYYY-MM-DD'}):f.type==='textarea'?h(A.Input.TextArea,{maxLength:f.max||10000,autoSize:{minRows:3,maxRows:10}}):f.type==='boolean'?h(A.Select,{options:[{label:'是',value:true},{label:'否',value:false}],disabled:f.disabled}):f.type==='files'?h(C.FileInput,{purpose:f.purpose,multiple:f.multiple!==false}):h(A.Input,{maxLength:f.max||200,disabled:f.disabled,autoComplete:'off'}))))));
   };
   C.FileInput = function({value=[],onChange,purpose,multiple=true}) {
     const [error,setError]=React.useState(null),[files,setFiles]=React.useState([]);
-    const ids=React.useRef(value||[]);
+    const ids=React.useRef(value||[]),uploadState=React.useContext(C.UploadContext);
+    const pending=React.useRef(new Set());
+    React.useEffect(()=>()=>{for(const controller of pending.current)controller.abort();},[]);
     ids.current=value||[];
     function update(next){ids.current=next;onChange(next);}
     const present=new Set(files.map(f=>f.response?.id).filter(Boolean));
@@ -90,12 +94,14 @@
       onRemove:f=>{update(ids.current.filter(id=>id!==f.response?.id));return true;},
       customRequest:option=>{
         const controller=new AbortController();
+        pending.current.add(controller);uploadState(1);
         const body=new FormData();
         body.append('file',option.file);
         body.append('purpose',purpose);
         C.request('/api/v1/files',{method:'POST',body,signal:controller.signal})
           .then(data=>{setError(null);update(multiple?[...new Set([...ids.current,data.id])]:[data.id]);option.onSuccess(data);})
-          .catch(e=>{if(!controller.signal.aborted){setError(e);option.onError(e);}});
+          .catch(e=>{if(!controller.signal.aborted){setError(e);option.onError(e);}})
+          .finally(()=>{pending.current.delete(controller);uploadState(-1);});
         return {abort:()=>controller.abort()};
       }
     }),value?.length>0&&h(C.Attachments,{ids:value}),

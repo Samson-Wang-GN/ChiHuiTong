@@ -166,7 +166,18 @@ def paginated(request, queryset, projection, *, status_field="status", states=()
             raise serializers.ValidationError("列表状态不合法")
         queryset = queryset.filter(**{status_field: state})
     total = queryset.count()
-    rows = queryset.order_by("-created_at", "id")[(page - 1) * size : page * size]
+    ordering = request.query_params.get("ordering", "-created_at")
+    sort_field = ordering.removeprefix("-")
+    sortable = {
+        "created_at", "scheduled_at", "requested_at", "amount_cents", "fee_cents",
+        "quantity", "total_cents", "received_cents", "due_at", "issued_on",
+        "starts_at", "ends_at", "validity_days", "redemption_units", "unit_price_cents",
+    }
+    fields = {field.name for field in queryset.model._meta.get_fields()}
+    fields.update(queryset.query.annotations)
+    if sort_field not in sortable or sort_field not in fields:
+        raise serializers.ValidationError("该字段不支持排序")
+    rows = queryset.order_by(ordering, "id")[(page - 1) * size : page * size]
     if status_field == "active":
         counts = {
             "active": counts.get(True, 0),

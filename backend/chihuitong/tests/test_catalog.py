@@ -29,6 +29,16 @@ def image_bytes():
 
 
 class FileDetailsTests(TestCase):
+    def test_numeric_sorting_and_restricted_ordering_fields(self):
+        platform = actor_fixture("platform", "13900000313")
+        for fee in [2000, 100, 10000]:
+            product_fixture(platform, fee_cents=fee)
+        response = api_client(platform).get("/api/v1/products?ordering=fee_cents")
+        self.assertEqual([item["fee_cents"] for item in response.data["results"]], [100, 2000, 10000])
+        response = api_client(platform).get("/api/v1/products?ordering=-fee_cents&page_size=2")
+        self.assertEqual([item["fee_cents"] for item in response.data["results"]], [10000, 2000])
+        self.assertEqual(api_client(platform).get("/api/v1/products?ordering=organization__name").status_code, 400)
+
     def test_metadata_keeps_same_file_access_boundary(self):
         owner = actor_fixture("channel", "13900000311")
         other = actor_fixture("channel", "13900000312")
