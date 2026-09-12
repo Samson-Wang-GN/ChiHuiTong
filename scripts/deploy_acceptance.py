@@ -57,6 +57,9 @@ def main():
     cfg = json.loads(runtime_config.read_text())
     if cfg['CHT_DB_NAME'] != 'chihuitong_acceptance' or cfg['CHT_WECHAT_PAY_ENABLED'] != 'false':
         raise SystemExit('Unexpected acceptance configuration; refusing overwrite')
+    # REQ-045 explicitly authorizes virtual success, never live payment/SMS.
+    cfg['CHT_ACCEPTANCE_SIMULATED_EXTERNALS'] = 'true'
+    runtime_config.write_text(json.dumps(cfg))
     envfile = RUNTIME/'service.env'
     envfile.write_text('\n'.join(f'{k}={v}' for k,v in cfg.items())+'\n')
     env = dict(os.environ, **cfg)

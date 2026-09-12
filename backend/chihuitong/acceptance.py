@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from .api import PhoneInput, validated
 from .crypto import digest, normalize_phone, seal, unseal
 from .errors import require
-from .models import LoginChallenge
+from .models import Account, LoginChallenge
 
 ACCOUNTS = {
     "platform": ("13800000001", "平台管理员"),
@@ -53,7 +53,16 @@ def allowed(phone):
     require(enabled(), "disabled", "验收短信箱未启用", 404)
     phone = normalize_phone(phone)
     require(
-        phone in {item[0] for item in ACCOUNTS.values()}, "forbidden", "仅支持指定验收账号", 403
+        phone in {item[0] for item in ACCOUNTS.values()}
+        or (
+            settings.ACCEPTANCE_SIMULATED_EXTERNALS
+            and Account.objects.filter(
+                phone_index=digest(phone, purpose="phone"), active=True
+            ).exists()
+        ),
+        "forbidden",
+        "仅支持已开通的验收账号",
+        403,
     )
     return phone
 
@@ -74,8 +83,11 @@ class AcceptanceSMS:
         os.replace(temporary, path)
 
     def send_template(self, phone, template, parameters, *, context):
-        # Never claim that a business SMS was sent to a real recipient.
-        require(False, "acceptance_no_delivery", "验收环境不发送业务短信", 503)
+        from .integrations.simulated import require_simulation
+
+        require_simulation()
+        # A synthetic reference is durable evidence of simulation, not SMS delivery.
+        return "SIMULATED-" + str(context)
 
 
 @api_view(["POST"])
@@ -122,6 +134,7 @@ def asset(request, name):
     if name in {
         "app.js", "style.css", "core.js", "catalog.js", "clinics.js", "workbench.js",
         "appointments.js",
+        "finance.js",
     }:
         path = Path(__file__).resolve().parent / "acceptance_assets" / name
     elif name in {"react.min.js", "react-dom.min.js", "arco.min.js", "arco.min.css"}:

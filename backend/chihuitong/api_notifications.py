@@ -113,6 +113,7 @@ def sms_deliveries(request):
             "attempts": item.attempts,
             "last_error_code": item.last_error_code,
             "accepted_at": iso(item.accepted_at),
+            "simulated": item.provider_reference.startswith("SIMULATED-"),
             "created_at": iso(item.created_at),
         },
         states=["pending", "sending", "unknown", "failed", "accepted"],
@@ -150,6 +151,7 @@ def sms_history(request, delivery_id):
             "error_code": item.error_code,
             "created_at": iso(item.created_at),
             "finished_at": iso(item.finished_at),
+            "simulated": item.provider_reference.startswith("SIMULATED-"),
         },
         states=["sending", "unknown", "failed", "accepted"],
     )

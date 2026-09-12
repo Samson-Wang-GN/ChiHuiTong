@@ -131,6 +131,7 @@ def main():
     name = 'chihuitong_acceptance_web_'+secrets.token_hex(6)
     env = dict(os.environ, CHT_ENVIRONMENT='test', CHT_ACCEPTANCE_ENABLED='true', CHT_ACCEPTANCE_PROXY_TOKEN=secrets.token_urlsafe(48), CHT_SECRET_KEY=secrets.token_urlsafe(48), CHT_FIELD_KEYS=base64.urlsafe_b64encode(secrets.token_bytes(32)).decode(), CHT_PHONE_INDEX_KEY=secrets.token_urlsafe(48), CHT_DB_NAME=name, CHT_DB_USER='ubuntu', CHT_DB_HOST=str(ROOT/'runtime/pgsocket'), CHT_DB_PORT='55432', CHT_ALLOWED_HOSTS='127.0.0.1,localhost', CHT_PRIVATE_STORAGE=str(report/'private-files'), CHT_SMS_BACKEND='chihuitong.acceptance.AcceptanceSMS', CHT_WECHAT_PAY_ENABLED='false', PYTHONDONTWRITEBYTECODE='1')
     dbargs = ['-h', env['CHT_DB_HOST'], '-p', '55432']
+    env['CHT_ACCEPTANCE_SIMULATED_EXTERNALS'] = 'true'
     def run(command, **kwargs):
         return subprocess.run([str(x) for x in command], check=True, text=True, timeout=120, **kwargs)
     location = run([PG/'psql', *dbargs, '-d', 'postgres', '-Atc', 'SHOW data_directory'], capture_output=True).stdout.strip()

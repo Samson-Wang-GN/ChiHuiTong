@@ -3,6 +3,7 @@ import json
 import uuid
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -13,6 +14,14 @@ from chihuitong.models import ClinicBill, Outbox, PaymentAttempt, PaymentNotific
 
 from .common import advance, advisory_lock, audit, check_version
 from .finance import get_bill, record_funds
+
+
+def payment_gateway():
+    if settings.ACCEPTANCE_SIMULATED_EXTERNALS:
+        from chihuitong.integrations.simulated import SimulatedWeChatPay
+
+        return SimulatedWeChatPay()
+    return WeChatPay()
 
 
 def get_attempt(actor, attempt_id, *, operate=False):
@@ -32,6 +41,7 @@ def projection(attempt):
         "method": attempt.method,
         "bill_version": attempt.bill_version,
         "version": attempt.version,
+        "simulated": attempt.mchid == "SIMULATED-NO-MONEY",
         "expires_at": attempt.expires_at.isoformat() if attempt.expires_at else None,
         "error_code": attempt.error_code,
         "can_retry_preparation": attempt.status == "unknown"
@@ -62,7 +72,7 @@ def create_payment(
         isinstance(key, str) and 8 <= len(key) <= 128, "idempotency_key", "请提供幂等请求编号", 400
     )
     require(method in {"native", "jsapi"}, "invalid_method", "请选择扫码或小程序支付", 400)
-    gateway = WeChatPay()
+    gateway = payment_gateway()
     if method == "jsapi":
         require(
             verified_openid and verified_appid == gateway.config.appid,
@@ -138,13 +148,15 @@ def create_payment(
         if current.status == "creating" and current.preparation_count == attempt.preparation_count:
             current.status, current.gateway_payload = "pending", result
             advance(current, "status", "gateway_payload")
+    if settings.ACCEPTANCE_SIMULATED_EXTERNALS:
+        return reconcile(current.id)
     return current
 
 
 def retry_preparation(actor, attempt_id):
     """Retry the same merchant order after a lost creation response, never invent a receipt."""
     ref = get_attempt(actor, attempt_id, operate=True)
-    gateway = WeChatPay()
+    gateway = payment_gateway()
     with transaction.atomic():
         bill = get_bill(actor, ref.bill_id, lock=True, pay=True)
         attempt = PaymentAttempt.objects.select_for_update().get(pk=attempt_id)
@@ -217,6 +229,8 @@ def retry_preparation(actor, attempt_id):
         if current.status == "creating" and current.preparation_count == attempt.preparation_count:
             current.status, current.gateway_payload = "pending", result
             advance(current, "status", "gateway_payload")
+    if settings.ACCEPTANCE_SIMULATED_EXTERNALS:
+        return reconcile(current.id)
     return current
 
 
@@ -309,7 +323,7 @@ def observe(attempt_id, data):
             ),
             amount_cents=attempt.amount_cents,
             received_at=datetime.fromisoformat(data["success_time"]),
-            kind="wechat",
+            kind="wechat_simulated" if attempt.mchid == "SIMULATED-NO-MONEY" else "wechat",
             source_id=attempt.id,
             force_anomaly="bill_version_changed"
             if bill.version != attempt.bill_version and attempt.status != "success"
@@ -326,6 +340,7 @@ def observe(attempt_id, data):
             attempt_id=str(attempt.id),
             amount_cents=attempt.amount_cents,
             anomaly=ledger.anomaly,
+            simulated=attempt.mchid == "SIMULATED-NO-MONEY",
         )
     elif attempt.status == "success":
         if state == "REFUND":
@@ -348,7 +363,7 @@ def observe(attempt_id, data):
 
 def reconcile(attempt_id, *, close=False):
     attempt = PaymentAttempt.objects.get(pk=attempt_id)
-    gateway = WeChatPay()
+    gateway = payment_gateway()
     require(
         attempt.appid == gateway.config.appid and attempt.mchid == gateway.config.mchid,
         "payment_config_changed",
@@ -368,7 +383,7 @@ def reconcile(attempt_id, *, close=False):
 
 
 def capture_notification(headers, raw):
-    gateway = WeChatPay()
+    gateway = payment_gateway()
     notification_id, data = gateway.notification(headers, raw)
     attempt = PaymentAttempt.objects.filter(number=data.get("out_trade_no")).first()
     require(attempt, "payment_not_found", "未找到对应支付订单", 404)

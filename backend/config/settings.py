@@ -96,6 +96,13 @@ OTP_COOLDOWN_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 SESSION_SECONDS = 8 * 60 * 60
 WECHAT_PAY_ENABLED = os.environ.get("CHT_WECHAT_PAY_ENABLED", "false").lower() == "true"
+ACCEPTANCE_SIMULATED_EXTERNALS = (
+    os.environ.get("CHT_ACCEPTANCE_SIMULATED_EXTERNALS", "false").lower() == "true"
+)
+if ACCEPTANCE_SIMULATED_EXTERNALS and (
+    not ACCEPTANCE_ENABLED or ENVIRONMENT == "production" or WECHAT_PAY_ENABLED
+):
+    raise ImproperlyConfigured("模拟外发只能在非生产独立验收模式启用，禁止同时开启真实支付")
 if ACCEPTANCE_ENABLED and WECHAT_PAY_ENABLED:
     raise ImproperlyConfigured("合成验收环境禁止真实支付")
 WECHAT_PAY = {

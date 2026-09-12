@@ -68,7 +68,11 @@ def payment_configuration(request):
     request_actor(request)
     # Never return keys, certificate paths or merchant secrets.
     return Response(
-        {"wechat_enabled": settings.WECHAT_PAY_ENABLED, "offline_receipt_enabled": True}
+        {
+            "wechat_enabled": settings.WECHAT_PAY_ENABLED,
+            "simulated": settings.ACCEPTANCE_SIMULATED_EXTERNALS,
+            "offline_receipt_enabled": True,
+        }
     )
 
 
