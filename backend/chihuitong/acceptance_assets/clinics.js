@@ -42,7 +42,7 @@
     const size=256*Math.pow(2,zoom),sin=Math.sin(Number(center.latitude)*Math.PI/180);
     const x=(Number(center.longitude)+180)/360*size+dx;
     const y=(0.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*size+dy;
-    const lng=((x/size*360)%360+540)%360-180;
+    const lng=((x/size*360)%360+360)%360-180;
     const lat=Math.atan(Math.sinh(Math.PI*(1-2*y/size)))*180/Math.PI;
     return {latitude:Math.max(-85,Math.min(85,lat)).toFixed(6),longitude:lng.toFixed(6)};
   };

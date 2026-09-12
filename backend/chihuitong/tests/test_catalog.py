@@ -32,12 +32,16 @@ class FileDetailsTests(TestCase):
     def test_metadata_keeps_same_file_access_boundary(self):
         owner = actor_fixture("channel", "13900000311")
         other = actor_fixture("channel", "13900000312")
-        asset = files.upload_file(owner, data=image_bytes(), filename="合成门诊照片.png", purpose="cover")
+        asset = files.upload_file(
+            owner, data=image_bytes(), filename="合成门诊照片.png", purpose="cover"
+        )
         response = api_client(owner).get(f"/api/v1/files/{asset.id}/details")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["name"], "合成门诊照片.png")
         self.assertNotIn("storage_key", response.data)
-        self.assertEqual(api_client(other).get(f"/api/v1/files/{asset.id}/details").status_code, 404)
+        self.assertEqual(
+            api_client(other).get(f"/api/v1/files/{asset.id}/details").status_code, 404
+        )
 
 
 def product_fixture(platform, **changes):

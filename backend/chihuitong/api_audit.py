@@ -29,7 +29,9 @@ def visible_metadata(actor, value):
     if actor.organization.kind not in {"channel", "clinic"}:
         hidden.add("fee_cents")
     if isinstance(value, dict):
-        return {key: visible_metadata(actor, item) for key, item in value.items() if key not in hidden}
+        return {
+            key: visible_metadata(actor, item) for key, item in value.items() if key not in hidden
+        }
     if isinstance(value, list):
         return [visible_metadata(actor, item) for item in value]
     return value

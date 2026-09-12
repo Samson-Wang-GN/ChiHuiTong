@@ -130,7 +130,16 @@ def file_details(request, asset_id):
     actor = request_actor(request)
     asset = FileAsset.objects.filter(pk=asset_id, status="ready").first()
     require(asset and files.can_read_file(actor, asset), "not_found", "附件不存在或无权访问", 404)
-    return Response({"id": str(asset.id), "name": asset.original_name, "content_type": asset.content_type, "size": asset.size, "purpose": asset.purpose, "status": asset.status})
+    return Response(
+        {
+            "id": str(asset.id),
+            "name": asset.original_name,
+            "content_type": asset.content_type,
+            "size": asset.size,
+            "purpose": asset.purpose,
+            "status": asset.status,
+        }
+    )
 
 
 @api_view(["GET"])

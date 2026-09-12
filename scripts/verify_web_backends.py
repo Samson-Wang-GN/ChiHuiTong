@@ -46,11 +46,11 @@ def serve(release):
         server.serve_forever()
 
 
-def check_browser(report, release, worker):
+def check_browser(report, release, worker, fixture, headed=False):
     from playwright.sync_api import sync_playwright
     result = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
+        browser = playwright.chromium.launch(headless=not headed)
         pages = {}
         contexts = []
         for role, phone in [('platform', '13800000001'), ('resource', '13800000002'), ('channel', '13800000003'), ('clinic', '13800000004')]:
@@ -69,10 +69,12 @@ def check_browser(report, release, worker):
             import re
             code = re.search(r'本次验证码：(\d{6})', text.inner_text()).group(1)
             page.get_by_label('验证码', exact=True).fill(code)
-            if role == 'clinic':
+            if role == 'clinic' and not headed:
                 page.get_by_text('登录时开启预约提醒', exact=True).click()
             page.get_by_role('button', name='登录', exact=True).click()
             page.get_by_role('button', name='退出登录', exact=True).wait_for()
+            if role == 'clinic' and headed:
+                page.wait_for_function('!!window.documentPictureInPicture?.window')
             page.locator('.workspace .arco-spin-loading').wait_for(state='hidden')
             menu = page.locator('.sidebar .arco-menu-item')
             titles = menu.all_text_contents()
@@ -107,6 +109,9 @@ def check_browser(report, release, worker):
             page.set_viewport_size({'width':1440, 'height':1000})
         from web_workflows import exercise
         exercise(pages, report, worker)
+        if headed:
+            from web_reminder import exercise_reminder
+            exercise_reminder(pages['clinic'], fixture, report)
         for item in result:
             assert not item['errors'], f"{item['role']}: {item['errors']}"
         for page in pages.values():
@@ -121,6 +126,7 @@ def check_browser(report, release, worker):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--serve', action='store_true')
+    parser.add_argument('--headed', action='store_true')
     args = parser.parse_args()
     if sys.platform != 'linux' or socket.gethostname() != 'VM-0-12-ubuntu' or os.getuid() == 0:
         raise SystemExit('Only approved development host as ubuntu')
@@ -161,6 +167,9 @@ def main():
         def worker():
             with (report/'worker.log').open('a') as log:
                 run([python,'manage.py','run_worker','--no-tick','--limit','100'], cwd=release/'backend', env=env, stdout=log, stderr=subprocess.STDOUT)
+        def fixture():
+            result = run([python, release/'scripts/web_business_fixture.py'], env=env, capture_output=True)
+            return json.loads(result.stdout)
         with (report/'server.log').open('w') as log:
             server = subprocess.Popen([str(python),str(Path(__file__).resolve()),'--serve'], env=env, stdout=log, stderr=subprocess.STDOUT)
             for _ in range(40):
@@ -170,7 +179,7 @@ def main():
                 if server.poll() is not None:
                     raise RuntimeError('Test gateway failed; inspect server.log')
                 time.sleep(.25)
-            summary['roles'] = check_browser(report, release, worker)
+            summary['roles'] = check_browser(report, release, worker, fixture, args.headed)
             summary['passed'] = True
     finally:
         if server:
