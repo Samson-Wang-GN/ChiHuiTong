@@ -466,10 +466,13 @@
         rowKey,
         columns: cols,
         onChange: (_pagination, sorter) => {
-          setOrdering(
-            sorter?.direction ? (sorter.direction === 'descend' ? '-' : '') + sorter.field : '',
-          );
-          setPage(1);
+          const nextOrder = sorter?.direction
+            ? (sorter.direction === 'descend' ? '-' : '') + sorter.field
+            : '';
+          if (nextOrder !== ordering) {
+            setOrdering(nextOrder);
+            setPage(1);
+          }
         },
         data: q.data?.results || [],
         loading: q.loading,

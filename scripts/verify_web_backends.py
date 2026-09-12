@@ -56,8 +56,10 @@ def check_browser(report, release, worker, fixture, headed=False):
         pages = {}
         contexts = []
         for role, phone in [('platform', '13800000001'), ('resource', '13800000002'), ('channel', '13800000003'), ('clinic', '13800000004')]:
-            context = browser.new_context(viewport={'width':1440, 'height':1000})
+            context = browser.new_context(no_viewport=True) if headed else browser.new_context(viewport={'width':1440, 'height':1000})
             page = context.new_page()
+            if headed:
+                page.set_viewport_size({'width':1440, 'height':1000})
             pages[role] = page
             contexts.append(context)
             errors = []
