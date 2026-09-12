@@ -2,7 +2,7 @@
   'use strict';
   const h = React.createElement;
   const {Button, Input, Card, Alert, Typography, Table, Tabs, Drawer: ArcoDrawer, Space, Select, Modal, Spin} = arco;
-  const Drawer = props => h(ArcoDrawer, {escToExit:true, ...props});
+  const Drawer = props => h(ArcoDrawer, {escToExit:true, autoFocus:true, focusLock:true, tabIndex:-1, ...props});
   const role = window.ACCEPTANCE_ROLE;
   const names = {platform:'平台管理',resource:'客户资源方',channel:'门诊渠道',clinic:'口腔门诊'};
   const phones = {platform:'13800000001',resource:'13800000002',channel:'13800000003',clinic:'13800000004'};
