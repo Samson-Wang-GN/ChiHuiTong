@@ -10,6 +10,8 @@ REQ-045 / TASK-090 / ADR-0028（沿用REQ-044独立部署保护）。仅在开�
 
 ## 本次范围
 
+TASK-094最新应用：`d4f39e71e4e005995820d25a96c795920a1537f5`，Excel识别/校验同步处理，其他任务仍按原timer执行。升级前备份`runtime/acceptance/before-20260912T104359Z.dump`；79条核心业务ID摘要不变，无数据库迁移。真实HTTPS回归`20260912T104425Z-acceptance-browser`通过。上一个可回退应用为下方1ccf62b；后续文档提交不切换已验证应用。
+
 TASK-092后续修正：当前应用1ccf62b5c4fcbc37d9c37b41f508baa94e0d0cc1，按真实Excel结构计算行列，修复无dimension模板被误记0×0。旧未提交批次在下一步时兼容修复，不重置用户记录；下段19b4c00为上一发布。
 
 最新REQ-046（后于下段REQ-045初始交付）：运行应用19b4c00ad5fa2df48984b38fd47fc66a6a373b3f，Excel上传自动匹配及一次下一步已部署。真实HTTPS回归`20260912T050512Z-acceptance-browser`通过，65条核心业务ID保留；其他数据和访问保护不变，详见[Excel交付](../excel-upload-review.md)。

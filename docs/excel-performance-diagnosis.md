@@ -2,6 +2,8 @@
 
 日期：2026-09-12；关联REQ-046、TASK-093。范围仅诊断和隔离测试，本次没有修改应用、任务调度、验收客户资料或用户订单。
 
+后续更新：用户已选择同步请求而非本文建议的常驻worker。TASK-094的实现及性能对比见[同步交付记录](excel-upload-review.md)，下面保留当时诊断结论；复用诊断脚本已更新为不启动worker的同步验证，旧报告仍按旧脚本/旧源码解释。
+
 ## 结论
 
 小文件主要慢在后台任务排队，并非Excel解析本身。当前验收worker每次执行一轮后退出，systemd设置`OnUnitActiveSec=60`，实际`AccuracyUSec=1min`。上传的`excel.inspect`和下一步的`excel.validate`各自入队，但没有即时唤醒机制。

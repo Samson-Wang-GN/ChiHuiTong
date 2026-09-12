@@ -14,6 +14,8 @@
 
 ## 当前状态
 
+最新TASK-094：应用d4f39e7已部署，Excel识别和校验改为同步请求，不再等待队列；保留原自动匹配/预览/一次下一步，其他后台任务不变。172项后端测试、无worker的Excel专项、完整四角色Web和真实HTTPS回归通过。万行同步校验约2.35秒（服务器处理，不含网络），原账号与数据保留，见[交付证据](docs/excel-upload-review.md)。下方为历史发布记录。
+
 最新修正TASK-092（应用1ccf62b）：兼容省略dimension的合法Excel模板，按真实单元格计算行列数，不再错误识别0×0。工作表/表头仍自动识别，正常文件一次下一步；旧未提交批次可直接重试。167项后端测试及模板上传页面专项通过，细节见[Excel交付记录](docs/excel-upload-review.md)。以下REQ-046首版记录保留历史验证范围。
 
 REQ-045 / TASK-090：四角色完整Web已开发部署，原账号/数据/口令保留。当前应用19b4c00包含REQ-046 / TASK-091的Excel上传简化：上传自动读取/匹配，原表头及前10行预览，必需字段缺失/歧义提示，底部一次下一步完成校验与确认。164项后端测试、89%覆盖率、Excel专项/完整跨角色及真实HTTPS回归通过。详见[Excel交付记录](docs/excel-upload-review.md)、[验收指引](docs/web-acceptance-guide.md)；四后台范围见[完整Web实施清单](docs/web-backend-plan.md)，自主决定见[ADR-0028](docs/decisions/0028-complete-web-backends.md)。
