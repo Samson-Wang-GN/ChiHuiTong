@@ -252,7 +252,7 @@ def exercise(pages, report, worker):
         fill(platform, '操作原因', '合成回归新增产品授权')
         dialog(platform).get_by_role('button', name='保存', exact=True).click()
         platform.wait_for_timeout(400)
-        assert field(platform, '分配比例（%）').locator('input').input_value() == '105'
+        assert float(field(platform, '分配比例（%）').locator('input').input_value()) == 105
         fill(platform, '分配比例（%）', 20)
         dialog(platform).get_by_text('本方分配 12.00 元', exact=False).wait_for()
         dialog(platform).get_by_role('button', name='保存', exact=True).click()

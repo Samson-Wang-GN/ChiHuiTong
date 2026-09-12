@@ -13,6 +13,8 @@ import sys
 import time
 from datetime import datetime, timezone
 
+sys.dont_write_bytecode = True
+
 ROOT = Path('/home/ubuntu/ChiHuiTong')
 PG = Path('/usr/lib/postgresql/16/bin')
 PORT = 18244
