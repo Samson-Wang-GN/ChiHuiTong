@@ -3,6 +3,7 @@ import json
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
+from PIL import Image
 
 from chihuitong.errors import BusinessError
 from chihuitong.integrations import safe_json, tencent_map
@@ -21,6 +22,28 @@ class LocationTests(TestCase):
             "district": "海淀区",
             "address": "合成测试路1号",
         }
+
+    @override_settings(TENCENT_MAP_KEY="synthetic-map-key")
+    def test_static_map_is_raster_only_scoped_and_bounded(self):
+        stream = io.BytesIO()
+        Image.new("RGB", (600, 360), "white").save(stream, format="PNG")
+        data = {"clinic_id": str(self.clinic.id), "latitude": "39.900000", "longitude": "116.300000", "zoom": 17}
+        with patch("urllib.request.OpenerDirector.open", return_value=io.BytesIO(stream.getvalue())) as call:
+            response = api_client(self.channel).post("/api/v1/clinics/map-preview", data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertTrue(call.call_args.args[0].full_url.startswith("https://apis.map.qq.com/ws/staticmap/v2/?"))
+        self.assertNotIn("synthetic-map-key", response.content.decode("latin1"))
+        self.assertEqual(api_client(self.resource).post("/api/v1/clinics/map-preview", data).status_code, 403)
+        other = actor_fixture("channel", "13900000065")
+        self.assertEqual(api_client(other).post("/api/v1/clinics/map-preview", data).status_code, 404)
+        self.assertEqual(api_client(self.channel).post("/api/v1/clinics/map-preview", {**data, "zoom": 99}).status_code, 400)
+        for raw in [b'{"message":"secret-provider-body"}', b'x' * (2 * 1024 * 1024 + 1)]:
+            with patch("urllib.request.OpenerDirector.open", return_value=io.BytesIO(raw)):
+                response = api_client(self.channel).post("/api/v1/clinics/map-preview", data)
+                self.assertEqual(response.status_code, 503)
+                self.assertNotIn("secret-provider-body", str(response.data))
 
     @override_settings(TENCENT_MAP_KEY="synthetic-map-key")
     def test_candidate_gcj_precision_and_no_profile_mutation(self):

@@ -19,10 +19,61 @@
     return h(C.FormDialog,{title:row?'维护门诊资料':'新增门诊',onClose,fields,initial:{...profile,channel_id:channel,responsible_id:profile.responsible_id||C.actor.id,cover_ids:profile.cover_id?[profile.cover_id]:[],location:profile.location||{status:'unconfirmed'}},submitText:row?'提交变更审核':'保存门诊资料',hint:'已审核门诊的所有修改均须再次审核。业务联系人及电话必填，不在客户小程序公开。地址变化后须重新核对地图。',onSubmit:async v=>{const {channel_id,admin_name,admin_phone,cover_ids,...next}=v;next.cover_id=cover_ids?.[0]||null;const address=keys.filter(k=>['province','city','district','address'].includes(k)).map(k=>next[k]).join('');if(next.location?.address_snapshot!==address)next.location={status:'unconfirmed'};return row?C.api(base+'clinics/'+row.id+'/profile-changes','POST',{profile:next,version:row.version}):C.api(base+'clinics','POST',{channel_id,admin_name,admin_phone,profile:next});}});
   };
   function LocationField({form,clinicId,value,onChange}){
-    const [error,setError]=React.useState(null),[busy,setBusy]=React.useState(false),[candidate,setCandidate]=React.useState(null);
-    async function locate(){setBusy(true);setError(null);try{const v=form.getFieldsValue();const data=await C.api(base+'clinics/geocode','POST',{...(clinicId?{clinic_id:clinicId}:{}),province:v.province,city:v.city,district:v.district,address:v.address});setCandidate(data.candidate);}catch(e){setError(e);}finally{setBusy(false);}}
-    return h('div',null,h(C.Error,{error}),h(A.Alert,{type:'info',content:value?.status==='confirmed'?'当前已保存确认坐标；地址改变后原定位将失效。':'尚未确认地图位置，可以保存资料；上线前必须完成地图核对。'}),h(A.Button,{loading:busy,onClick:locate},'按地址定位'),candidate&&h(A.Alert,{type:'warning',content:'地址候选已取得，但尚未在地图核对；不会自动标记确认。'}),value?.status==='confirmed'&&h(C.Facts,{data:value,fields:['longitude','latitude']}));
+    const [error,setError]=React.useState(null),[busy,setBusy]=React.useState(false);
+    function address(){const v=form.getFieldsValue();return ['province','city','district','address'].map(k=>v[k]||'').join('');}
+    function show(candidate){
+      const snapshot=address();
+      C.open('locationMap',{clinicId,candidate,address:snapshot,onConfirm:position=>{
+        if(address()!==snapshot)throw new Error('门诊地址已改变，请重新按地址定位后确认。');
+        onChange({...position,status:'confirmed',confirmed:true,coordinate_system:'GCJ-02',address_snapshot:snapshot,source:'map_manual'});
+      }});
+    }
+    async function locate(){
+      setBusy(true);setError(null);
+      try{const v=form.getFieldsValue();const data=await C.api(base+'clinics/geocode','POST',{...(clinicId?{clinic_id:clinicId}:{}),province:v.province,city:v.city,district:v.district,address:v.address});show(data.candidate);}
+      catch(e){setError(e);}finally{setBusy(false);}
+    }
+    return h('div',null,h(C.Error,{error}),
+      h(A.Alert,{type:'info',content:value?.status==='confirmed'?'已确认门诊位置；地址改变后须重新定位。':'先按地址定位，再在真实地图中核对门诊所在建筑并确认。'}),
+      h(A.Space,null,h(A.Button,{loading:busy,onClick:locate},'按地址定位'),
+      value?.status==='confirmed'&&h(A.Button,{onClick:()=>show(value)},'查看 / 调整地图位置')));
   }
+  C.mapPoint=function(center,zoom,dx,dy){
+    const size=256*Math.pow(2,zoom),sin=Math.sin(Number(center.latitude)*Math.PI/180);
+    const x=(Number(center.longitude)+180)/360*size+dx;
+    const y=(0.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*size+dy;
+    const lng=((x/size*360)%360+540)%360-180;
+    const lat=Math.atan(Math.sinh(Math.PI*(1-2*y/size)))*180/Math.PI;
+    return {latitude:Math.max(-85,Math.min(85,lat)).toFixed(6),longitude:lng.toFixed(6)};
+  };
+  C.dialogs.locationMap=function({clinicId,candidate,address,onConfirm,onClose}){
+    const [center,setCenter]=React.useState({latitude:Number(candidate.latitude).toFixed(6),longitude:Number(candidate.longitude).toFixed(6)});
+    const [zoom,setZoom]=React.useState(17),[url,setUrl]=React.useState(null),[busy,setBusy]=React.useState(false),[error,setError]=React.useState(null),[retry,setRetry]=React.useState(0);
+    React.useEffect(()=>{
+      const controller=new AbortController();let imageUrl=null;
+      setBusy(true);setError(null);setUrl(null);
+      C.request(base+'clinics/map-preview',{method:'POST',body:{...(clinicId?{clinic_id:clinicId}:{}),...center,zoom},binary:true,signal:controller.signal})
+        .then(blob=>{if(!controller.signal.aborted){imageUrl=URL.createObjectURL(blob);setUrl(imageUrl);}})
+        .catch(e=>{if(!controller.signal.aborted)setError(e);})
+        .finally(()=>{if(!controller.signal.aborted)setBusy(false);});
+      return()=>{controller.abort();if(imageUrl)URL.revokeObjectURL(imageUrl);};
+    },[center.latitude,center.longitude,zoom,retry]);
+    function move(dx,dy){setCenter(C.mapPoint(center,zoom,dx,dy));}
+    function confirm(){try{onConfirm(center);onClose();}catch(e){setError(e);}}
+    return h(C.Drawer,{title:'在地图中确认门诊位置',onClose,width:720,footer:h(A.Space,null,h(A.Button,{onClick:onClose},'取消'),
+      h(A.Button,{type:'primary',disabled:busy||!url||!!error,onClick:confirm},'确认中心标记为门诊位置'))},
+      h(A.Alert,{type:'info',content:address+'。点击地图中的门诊位置，将其移到中心标记；确认前核对道路和建筑。'}),
+      h(C.Error,{error,retry:()=>setRetry(v=>v+1)}),
+      h(A.Space,{wrap:true,className:'detail-actions'},
+        h(A.Button,{disabled:busy||zoom>=18,onClick:()=>setZoom(v=>v+1)},'放大'),
+        h(A.Button,{disabled:busy||zoom<=3,onClick:()=>setZoom(v=>v-1)},'缩小'),
+        [['向北',0,-100],['向南',0,100],['向西',-160,0],['向东',160,0]].map(([label,x,y])=>h(A.Button,{key:label,disabled:busy,onClick:()=>move(x,y)},label))),
+      h(A.Spin,{loading:busy,style:{width:'100%'}},h('div',{className:'location-map',onClick:e=>{
+        if(!url||busy)return;const r=e.currentTarget.getBoundingClientRect();move((e.clientX-r.left)/r.width*600-300,(e.clientY-r.top)/r.height*360-180);
+      }},url?h('img',{src:url,alt:'腾讯地图真实底图，点击选择门诊位置',draggable:false}):h(A.Empty,{description:busy?'地图加载中':'地图未加载，不能确认位置'}),
+      url&&h('span',{className:'location-map-pin','aria-label':'门诊位置标记'},'●'))),
+      h('p',{className:'muted'},'位置确认仅保存到本次表单，提交后仍须平台审核。地图标识与底图版权信息原样保留。'));
+  };
   C.dialogs.clinicChannel=function({row,onClose}){
     const channels=C.useQuery(base+'organizations?status=active&page_size=100');const [channel,setChannel]=React.useState('');const owners=C.useQuery(channel?base+'organizations/'+channel+'/members?status=active&page_size=100':null);
     return h(C.FormDialog,{title:'变更门诊所属渠道',onClose,fields:[{name:'channel_id',label:'新渠道',render:()=>h(A.Select,{options:(channels.data?.results||[]).filter(o=>o.kind==='channel').map(o=>({value:o.id,label:o.name})),onChange:setChannel})},{name:'responsible_id',label:'新负责业务员',type:'select',options:(owners.data?.results||[]).map(m=>({value:m.id,label:m.name}))},C.Reason],hint:'必须先从门诊列表下线。变更后核销的业绩归新渠道；历史已核销交易不追溯。',onSubmit:v=>C.api(base+'clinics/'+row.id+'/channel','POST',{...v,version:row.version})});

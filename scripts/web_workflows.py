@@ -36,6 +36,20 @@ def read(page, path):
     return page.evaluate('path => window.CHT.api(path)', path)
 
 
+def upload(page, report):
+    with page.expect_response(lambda response: response.url.endswith('/api/v1/files') and response.request.method == 'POST') as response:
+        page.locator('.arco-drawer-wrapper').last.locator('input[type=file]').set_input_files(report/'synthetic-proof.png')
+    assert response.value.status == 201
+    page.locator('.arco-drawer-wrapper').last.get_by_role('button', name='查看附件 1', exact=True).wait_for()
+
+
+def date_field(page, label, value):
+    element = field(page, label).locator('input').first
+    element.fill(value)
+    element.press('Enter')
+    element.press('Tab')
+
+
 def exercise(pages, report, worker):
     resource, platform, clinic = pages['resource'], pages['platform'], pages['clinic']
     completed = []
@@ -146,6 +160,42 @@ def exercise(pages, report, worker):
         assert all(bill['status']=='settled' for bill in bills)
         close(clinic)
         completed.append('explicit simulated payment settles only current synthetic bill')
+
+        # Each partner confirms its own monthly bill, platform records offline proof, partner receives.
+        from datetime import datetime
+        today = datetime.now().strftime('%Y-%m-%d')
+        for role in ['resource', 'channel']:
+            partner = pages[role]
+            menu(partner, '合作方结算单')
+            partner.get_by_role('button', name='详情', exact=True).first.click()
+            partner.get_by_role('button', name='确认对账', exact=True).click()
+            partner.locator('.arco-drawer-wrapper').last.get_by_role('button', name='保存', exact=True).click()
+            partner.wait_for_timeout(300)
+            bill = read(partner, '/api/v1/partner-bills')['results'][0]
+            assert bill['status'] == 'pending_payment'
+            close(partner)
+            menu(platform, '合作方结算单')
+            platform.get_by_role('button', name='刷新', exact=True).click()
+            platform.locator('.arco-table-tr').filter(has_text=bill['organization_name']).get_by_role('button', name='详情', exact=True).click()
+            platform.get_by_role('button', name='登记付款并上传凭证', exact=True).click()
+            date_field(platform, '付款时间', today+' 08:00')
+            fill(platform, '付款流水号', 'SYNTHETIC-'+role)
+            upload(platform, report)
+            platform.get_by_role('button', name='登记已付款', exact=True).click()
+            platform.wait_for_timeout(300)
+            paid = read(platform, '/api/v1/partner-bills/'+bill['id'])
+            assert paid['status'] == 'pending_receipt'
+            assert len(paid['payment']['attachment_ids']) == 1
+            close(platform)
+            partner.get_by_role('button', name='刷新', exact=True).click()
+            partner.get_by_role('button', name='详情', exact=True).first.click()
+            partner.get_by_role('button', name='确认收款', exact=True).click()
+            date_field(partner, '实际收款日期', today)
+            partner.locator('.arco-drawer-wrapper').last.get_by_role('button', name='确认收款', exact=True).click()
+            partner.wait_for_timeout(300)
+            assert read(partner, '/api/v1/partner-bills/'+bill['id'])['status'] == 'completed'
+            close(partner)
+            completed.append(role+' monthly statement confirm platform proof and receipt')
         for role, page in pages.items():
             page.screenshot(path=str(report/f'{role}-workflow.png'), full_page=True, animations='disabled')
     except Exception:

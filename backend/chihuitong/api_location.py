@@ -1,11 +1,12 @@
 from rest_framework import serializers
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.http import HttpResponse
 
 from .api import StrictSerializer, validated
 from .errors import require
 from .identity import rate_limit, request_actor
-from .integrations.tencent_map import geocode
+from .integrations.tencent_map import geocode, static_map
 from .services.clinics import get_clinic
 from .services.common import audit
 
@@ -16,6 +17,31 @@ class GeocodeInput(StrictSerializer):
     city = serializers.CharField(max_length=100)
     district = serializers.CharField(max_length=100)
     address = serializers.CharField(max_length=300)
+
+
+class MapInput(StrictSerializer):
+    clinic_id = serializers.UUIDField(required=False)
+    latitude = serializers.DecimalField(max_digits=10, decimal_places=6, min_value=-85, max_value=85)
+    longitude = serializers.DecimalField(max_digits=10, decimal_places=6, min_value=-180, max_value=180)
+    zoom = serializers.IntegerField(min_value=3, max_value=18)
+
+
+@api_view(["POST"])
+def map_preview(request):
+    actor = request_actor(request)
+    require(actor.platform or actor.organization.kind in {"channel", "clinic"}, "forbidden", "仅门诊资料维护人员可处理定位", 403)
+    if actor.organization.kind == "clinic":
+        actor.require_admin()
+    data = validated(MapInput, request)
+    if data.get("clinic_id"):
+        get_clinic(actor, data["clinic_id"], edit=True)
+    else:
+        require(actor.platform or actor.organization.kind == "channel", "clinic_required", "请选择本人门诊", 400)
+    rate_limit(f"map-preview:{actor.membership.id}", seconds=60, maximum=60)
+    response = HttpResponse(static_map(data["latitude"], data["longitude"], data["zoom"]), content_type="image/png")
+    response["Cache-Control"] = "no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @api_view(["POST"])

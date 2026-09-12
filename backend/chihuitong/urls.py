@@ -40,6 +40,7 @@ urlpatterns = [
     path("contract-versions/<uuid:version_id>/products", catalog.contract_products),
     path("clinics", catalog.clinic_list),
     path("clinics/geocode", location.locate),
+    path("clinics/map-preview", location.map_preview),
     path("clinics/<uuid:clinic_id>", catalog.clinic_detail),
     path("clinics/<uuid:clinic_id>/profile-changes", catalog.profile_changes),
     path("profile-changes/<uuid:change_id>/review", catalog.profile_review),
