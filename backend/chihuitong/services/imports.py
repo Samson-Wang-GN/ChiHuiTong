@@ -16,9 +16,9 @@ from .customers import match_preview, normalize_customer
 from .files import checked_xlsx, file_bytes, validate_attachment_ids
 
 ALIASES = {
-    "name": ["姓名", "客户姓名", "客户名称", "持卡人姓名", "name"],
-    "phone": ["手机号", "手机号码", "客户手机号", "客户手机", "联系电话", "phone", "mobile"],
-    "quantity": ["开卡数量", "数量", "张数", "卡数量", "quantity"],
+    "name": ["姓名", "客户姓名", "客户名称", "持卡人姓名", "会员姓名", "用户姓名", "name", "customer_name"],
+    "phone": ["手机号", "手机号码", "客户手机号", "客户手机号码", "客户手机", "联系电话", "联系手机", "手机", "phone", "mobile", "phone_number"],
+    "quantity": ["开卡数量", "开卡张数", "购卡数量", "购卡张数", "采购数量", "数量", "张数", "卡数量", "quantity"],
     "resource_customer_no": [
         "资源方客户编号",
         "客户编号",
@@ -34,7 +34,9 @@ ALIASES = {
 
 
 def header_key(value):
-    return "".join(unicodedata.normalize("NFKC", str(value or "")).split()).lower()
+    value = unicodedata.normalize("NFKC", str(value or "")).lower()
+    # Normalize presentation punctuation, not arbitrary substrings (e.g. salesman phone).
+    return "".join(char for char in value if char.isalnum())
 
 
 def visible_imports(actor):
@@ -114,7 +116,7 @@ def inspect_import(batch_id, expected_version):
             )
             preview[sheet.title] = [
                 [safe_cell(cell) for cell in row]
-                for row in sheet.iter_rows(max_row=min(20, sheet.max_row or 0))
+                for row in sheet.iter_rows(max_row=min(30, sheet.max_row or 0))
             ]
     finally:
         book.close()
@@ -349,13 +351,13 @@ def suggest_mapping(headers, stored_format=None):
     suggestions, ambiguous = {}, {}
     if stored_format:
         require(
-            sorted(keys) == sorted(stored_format.structure["headers"]),
+            sorted(keys) == sorted(header_key(value) for value in stored_format.structure["headers"]),
             "format_changed",
             "表头结构已变化，请重新对应列",
             400,
         )
         aliases = {
-            field: {header} for field, header in stored_format.structure["field_headers"].items()
+            field: {header_key(header)} for field, header in stored_format.structure["field_headers"].items()
         }
     for field, names in aliases.items():
         candidates = [i for i, key in enumerate(keys) if key and key in names]
@@ -364,3 +366,44 @@ def suggest_mapping(headers, stored_format=None):
         elif len(candidates) > 1:
             ambiguous[field] = candidates
     return {"mapping": suggestions, "ambiguous": ambiguous, "requires_confirmation": True}
+
+
+def recommend_import(batch):
+    """Bounded, deterministic header suggestions; never infer customer fields from values."""
+    formats = {}
+    for item in ImportFormat.objects.filter(organization=batch.organization).order_by("created_at", "id"):
+        structure = tuple(sorted(header_key(v) for v in item.structure["headers"]))
+        formats.setdefault(structure, []).append(item)
+    candidates = []
+    for sheet in batch.sheets:
+        for number, headers in enumerate(batch.preview.get(sheet["name"], [])[:20], 1):
+            result = suggest_mapping(headers)
+            saved = formats.get(tuple(sorted(header_key(v) for v in headers)), [])
+            if saved:
+                matches = [suggest_mapping(headers, item) for item in saved]
+                # Conflicting historical formats must not silently choose one identity column.
+                for field in ALIASES:
+                    indexes = set()
+                    for match in matches:
+                        if field in match["mapping"]:
+                            indexes.add(match["mapping"][field])
+                        indexes.update(match["ambiguous"].get(field, []))
+                    if indexes:
+                        result["mapping"].pop(field, None)
+                        result["ambiguous"].pop(field, None)
+                        if len(indexes) == 1:
+                            result["mapping"][field] = indexes.pop()
+                        else:
+                            result["ambiguous"][field] = sorted(indexes)
+            known = set(result["mapping"]) | set(result["ambiguous"])
+            score = len(known & {"name", "phone"}) * 100 + ("quantity" in known) * 20 + len(known)
+            if score:
+                candidates.append({"sheet": sheet["name"], "header_row": number,
+                                   "score": score, "saved_format": bool(saved), **result})
+    if not candidates:
+        first = next((s for s in batch.sheets if s["rows"]), None)
+        return {"sheet": first["name"] if first else "", "header_row": 1,
+                "mapping": {}, "ambiguous": {}, "alternatives": 0, "saved_format": False}
+    candidates.sort(key=lambda item: item["score"], reverse=True)
+    best = candidates[0]
+    return {**best, "alternatives": sum(c["score"] == best["score"] for c in candidates) - 1}

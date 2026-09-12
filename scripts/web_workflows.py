@@ -119,22 +119,22 @@ def exercise(pages, report, worker, fixture):
         with resource.expect_response(lambda response: response.url.endswith('/api/v1/files') and response.request.method=='POST') as uploaded:
             dialog(resource).locator('input[type=file]').set_input_files(report/'synthetic-customers.xlsx')
         assert uploaded.value.status == 201
-        resource.get_by_role('button', name='读取 Excel', exact=True).click()
-        resource.get_by_text('等待读取', exact=True).wait_for()
+        resource.get_by_text('正在读取文件并自动匹配列名…', exact=True).wait_for()
+        # Upload itself starts inspection; no separate read or match clicks.
+        resource.wait_for_timeout(400)
         worker()
-        resource.get_by_text('待确认列', exact=True).wait_for(timeout=15000)
-        resource.get_by_role('button', name='识别列对应关系', exact=True).click()
-        resource.get_by_text('以下字段存在多个候选列', exact=False).wait_for()
+        resource.get_by_text('原文件预览 · 前10条数据', exact=True).wait_for(timeout=15000)
+        resource.get_by_text('有多个候选列，请选择正确的一列', exact=True).wait_for()
+        assert resource.locator('.import-preview .arco-table-tr').count() == 2
+        assert resource.get_by_role('button', name='读取 Excel', exact=True).count() == 0
         phone_row = dialog(resource).locator('.arco-table-tr').filter(has_text='客户手机号（必填）')
         phone_row.locator('.arco-select').click()
         resource.locator('.arco-select-popup:visible .arco-select-option').filter(has_text=re.compile('^B · 手机号$')).click()
-        resource.get_by_role('button', name='确认列对应并校验', exact=True).click()
-        resource.get_by_text('正在校验', exact=True).wait_for()
+        with resource.expect_response(lambda response: '/imports/' in response.url and response.url.endswith('/mapping')) as configured:
+            resource.get_by_role('button', name='下一步', exact=True).click()
+        assert configured.value.status == 200
         worker()
-        resource.get_by_role('button', name='确认本次导入', exact=True).wait_for(timeout=15000)
-        resource.get_by_role('button', name='确认本次导入', exact=True).click()
-        resource.get_by_role('button', name='已确认导入', exact=True).wait_for()
-        resource.get_by_role('button', name='下一步', exact=True).click()
+        resource.get_by_role('button', name='提交开卡订单', exact=True).wait_for(timeout=15000)
         select(resource, '推广产品')
         select(resource, '对客户展示的权益来源')
         resource.get_by_role('button', name='提交开卡订单', exact=True).click()

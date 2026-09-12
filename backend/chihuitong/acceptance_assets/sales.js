@@ -402,6 +402,7 @@
   C.dialogs.saleWizard = function ({ onClose }) {
     const [previewPrice, setPreviewPrice] = React.useState(0),
       [previewUnits, setPreviewUnits] = React.useState(1);
+    const prepareImport = React.useRef(null);
     const [step, setStep] = React.useState(1),
       [draft, setDraft] = React.useState({ selection: 'physical' });
     const org = C.actor.organization_id,
@@ -452,7 +453,7 @@
                 { name: 'age', type: 'number', max: 150, optional: true },
                 { name: 'occupation', optional: true },
               ]
-            : [{ name: 'import', label: 'Excel列适配与确认', render: () => h(C.ImportEditor) }];
+            : [{ name: 'import', label: '上传客户Excel', optional: true, render: () => h(C.ImportEditor, { prepareRef: prepareImport }) }];
     else
       fields = [
         {
@@ -549,10 +550,12 @@
       ),
       onSubmit: async (v, key) => {
         const data = { ...draft, ...v };
-        setDraft(data);
         if (step < 3) {
-          if (step === 2 && draft.selection === 'named_excel' && v.import?.status !== 'confirmed')
-            throw new Error('请先完成列校验并确认导入');
+          if (step === 2 && draft.selection === 'named_excel') {
+            if (!prepareImport.current) throw new Error('请上传客户Excel');
+            data.import = await prepareImport.current();
+          }
+          setDraft(data);
           setStep(step + 1);
           return false;
         }

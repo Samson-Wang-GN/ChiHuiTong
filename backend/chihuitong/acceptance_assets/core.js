@@ -698,7 +698,7 @@
       ),
     );
   };
-  C.FileInput = function ({ value = [], onChange, purpose, multiple = true }) {
+  C.FileInput = function ({ value = [], onChange, purpose, multiple = true, disabled = false }) {
     const [error, setError] = React.useState(null),
       [files, setFiles] = React.useState([]);
     const ids = React.useRef(value || []),
@@ -722,6 +722,7 @@
       h(C.Error, { error }),
       h(A.Upload, {
         multiple,
+        disabled,
         autoUpload: true,
         limit: multiple ? 20 : 1,
         fileList: files,
