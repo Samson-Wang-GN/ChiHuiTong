@@ -40,7 +40,7 @@
           content:
             profile.location?.status === 'confirmed'
               ? '已确认位置 · ' + profile.location.address_snapshot
-              : '尚未确认地图位置，不能上线接收新预约',
+              : '尚未确认地图位置，暂不能准确按距离推荐；请补充定位并提交审核',
         }),
         profile.location?.status === 'confirmed' &&
           h(C.Facts, { data: profile.location, fields: ['longitude', 'latitude'] }),
