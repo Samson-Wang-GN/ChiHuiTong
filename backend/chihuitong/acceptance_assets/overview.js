@@ -1,20 +1,326 @@
-(function(){
+(function () {
   'use strict';
-  const C=window.CHT,{h,A}=C,base='/api/v1/customer-overview';
-  const titles={customers:'客户人数',purchased:'采购卡张数',activated:'激活卡张数',appointments:'累计预约次数',redemptions:'核销次数',activation_rate:'卡片激活率',appointment_rate:'客户预约率',redemption_rate:'客户核销率'};
-  const rules={customers:'所选开卡批次关联客户去重人数；不记名卡激活后才关联客户。',purchased:'所选批次已开卡且未作废的卡张数。',activated:'所选批次已激活 / 已领取且未作废的卡张数。',appointments:'关联权益的待确认、成功、完成预约总次数，不包含取消；系统自动完成仍计预约，但不计核销。',redemptions:'当前有效且未撤销的核销次数，系统自动完成不计核销。',activation_rate:'已激活卡张数 / 有效采购卡张数。',appointment_rate:'已预约去重客户人数 / 已激活去重客户人数。',redemption_rate:'已核销去重客户人数 / 已预约去重客户人数。'};
-  function metricText(value){return value&&typeof value==='object'?value.value==null?'—':value.value+'%':value??'—';}
-  function contextParams(ctx){return Object.fromEntries(['date_from','date_to','as_of','recorded_cutoff','resource_id','product_id','mode'].filter(k=>ctx[k]).map(k=>[k,ctx[k]]));}
-  function openMetric(key,context,productId){C.open('metric',{metric:key,params:{...contextParams(context),...(productId?{product_id:productId}:{})}});}
-  C.pages.overview=function(){const [range,setRange]=React.useState([]),[mode,setMode]=React.useState('all'),[resource,setResource]=React.useState('');const params={date_from:range?.[0],date_to:range?.[1],mode,...(C.role==='platform'&&resource?{resource_id:resource}:{})};const q=C.useQuery(base+'?'+C.query(params));const r=q.data;return h('div',null,h(C.Panel,{title:'客户与权益概览'},h(A.Space,{wrap:true},h(A.DatePicker.RangePicker,{value:range,onChange:setRange,placeholder:['开卡批次起日','开卡批次止日']}),h(A.Select,{value:mode,onChange:setMode,style:{width:200},options:C.options({all:'全部销售方式',physical:'不记名实体卡',named:'记名非实体卡'})}),C.role==='platform'&&h(A.Select,{value:resource,onChange:setResource,style:{width:240},options:[{value:'',label:'全部客户资源方'},...(r?.resources||[]).map(o=>({value:o.id,label:o.name}))]}),h(A.Button,{onClick:q.reload,loading:q.loading},'刷新')),h(C.Error,{error:q.error,retry:q.reload}),r&&h('div',null,h('p',{className:'muted'},'开卡批次 '+r.context.date_from+' 至 '+r.context.date_to+' · 观察截止 '+C.text('as_of_at',r.context.as_of)),h(A.Alert,{type:'info',content:'点击指标查看日 / 周 / 月变化和对应明细。各比率按期末集合重算，分母为0显示“—”。'}),r.metrics.excluded_missing_issuance>0&&h(A.Alert,{type:'warning',content:'部分记录缺少历史开卡事件，已从可重建范围排除，不能将此部分视为零。'}),h('div',{className:'cards'},Object.entries(titles).map(([key,title])=>h(A.Card,{key,title},h(A.Button,{type:'text',className:'metric-button',onClick:()=>openMetric(key,r.context)},metricText(r.metrics[key]))))))),r&&h(C.Panel,{title:'按推广产品汇总'},h(C.List,{key:C.query(params),path:base+'/products',params:contextParams(r.context),search:true,columns:[C.column('internal_name','推广产品',220),...Object.entries(titles).map(([key,title])=>({title,width:160,render:(_,row)=>h(A.Button,{type:'text',onClick:()=>openMetric(key,r.context,row.id)},metricText(row[key]))})),C.column('status')]})));};
-  function Chart({points=[],rate=false}){
-    const values=points.map(p=>p.value&&typeof p.value==='object'?(p.value.value==null?null:Number(p.value.value)):p.value),valid=values.filter(v=>v!=null),low=Math.min(0,...valid),high=Math.max(1,...valid),span=high-low;
-    const x=i=>60+i*680/Math.max(1,points.length-1),y=v=>220-(v-low)/span*180;let d='',previous=false;
-    values.forEach((value,i)=>{if(value==null){previous=false;return;}d+=(previous?'L':'M')+x(i)+','+y(value)+' ';previous=true;});
-    return h('svg',{viewBox:'0 0 800 270',role:'img','aria-label':'指标变化曲线，精确数值见下方表格',className:'readonly-figure',style:{width:'100%',border:'1px solid var(--color-border-2)',borderRadius:4}},h('line',{x1:60,x2:740,y1:y(0),y2:y(0),stroke:'var(--color-border-2)'}),h('line',{x1:60,x2:60,y1:30,y2:220,stroke:'var(--color-border-2)'}),h('text',{x:8,y:40,fill:'var(--color-text-2)',fontSize:12},high+(rate?'%':'')),h('text',{x:8,y:220,fill:'var(--color-text-2)',fontSize:12},low+(rate?'%':'')),h('path',{d,fill:'none',stroke:'rgb(var(--primary-6))',strokeWidth:2}),points.map((p,i)=>values[i]==null?null:h('circle',{key:i,cx:x(i),cy:y(values[i]),r:3,fill:'rgb(var(--primary-6))'},h('title',null,p.from+' 至 '+p.to+'：'+metricText(p.value)))),h('text',{x:60,y:252,fill:'var(--color-text-2)',fontSize:12},points[0]?.from||''),h('text',{x:740,y:252,textAnchor:'end',fill:'var(--color-text-2)',fontSize:12},points.at(-1)?.to||''));
+  const C = window.CHT,
+    { h, A } = C,
+    base = '/api/v1/customer-overview';
+  const titles = {
+    customers: '客户人数',
+    purchased: '采购卡张数',
+    activated: '激活卡张数',
+    appointments: '累计预约次数',
+    redemptions: '核销次数',
+    activation_rate: '卡片激活率',
+    appointment_rate: '客户预约率',
+    redemption_rate: '客户核销率',
+  };
+  const rules = {
+    customers: '所选开卡批次关联客户去重人数；不记名卡激活后才关联客户。',
+    purchased: '所选批次已开卡且未作废的卡张数。',
+    activated: '所选批次已激活 / 已领取且未作废的卡张数。',
+    appointments:
+      '关联权益的待确认、成功、完成预约总次数，不包含取消；系统自动完成仍计预约，但不计核销。',
+    redemptions: '当前有效且未撤销的核销次数，系统自动完成不计核销。',
+    activation_rate: '已激活卡张数 / 有效采购卡张数。',
+    appointment_rate: '已预约去重客户人数 / 已激活去重客户人数。',
+    redemption_rate: '已核销去重客户人数 / 已预约去重客户人数。',
+  };
+  function metricText(value) {
+    return value && typeof value === 'object'
+      ? value.value == null
+        ? '—'
+        : value.value + '%'
+      : (value ?? '—');
   }
-  C.dialogs.metric=function({metric,params,onClose}){
-    const [granularity,setGranularity]=React.useState('day'),[display,setDisplay]=React.useState('cumulative'),[component,setComponent]=React.useState('numerator');const rate=metric.endsWith('_rate');const q=C.useQuery(base+'/trend?'+C.query({...params,metric,granularity,display}));const details={...params,metric,component};
-    return h(C.Drawer,{title:titles[metric]+' · 趋势与明细',onClose},h(A.Alert,{type:'info',content:rules[metric]}),h(A.Space,{wrap:true,style:{margin:'20px 0'}},h(A.Select,{value:granularity,onChange:setGranularity,options:C.options({day:'按天',week:'按周',month:'按月'}),style:{width:130}}),!rate&&h(A.Select,{value:display,onChange:setDisplay,options:C.options({cumulative:'累计值',net:'净变化'}),style:{width:130}})),h(C.Error,{error:q.error,retry:q.reload}),h(A.Spin,{loading:q.loading,style:{width:'100%'}},q.data&&h(Chart,{points:q.data.points,rate})),h(A.Tabs,{defaultActiveTab:'details'},h(A.Tabs.TabPane,{key:'details',title:'指标明细'},rate&&h(A.Radio.Group,{value:component,onChange:setComponent,type:'button',options:[{label:'分子明细',value:'numerator'},{label:'分母明细',value:'denominator'}],style:{marginBottom:16}}),h(C.List,{key:component,path:base+'/details',params:details,exportPath:base+'/export.xlsx',exportName:titles[metric]+'明细.xlsx',columns:['customer_number','name','phone','serial','internal_name','status','units'].map(k=>C.column(k))})),h(A.Tabs.TabPane,{key:'values',title:'趋势精确数值'},h(A.Table,{rowKey:'from',data:q.data?.points||[],columns:[{title:'统计起日',dataIndex:'from'},{title:'统计止日',dataIndex:'to'},{title:titles[metric],render:(_,r)=>metricText(r.value)},...(rate?[{title:'分子',render:(_,r)=>r.value.numerator},{title:'分母',render:(_,r)=>r.value.denominator}]:[])],pagination:{pageSize:20}}))));
+  function contextParams(ctx) {
+    return Object.fromEntries(
+      ['date_from', 'date_to', 'as_of', 'recorded_cutoff', 'resource_id', 'product_id', 'mode']
+        .filter((k) => ctx[k])
+        .map((k) => [k, ctx[k]]),
+    );
+  }
+  function openMetric(key, context, productId) {
+    C.open('metric', {
+      metric: key,
+      params: { ...contextParams(context), ...(productId ? { product_id: productId } : {}) },
+    });
+  }
+  C.pages.overview = function () {
+    const [range, setRange] = React.useState([]),
+      [mode, setMode] = React.useState('all'),
+      [resource, setResource] = React.useState('');
+    const params = {
+      date_from: range?.[0],
+      date_to: range?.[1],
+      mode,
+      ...(C.role === 'platform' && resource ? { resource_id: resource } : {}),
+    };
+    const q = C.useQuery(base + '?' + C.query(params));
+    const r = q.data;
+    return h(
+      'div',
+      null,
+      h(
+        C.Panel,
+        { title: '客户与权益概览' },
+        h(
+          A.Space,
+          { wrap: true },
+          h(A.DatePicker.RangePicker, {
+            value: range,
+            onChange: setRange,
+            placeholder: ['开卡批次起日', '开卡批次止日'],
+          }),
+          h(A.Select, {
+            value: mode,
+            onChange: setMode,
+            style: { width: 200 },
+            options: C.options({
+              all: '全部销售方式',
+              physical: '不记名实体卡',
+              named: '记名非实体卡',
+            }),
+          }),
+          C.role === 'platform' &&
+            h(A.Select, {
+              value: resource,
+              onChange: setResource,
+              style: { width: 240 },
+              options: [
+                { value: '', label: '全部客户资源方' },
+                ...(r?.resources || []).map((o) => ({ value: o.id, label: o.name })),
+              ],
+            }),
+          h(A.Button, { onClick: q.reload, loading: q.loading }, '刷新'),
+        ),
+        h(C.Error, { error: q.error, retry: q.reload }),
+        r &&
+          h(
+            'div',
+            null,
+            h(
+              'p',
+              { className: 'muted' },
+              '开卡批次 ' +
+                r.context.date_from +
+                ' 至 ' +
+                r.context.date_to +
+                ' · 观察截止 ' +
+                C.text('as_of_at', r.context.as_of),
+            ),
+            h(A.Alert, {
+              type: 'info',
+              content:
+                '点击指标查看日 / 周 / 月变化和对应明细。各比率按期末集合重算，分母为0显示“—”。',
+            }),
+            r.metrics.excluded_missing_issuance > 0 &&
+              h(A.Alert, {
+                type: 'warning',
+                content: '部分记录缺少历史开卡事件，已从可重建范围排除，不能将此部分视为零。',
+              }),
+            h(
+              'div',
+              { className: 'cards' },
+              Object.entries(titles).map(([key, title]) =>
+                h(
+                  A.Card,
+                  { key, title },
+                  h(
+                    A.Button,
+                    {
+                      type: 'text',
+                      className: 'metric-button',
+                      onClick: () => openMetric(key, r.context),
+                    },
+                    metricText(r.metrics[key]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ),
+      r &&
+        h(
+          C.Panel,
+          { title: '按推广产品汇总' },
+          h(C.List, {
+            key: C.query(params),
+            path: base + '/products',
+            params: contextParams(r.context),
+            search: true,
+            columns: [
+              C.column('internal_name', '推广产品', 220),
+              ...Object.entries(titles).map(([key, title]) => ({
+                title,
+                width: 160,
+                render: (_, row) =>
+                  h(
+                    A.Button,
+                    { type: 'text', onClick: () => openMetric(key, r.context, row.id) },
+                    metricText(row[key]),
+                  ),
+              })),
+              C.column('status'),
+            ],
+          }),
+        ),
+    );
+  };
+  function Chart({ points = [], rate = false }) {
+    const values = points.map((p) =>
+        p.value && typeof p.value === 'object'
+          ? p.value.value == null
+            ? null
+            : Number(p.value.value)
+          : p.value,
+      ),
+      valid = values.filter((v) => v != null),
+      low = Math.min(0, ...valid),
+      high = Math.max(1, ...valid),
+      span = high - low;
+    const x = (i) => 60 + (i * 680) / Math.max(1, points.length - 1),
+      y = (v) => 220 - ((v - low) / span) * 180;
+    let d = '',
+      previous = false;
+    values.forEach((value, i) => {
+      if (value == null) {
+        previous = false;
+        return;
+      }
+      d += (previous ? 'L' : 'M') + x(i) + ',' + y(value) + ' ';
+      previous = true;
+    });
+    return h(
+      'svg',
+      {
+        viewBox: '0 0 800 270',
+        role: 'img',
+        'aria-label': '指标变化曲线，精确数值见下方表格',
+        className: 'readonly-figure',
+        style: { width: '100%', border: '1px solid var(--color-border-2)', borderRadius: 4 },
+      },
+      h('line', { x1: 60, x2: 740, y1: y(0), y2: y(0), stroke: 'var(--color-border-2)' }),
+      h('line', { x1: 60, x2: 60, y1: 30, y2: 220, stroke: 'var(--color-border-2)' }),
+      h(
+        'text',
+        { x: 8, y: 40, fill: 'var(--color-text-2)', fontSize: 12 },
+        high + (rate ? '%' : ''),
+      ),
+      h(
+        'text',
+        { x: 8, y: 220, fill: 'var(--color-text-2)', fontSize: 12 },
+        low + (rate ? '%' : ''),
+      ),
+      h('path', { d, fill: 'none', stroke: 'rgb(var(--primary-6))', strokeWidth: 2 }),
+      points.map((p, i) =>
+        values[i] == null
+          ? null
+          : h(
+              'circle',
+              { key: i, cx: x(i), cy: y(values[i]), r: 3, fill: 'rgb(var(--primary-6))' },
+              h('title', null, p.from + ' 至 ' + p.to + '：' + metricText(p.value)),
+            ),
+      ),
+      h(
+        'text',
+        { x: 60, y: 252, fill: 'var(--color-text-2)', fontSize: 12 },
+        points[0]?.from || '',
+      ),
+      h(
+        'text',
+        { x: 740, y: 252, textAnchor: 'end', fill: 'var(--color-text-2)', fontSize: 12 },
+        points.at(-1)?.to || '',
+      ),
+    );
+  }
+  C.dialogs.metric = function ({ metric, params, onClose }) {
+    const [granularity, setGranularity] = React.useState('day'),
+      [display, setDisplay] = React.useState('cumulative'),
+      [component, setComponent] = React.useState('numerator');
+    const rate = metric.endsWith('_rate');
+    const q = C.useQuery(base + '/trend?' + C.query({ ...params, metric, granularity, display }));
+    const details = { ...params, metric, component };
+    return h(
+      C.Drawer,
+      { title: titles[metric] + ' · 趋势与明细', onClose },
+      h(A.Alert, { type: 'info', content: rules[metric] }),
+      h(
+        A.Space,
+        { wrap: true, style: { margin: '20px 0' } },
+        h(A.Select, {
+          value: granularity,
+          onChange: setGranularity,
+          options: C.options({ day: '按天', week: '按周', month: '按月' }),
+          style: { width: 130 },
+        }),
+        !rate &&
+          h(A.Select, {
+            value: display,
+            onChange: setDisplay,
+            options: C.options({ cumulative: '累计值', net: '净变化' }),
+            style: { width: 130 },
+          }),
+      ),
+      h(C.Error, { error: q.error, retry: q.reload }),
+      h(
+        A.Spin,
+        { loading: q.loading, style: { width: '100%' } },
+        q.data && h(Chart, { points: q.data.points, rate }),
+      ),
+      h(
+        A.Tabs,
+        { defaultActiveTab: 'details' },
+        h(
+          A.Tabs.TabPane,
+          { key: 'details', title: '指标明细' },
+          rate &&
+            h(A.Radio.Group, {
+              value: component,
+              onChange: setComponent,
+              type: 'button',
+              options: [
+                { label: '分子明细', value: 'numerator' },
+                { label: '分母明细', value: 'denominator' },
+              ],
+              style: { marginBottom: 16 },
+            }),
+          h(C.List, {
+            key: component,
+            path: base + '/details',
+            params: details,
+            exportPath: base + '/export.xlsx',
+            exportName: titles[metric] + '明细.xlsx',
+            columns: [
+              'customer_number',
+              'name',
+              'phone',
+              'serial',
+              'internal_name',
+              'status',
+              'units',
+            ].map((k) => C.column(k)),
+          }),
+        ),
+        h(
+          A.Tabs.TabPane,
+          { key: 'values', title: '趋势精确数值' },
+          h(A.Table, {
+            rowKey: 'from',
+            data: q.data?.points || [],
+            columns: [
+              { title: '统计起日', dataIndex: 'from' },
+              { title: '统计止日', dataIndex: 'to' },
+              { title: titles[metric], render: (_, r) => metricText(r.value) },
+              ...(rate
+                ? [
+                    { title: '分子', render: (_, r) => r.value.numerator },
+                    { title: '分母', render: (_, r) => r.value.denominator },
+                  ]
+                : []),
+            ],
+            pagination: { pageSize: 20 },
+          }),
+        ),
+      ),
+    );
   };
 })();

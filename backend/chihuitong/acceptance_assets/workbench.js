@@ -1,11 +1,156 @@
-(function(){
+(function () {
   'use strict';
-  const C=window.CHT,{h,A}=C;
-  const base='/api/v1/';
-  const titles={organization_review:'合作机构审核',clinic_profile:'门诊资料审核',profile_resubmission:'门诊资料待重提',contract_review:'合同审核',contract_submission:'合同待提交',sales_review:'开卡审核',sales_stop:'停止 / 取消审核',sales_payment:'采购付款',purchase_receipt:'采购收款审核',clinic_receipt:'门诊收款审核',partner_payment:'合作方付款',partner_confirmation:'合作方对账 / 收款',clinic_payment:'门诊付款',clinic_collection:'门诊催收',finance_feedback:'财务异议',failed_job:'失败任务',appointment_confirmation:'预约确认',appointment_reschedule:'客户改期',appointment_fulfillment:'过期预约待办'};
-  Object.assign(C.labels,titles);
-  C.openTask=async row=>{try{const d=await C.api(row.detail_endpoint||base+'workbench/tasks/'+row.kind+'/'+row.object_id);const r=d.record;const routes={organization_review:['institution',{id:r.id}],clinic_profile:['clinic',{id:r.clinic_id,tab:'review'}],profile_resubmission:['clinic',{id:r.clinic_id,tab:'review'}],contract_review:['contract',{id:r.id,canManage:true}],contract_submission:['contract',{id:r.id,canManage:true}],sales_review:['sale',{id:r.id}],sales_stop:['sale',{id:r.id}],sales_payment:['sale',{id:r.id}],purchase_receipt:['purchaseReceipt',{row:r}],clinic_receipt:['clinicReceipt',{row:r}],partner_payment:['partnerBill',{id:r.id}],partner_confirmation:['partnerBill',{id:r.id}],clinic_payment:['clinicBill',{id:r.id}],clinic_collection:['clinicBill',{id:r.id}],finance_feedback:['feedback',{row:r}],failed_job:['job',{row:r}],appointment_confirmation:['appointment',{id:r.id}],appointment_reschedule:['reschedule',{row:r}],appointment_fulfillment:['appointment',{id:r.appointment?.id}]};const target=routes[d.kind];if(!target||!C.dialogs[target[0]])throw new Error('此事项暂不可打开，请刷新页面重试');C.open(...target);}catch(e){A.Message.error(e.message);}};
-  C.showTasks=category=>{C.taskCategory=category||'all';C.navigate('tasks');};
-  C.pages.workbench=function(){const q=C.useQuery(base+'workbench');const tasks=q.data?.tasks;return h('div',null,h(C.Error,{error:q.error,retry:q.reload}),C.role==='clinic'&&C.ReminderControl&&h(C.ReminderControl),h(A.Spin,{loading:q.loading,style:{width:'100%'}},h('div',{className:'cards'},Object.entries(tasks?.categories||{}).map(([key,value])=>h(A.Card,{key,className:'task-card',title:titles[key]||key},h('div',{className:'task-number'},typeof value==='number'?value:value.pending??0),h(A.Button,{type:'text',onClick:()=>C.showTasks(key)},'查看待处理任务')))),h(C.Panel,{title:'当前待处理任务',extra:h(A.Button,{onClick:()=>C.showTasks('all')},'全部待办')},h(A.Table,{data:tasks?.results||[],rowKey:'id',pagination:false,columns:[C.column('title','待办事项',220),C.column('due_at','处理截止时间',180),C.column('status'),{title:'操作',width:100,render:(_,r)=>C.button('立即处理',()=>C.openTask(r))}],noDataElement:h(A.Empty,{description:'暂无待处理事项'})}))));};
-  C.pages.tasks=function(){const [category,setCategory]=React.useState(C.taskCategory||'all');const summary=C.useQuery(base+'workbench');return h(C.Panel,{title:'待处理任务'},h(A.Alert,{type:'info',content:'在此直接打开对应事项处理。阅读提醒不会完成任务，任务状态随业务处理结果更新。'}),h(C.List,{key:category,path:base+'workbench/tasks',initialStatus:'pending',params:{category},toolbar:h(A.Select,{value:category,onChange:setCategory,style:{width:240},options:[{label:'全部任务类型',value:'all'},...Object.keys(summary.data?.tasks?.categories||{}).map(value=>({value,label:titles[value]||value}))]}),columns:[C.column('title','待办事项',230),C.column('created_at','产生时间',180),C.column('due_at','处理截止时间',180),C.column('status')],actions:r=>C.button('处理详情',()=>C.openTask(r))}));};
+  const C = window.CHT,
+    { h, A } = C;
+  const base = '/api/v1/';
+  const titles = {
+    organization_review: '合作机构审核',
+    clinic_profile: '门诊资料审核',
+    profile_resubmission: '门诊资料待重提',
+    contract_review: '合同审核',
+    contract_submission: '合同待提交',
+    sales_review: '开卡审核',
+    sales_stop: '停止 / 取消审核',
+    sales_payment: '采购付款',
+    purchase_receipt: '采购收款审核',
+    clinic_receipt: '门诊收款审核',
+    partner_payment: '合作方付款',
+    partner_confirmation: '合作方对账 / 收款',
+    clinic_payment: '门诊付款',
+    clinic_collection: '门诊催收',
+    finance_feedback: '财务异议',
+    failed_job: '失败任务',
+    appointment_confirmation: '预约确认',
+    appointment_reschedule: '客户改期',
+    appointment_fulfillment: '过期预约待办',
+  };
+  Object.assign(C.labels, titles);
+  C.openTask = async (row) => {
+    try {
+      const d = await C.api(
+        row.detail_endpoint || base + 'workbench/tasks/' + row.kind + '/' + row.object_id,
+      );
+      const r = d.record;
+      const routes = {
+        organization_review: ['institution', { id: r.id }],
+        clinic_profile: ['clinic', { id: r.clinic_id, tab: 'review' }],
+        profile_resubmission: ['clinic', { id: r.clinic_id, tab: 'review' }],
+        contract_review: ['contract', { id: r.id, canManage: true }],
+        contract_submission: ['contract', { id: r.id, canManage: true }],
+        sales_review: ['sale', { id: r.id }],
+        sales_stop: ['sale', { id: r.id }],
+        sales_payment: ['sale', { id: r.id }],
+        purchase_receipt: ['purchaseReceipt', { row: r }],
+        clinic_receipt: ['clinicReceipt', { row: r }],
+        partner_payment: ['partnerBill', { id: r.id }],
+        partner_confirmation: ['partnerBill', { id: r.id }],
+        clinic_payment: ['clinicBill', { id: r.id }],
+        clinic_collection: ['clinicBill', { id: r.id }],
+        finance_feedback: ['feedback', { row: r }],
+        failed_job: ['job', { row: r }],
+        appointment_confirmation: ['appointment', { id: r.id }],
+        appointment_reschedule: ['reschedule', { row: r }],
+        appointment_fulfillment: ['appointment', { id: r.appointment?.id }],
+      };
+      const target = routes[d.kind];
+      if (!target || !C.dialogs[target[0]]) throw new Error('此事项暂不可打开，请刷新页面重试');
+      C.open(...target);
+    } catch (e) {
+      A.Message.error(e.message);
+    }
+  };
+  C.showTasks = (category) => {
+    C.taskCategory = category || 'all';
+    C.navigate('tasks');
+  };
+  C.pages.workbench = function () {
+    const q = C.useQuery(base + 'workbench');
+    const tasks = q.data?.tasks;
+    return h(
+      'div',
+      null,
+      h(C.Error, { error: q.error, retry: q.reload }),
+      C.role === 'clinic' && C.ReminderControl && h(C.ReminderControl),
+      h(
+        A.Spin,
+        { loading: q.loading, style: { width: '100%' } },
+        h(
+          'div',
+          { className: 'cards' },
+          Object.entries(tasks?.categories || {}).map(([key, value]) =>
+            h(
+              A.Card,
+              { key, className: 'task-card', title: titles[key] || key },
+              h(
+                'div',
+                { className: 'task-number' },
+                typeof value === 'number' ? value : (value.pending ?? 0),
+              ),
+              h(A.Button, { type: 'text', onClick: () => C.showTasks(key) }, '查看待处理任务'),
+            ),
+          ),
+        ),
+        h(
+          C.Panel,
+          {
+            title: '当前待处理任务',
+            extra: h(A.Button, { onClick: () => C.showTasks('all') }, '全部待办'),
+          },
+          h(A.Table, {
+            data: tasks?.results || [],
+            rowKey: 'id',
+            pagination: false,
+            columns: [
+              C.column('title', '待办事项', 220),
+              C.column('due_at', '处理截止时间', 180),
+              C.column('status'),
+              {
+                title: '操作',
+                width: 100,
+                render: (_, r) => C.button('立即处理', () => C.openTask(r)),
+              },
+            ],
+            noDataElement: h(A.Empty, { description: '暂无待处理事项' }),
+          }),
+        ),
+      ),
+    );
+  };
+  C.pages.tasks = function () {
+    const [category, setCategory] = React.useState(C.taskCategory || 'all');
+    const summary = C.useQuery(base + 'workbench');
+    return h(
+      C.Panel,
+      { title: '待处理任务' },
+      h(A.Alert, {
+        type: 'info',
+        content: '在此直接打开对应事项处理。阅读提醒不会完成任务，任务状态随业务处理结果更新。',
+      }),
+      h(C.List, {
+        key: category,
+        path: base + 'workbench/tasks',
+        initialStatus: 'pending',
+        params: { category },
+        toolbar: h(A.Select, {
+          value: category,
+          onChange: setCategory,
+          style: { width: 240 },
+          options: [
+            { label: '全部任务类型', value: 'all' },
+            ...Object.keys(summary.data?.tasks?.categories || {}).map((value) => ({
+              value,
+              label: titles[value] || value,
+            })),
+          ],
+        }),
+        columns: [
+          C.column('title', '待办事项', 230),
+          C.column('created_at', '产生时间', 180),
+          C.column('due_at', '处理截止时间', 180),
+          C.column('status'),
+        ],
+        actions: (r) => C.button('处理详情', () => C.openTask(r)),
+      }),
+    );
+  };
 })();

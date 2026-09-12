@@ -1,28 +1,453 @@
-(function(){
+(function () {
   'use strict';
-  const C=window.CHT,{h,A}=C,base='/api/v1/';
-  Object.assign(C.names,{total_rows:'客户明细行数',processed_rows:'已校验行数',error_rows:'异常行数',total_cards:'开卡总张数',mapping_digest:'列对应确认摘要',failure_code:'读取 / 校验异常',sheet:'工作表',header_row:'表头行',quantity_mode:'数量读取方式',uniform_quantity:'每位客户统一张数'});
-  Object.assign(C.labels,{queued:'等待读取',mapping:'待确认列',validating:'正在校验',validated:'校验完成',confirmed:'已确认',valid:'校验通过',invalid:'异常',column:'读取数量列',uniform:'使用统一数量'});
-  const fields=['name','phone','quantity','resource_customer_no','gender','age','occupation'];
-  const fieldLabel=key=>key==='name'?'客户姓名':key==='phone'?'客户手机号':key==='quantity'?'开卡张数':C.names[key];
-  function letters(index){let text='';for(let n=index+1;n;n=Math.floor((n-1)/26))text=String.fromCharCode(65+(n-1)%26)+text;return text;}
-  function Rows({id}){return h(C.List,{path:base+'imports/'+id+'/rows',columns:[{title:'Excel原行号',dataIndex:'row_number',width:120},...fields.map(key=>({title:fieldLabel(key),width:150,render:(_,r)=>C.text(key,r.normalized[key]??r.raw[key])})),C.column('status'),{title:'异常原因',width:250,render:(_,r)=>(r.errors||[]).map(e=>e.message).join('；')}]});}
-  C.ImportReceipt=function({id}){const q=C.useQuery(base+'imports/'+id),r=q.data;return h('div',null,h(C.Error,{error:q.error,retry:q.reload}),r&&h('div',null,h(C.Facts,{data:r,fields:['id','status','total_rows','error_rows','total_cards','failure_code']}),h(C.Panel,{title:'已确认的导入依据'},h(C.Facts,{data:r.configuration,fields:['sheet','header_row','quantity_mode','uniform_quantity']}),h(A.Table,{rowKey:'field',pagination:false,columns:[{title:'系统字段',dataIndex:'field',render:fieldLabel},{title:'原Excel列',dataIndex:'column'}],data:Object.entries(r.configuration?.mapping||{}).map(([field,index])=>({field,column:letters(index)+' · '+(r.preview?.[r.configuration.sheet]?.[r.configuration.header_row-1]?.[index]||'空表头')}))})),h(C.Panel,{title:'导入明细'},h(Rows,{id}))));};
-  C.ImportEditor=function({value,onChange}){
-    const [assets,setAssets]=React.useState([]),[id,setId]=React.useState(value?.id||''),[current,setCurrent]=React.useState(value||null),[sheet,setSheet]=React.useState(''),[header,setHeader]=React.useState(1),[mapping,setMapping]=React.useState({}),[quantityMode,setQuantityMode]=React.useState('column'),[quantity,setQuantity]=React.useState(null),[format,setFormat]=React.useState(''),[dirty,setDirty]=React.useState(false),[busy,setBusy]=React.useState(false),[error,setError]=React.useState(null),[ambiguous,setAmbiguous]=React.useState({});
-    const keys=React.useRef(new Map()),initial=React.useRef('');
-    const q=C.useQuery(id?base+'imports/'+id:null),formats=C.useQuery(base+'import-formats?page_size=100');
-    React.useEffect(()=>{if(!q.data)return;setCurrent(q.data);if(initial.current!==q.data.id&&q.data.sheets.length){const config=q.data.configuration||{};setSheet(config.sheet||q.data.sheets[0].name);setHeader(config.header_row||1);setMapping(config.mapping||{});setQuantityMode(config.quantity_mode||'column');setQuantity(config.uniform_quantity||null);initial.current=q.data.id;}if(q.data.status==='confirmed'&&!dirty)onChange(q.data);},[q.data]);
-    React.useEffect(()=>{if(!id||!['queued','validating'].includes(current?.status))return;const timer=setInterval(q.reload,2500);return()=>clearInterval(timer);},[id,current?.status]);
-    async function mutate(path,body){const signature=path+JSON.stringify(body);if(!keys.current.has(signature))keys.current.set(signature,crypto.randomUUID());return C.api(path,'POST',body,keys.current.get(signature));}
-    async function act(fn){setBusy(true);setError(null);try{await fn();}catch(e){setError(e);}finally{setBusy(false);}}
-    function changed(fn){fn();setDirty(true);onChange(null);}
-    function upload(){act(async()=>{const batch=await mutate(base+'imports',{asset_id:assets[0]});setId(batch.id);setCurrent(batch);setDirty(false);initial.current='';onChange(null);});}
-    function suggest(){act(async()=>{const result=await C.api(base+'imports/'+id+'/suggest','POST',{sheet,header_row:header,...(format?{format_id:format}:{})});setMapping(result.mapping);setAmbiguous(result.ambiguous);setDirty(true);onChange(null);});}
-    function validate(){act(async()=>{if(mapping.name===undefined||mapping.phone===undefined)throw new Error('请确认客户姓名、客户手机号对应的列');const selected=Object.fromEntries(Object.entries(mapping).filter(([field,index])=>index!==undefined&&(quantityMode!=='uniform'||field!=='quantity')));const batch=await mutate(base+'imports/'+id+'/mapping',{version:current.version,sheet,header_row:header,mapping:selected,quantity_mode:quantityMode,...(quantityMode==='uniform'?{uniform_quantity:quantity}:{})});setDirty(false);setCurrent(batch);onChange(null);q.reload();});}
-    function confirm(){act(async()=>{const batch=await mutate(base+'imports/'+id+'/confirm',{version:current.version,mapping_digest:current.mapping_digest});setCurrent(batch);setDirty(false);onChange(batch);q.reload();});}
-    const preview=current?.preview?.[sheet]||[],headers=preview[header-1]||[];
-    const options=headers.map((text,index)=>({value:index,label:letters(index)+' · '+String(text||'空表头')}));
-    return h('div',{className:'import-editor'},h(C.Error,{error:error||q.error,retry:q.reload}),h(A.Alert,{type:'info',content:'支持 .xlsx 文件。姓名、手机号必须人工核对；手机号与姓名冲突作为异常。缺少数量列时请明确填写统一数量，不会自动填1。'}),h(C.FileInput,{purpose:'sales_excel',multiple:false,value:assets,onChange:ids=>{setAssets(ids);}}),h(A.Button,{disabled:!assets.length,loading:busy,onClick:upload,style:{marginTop:12}},id?'重新读取已上传文件':'读取 Excel'),current&&h('div',null,h(C.Panel,{title:'文件读取与列对应'},h(C.Tag,{value:current.status}),h(A.Space,{wrap:true,style:{margin:'16px 0'}},h(A.Select,{value:sheet,onChange:v=>changed(()=>{setSheet(v);setMapping({});}),style:{width:200},placeholder:'选择工作表',options:(current.sheets||[]).map(s=>({value:s.name,label:s.name+'（'+s.rows+'行）'}))}),h(A.InputNumber,{value:header,onChange:v=>{if(v)changed(()=>{setHeader(v);setMapping({});});},min:1,max:20,prefix:'表头第',suffix:'行'}),h(A.Select,{value:format,onChange:setFormat,style:{width:220},options:[{value:'',label:'自动识别列名'},...(formats.data?.results||[]).map(f=>({value:f.id,label:f.name}))]}),h(A.Button,{onClick:suggest,disabled:!sheet||!headers.length,loading:busy},'识别列对应关系')),Object.keys(ambiguous).length>0&&h(A.Alert,{type:'warning',content:'以下字段存在多个候选列，请手工选择：'+Object.keys(ambiguous).map(fieldLabel).join('、')}),h(A.Table,{pagination:false,rowKey:'field',data:fields.map(field=>({field})),columns:[{title:'系统字段',width:180,render:(_,r)=>fieldLabel(r.field)+(['name','phone'].includes(r.field)?'（必填）':'')},{title:'Excel列',width:230,render:(_,r)=>h(A.Select,{value:mapping[r.field],allowClear:!['name','phone'].includes(r.field),disabled:r.field==='quantity'&&quantityMode==='uniform',placeholder:'请选择对应列',options,onChange:index=>changed(()=>setMapping(v=>({...v,[r.field]:index}))),'aria-label':fieldLabel(r.field)+'对应列'})},{title:'原文件样例',width:180,render:(_,r)=>mapping[r.field]===undefined?'—':preview.slice(header,header+3).map(row=>String(row[mapping[r.field]]??'')).join(' / ')}],scroll:{x:600}}),h(A.Space,{wrap:true,style:{margin:'16px 0'}},h(A.Select,{value:quantityMode,onChange:v=>changed(()=>setQuantityMode(v)),style:{width:220},options:C.options({column:'读取开卡数量列',uniform:'每位客户使用统一数量'})}),quantityMode==='uniform'&&h(A.InputNumber,{value:quantity,onChange:v=>changed(()=>setQuantity(v)),min:1,max:100000,placeholder:'请输入每人张数'})),h(A.Alert,{type:'info',content:'资源方客户编号仅留存，不用于系统关联。性别、年龄、职业可不选列；存在已有资料时仅补充空缺。'}),h(A.Button,{type:'primary',onClick:validate,disabled:!headers.length||['queued','validating'].includes(current.status),loading:busy,style:{marginTop:16}},'确认列对应并校验')),['validated','confirmed'].includes(current.status)&&h(C.Panel,{title:'校验结果'},h(C.Facts,{data:current,fields:['total_rows','processed_rows','error_rows','total_cards']}),dirty&&h(A.Alert,{type:'warning',content:'列配置已修改，请重新校验；旧校验结果不可用于提交订单。'}),h(A.Space,{wrap:true,style:{margin:'16px 0'}},h(A.Button,{onClick:()=>C.download(base+'imports/'+id+'/errors.xlsx','导入异常清单.xlsx').catch(e=>setError(e))},'下载错误 Excel'),h(A.Button,{type:'primary',disabled:dirty||current.error_rows>0||current.status==='confirmed',loading:busy,onClick:confirm},current.status==='confirmed'?'已确认导入':'确认本次导入'),current.status==='confirmed'&&h(A.Button,{onClick:()=>C.form({title:'保存机构导入格式',fields:[{name:'name',label:'格式名称'}],hint:'仅保存列结构，不保存客户样例；下次应用时仍须人工核对。',onSubmit:v=>C.api(base+'import-formats','POST',{batch_id:id,...v})})},'保存为机构格式')),h(Rows,{id}))));
+  const C = window.CHT,
+    { h, A } = C,
+    base = '/api/v1/';
+  Object.assign(C.names, {
+    total_rows: '客户明细行数',
+    processed_rows: '已校验行数',
+    error_rows: '异常行数',
+    total_cards: '开卡总张数',
+    mapping_digest: '列对应确认摘要',
+    failure_code: '读取 / 校验异常',
+    sheet: '工作表',
+    header_row: '表头行',
+    quantity_mode: '数量读取方式',
+    uniform_quantity: '每位客户统一张数',
+  });
+  Object.assign(C.labels, {
+    queued: '等待读取',
+    mapping: '待确认列',
+    validating: '正在校验',
+    validated: '校验完成',
+    confirmed: '已确认',
+    valid: '校验通过',
+    invalid: '异常',
+    column: '读取数量列',
+    uniform: '使用统一数量',
+  });
+  const fields = [
+    'name',
+    'phone',
+    'quantity',
+    'resource_customer_no',
+    'gender',
+    'age',
+    'occupation',
+  ];
+  const fieldLabel = (key) =>
+    key === 'name'
+      ? '客户姓名'
+      : key === 'phone'
+        ? '客户手机号'
+        : key === 'quantity'
+          ? '开卡张数'
+          : C.names[key];
+  function letters(index) {
+    let text = '';
+    for (let n = index + 1; n; n = Math.floor((n - 1) / 26))
+      text = String.fromCharCode(65 + ((n - 1) % 26)) + text;
+    return text;
+  }
+  function Rows({ id }) {
+    return h(C.List, {
+      path: base + 'imports/' + id + '/rows',
+      columns: [
+        { title: 'Excel原行号', dataIndex: 'row_number', width: 120 },
+        ...fields.map((key) => ({
+          title: fieldLabel(key),
+          width: 150,
+          render: (_, r) => C.text(key, r.normalized[key] ?? r.raw[key]),
+        })),
+        C.column('status'),
+        {
+          title: '异常原因',
+          width: 250,
+          render: (_, r) => (r.errors || []).map((e) => e.message).join('；'),
+        },
+      ],
+    });
+  }
+  C.ImportReceipt = function ({ id }) {
+    const q = C.useQuery(base + 'imports/' + id),
+      r = q.data;
+    return h(
+      'div',
+      null,
+      h(C.Error, { error: q.error, retry: q.reload }),
+      r &&
+        h(
+          'div',
+          null,
+          h(C.Facts, {
+            data: r,
+            fields: ['id', 'status', 'total_rows', 'error_rows', 'total_cards', 'failure_code'],
+          }),
+          h(
+            C.Panel,
+            { title: '已确认的导入依据' },
+            h(C.Facts, {
+              data: r.configuration,
+              fields: ['sheet', 'header_row', 'quantity_mode', 'uniform_quantity'],
+            }),
+            h(A.Table, {
+              rowKey: 'field',
+              pagination: false,
+              columns: [
+                { title: '系统字段', dataIndex: 'field', render: fieldLabel },
+                { title: '原Excel列', dataIndex: 'column' },
+              ],
+              data: Object.entries(r.configuration?.mapping || {}).map(([field, index]) => ({
+                field,
+                column:
+                  letters(index) +
+                  ' · ' +
+                  (r.preview?.[r.configuration.sheet]?.[r.configuration.header_row - 1]?.[index] ||
+                    '空表头'),
+              })),
+            }),
+          ),
+          h(C.Panel, { title: '导入明细' }, h(Rows, { id })),
+        ),
+    );
+  };
+  C.ImportEditor = function ({ value, onChange }) {
+    const [assets, setAssets] = React.useState([]),
+      [id, setId] = React.useState(value?.id || ''),
+      [current, setCurrent] = React.useState(value || null),
+      [sheet, setSheet] = React.useState(''),
+      [header, setHeader] = React.useState(1),
+      [mapping, setMapping] = React.useState({}),
+      [quantityMode, setQuantityMode] = React.useState('column'),
+      [quantity, setQuantity] = React.useState(null),
+      [format, setFormat] = React.useState(''),
+      [dirty, setDirty] = React.useState(false),
+      [busy, setBusy] = React.useState(false),
+      [error, setError] = React.useState(null),
+      [ambiguous, setAmbiguous] = React.useState({});
+    const keys = React.useRef(new Map()),
+      initial = React.useRef('');
+    const q = C.useQuery(id ? base + 'imports/' + id : null),
+      formats = C.useQuery(base + 'import-formats?page_size=100');
+    React.useEffect(() => {
+      if (!q.data) return;
+      setCurrent(q.data);
+      if (initial.current !== q.data.id && q.data.sheets.length) {
+        const config = q.data.configuration || {};
+        setSheet(config.sheet || q.data.sheets[0].name);
+        setHeader(config.header_row || 1);
+        setMapping(config.mapping || {});
+        setQuantityMode(config.quantity_mode || 'column');
+        setQuantity(config.uniform_quantity || null);
+        initial.current = q.data.id;
+      }
+      if (q.data.status === 'confirmed' && !dirty) onChange(q.data);
+    }, [q.data]);
+    React.useEffect(() => {
+      if (!id || !['queued', 'validating'].includes(current?.status)) return;
+      const timer = setInterval(q.reload, 2500);
+      return () => clearInterval(timer);
+    }, [id, current?.status]);
+    async function mutate(path, body) {
+      const signature = path + JSON.stringify(body);
+      if (!keys.current.has(signature)) keys.current.set(signature, crypto.randomUUID());
+      return C.api(path, 'POST', body, keys.current.get(signature));
+    }
+    async function act(fn) {
+      setBusy(true);
+      setError(null);
+      try {
+        await fn();
+      } catch (e) {
+        setError(e);
+      } finally {
+        setBusy(false);
+      }
+    }
+    function changed(fn) {
+      fn();
+      setDirty(true);
+      onChange(null);
+    }
+    function upload() {
+      act(async () => {
+        const batch = await mutate(base + 'imports', { asset_id: assets[0] });
+        setId(batch.id);
+        setCurrent(batch);
+        setDirty(false);
+        initial.current = '';
+        onChange(null);
+      });
+    }
+    function suggest() {
+      act(async () => {
+        const result = await C.api(base + 'imports/' + id + '/suggest', 'POST', {
+          sheet,
+          header_row: header,
+          ...(format ? { format_id: format } : {}),
+        });
+        setMapping(result.mapping);
+        setAmbiguous(result.ambiguous);
+        setDirty(true);
+        onChange(null);
+      });
+    }
+    function validate() {
+      act(async () => {
+        if (mapping.name === undefined || mapping.phone === undefined)
+          throw new Error('请确认客户姓名、客户手机号对应的列');
+        const selected = Object.fromEntries(
+          Object.entries(mapping).filter(
+            ([field, index]) =>
+              index !== undefined && (quantityMode !== 'uniform' || field !== 'quantity'),
+          ),
+        );
+        const batch = await mutate(base + 'imports/' + id + '/mapping', {
+          version: current.version,
+          sheet,
+          header_row: header,
+          mapping: selected,
+          quantity_mode: quantityMode,
+          ...(quantityMode === 'uniform' ? { uniform_quantity: quantity } : {}),
+        });
+        setDirty(false);
+        setCurrent(batch);
+        onChange(null);
+        q.reload();
+      });
+    }
+    function confirm() {
+      act(async () => {
+        const batch = await mutate(base + 'imports/' + id + '/confirm', {
+          version: current.version,
+          mapping_digest: current.mapping_digest,
+        });
+        setCurrent(batch);
+        setDirty(false);
+        onChange(batch);
+        q.reload();
+      });
+    }
+    const preview = current?.preview?.[sheet] || [],
+      headers = preview[header - 1] || [];
+    const options = headers.map((text, index) => ({
+      value: index,
+      label: letters(index) + ' · ' + String(text || '空表头'),
+    }));
+    return h(
+      'div',
+      { className: 'import-editor' },
+      h(C.Error, { error: error || q.error, retry: q.reload }),
+      h(A.Alert, {
+        type: 'info',
+        content:
+          '支持 .xlsx 文件。姓名、手机号必须人工核对；手机号与姓名冲突作为异常。缺少数量列时请明确填写统一数量，不会自动填1。',
+      }),
+      h(C.FileInput, {
+        purpose: 'sales_excel',
+        multiple: false,
+        value: assets,
+        onChange: (ids) => {
+          setAssets(ids);
+        },
+      }),
+      h(
+        A.Button,
+        { disabled: !assets.length, loading: busy, onClick: upload, style: { marginTop: 12 } },
+        id ? '重新读取已上传文件' : '读取 Excel',
+      ),
+      current &&
+        h(
+          'div',
+          null,
+          h(
+            C.Panel,
+            { title: '文件读取与列对应' },
+            h(C.Tag, { value: current.status }),
+            h(
+              A.Space,
+              { wrap: true, style: { margin: '16px 0' } },
+              h(A.Select, {
+                value: sheet,
+                onChange: (v) =>
+                  changed(() => {
+                    setSheet(v);
+                    setMapping({});
+                  }),
+                style: { width: 200 },
+                placeholder: '选择工作表',
+                options: (current.sheets || []).map((s) => ({
+                  value: s.name,
+                  label: s.name + '（' + s.rows + '行）',
+                })),
+              }),
+              h(A.InputNumber, {
+                value: header,
+                onChange: (v) => {
+                  if (v)
+                    changed(() => {
+                      setHeader(v);
+                      setMapping({});
+                    });
+                },
+                min: 1,
+                max: 20,
+                prefix: '表头第',
+                suffix: '行',
+              }),
+              h(A.Select, {
+                value: format,
+                onChange: setFormat,
+                style: { width: 220 },
+                options: [
+                  { value: '', label: '自动识别列名' },
+                  ...(formats.data?.results || []).map((f) => ({ value: f.id, label: f.name })),
+                ],
+              }),
+              h(
+                A.Button,
+                { onClick: suggest, disabled: !sheet || !headers.length, loading: busy },
+                '识别列对应关系',
+              ),
+            ),
+            Object.keys(ambiguous).length > 0 &&
+              h(A.Alert, {
+                type: 'warning',
+                content:
+                  '以下字段存在多个候选列，请手工选择：' +
+                  Object.keys(ambiguous).map(fieldLabel).join('、'),
+              }),
+            h(A.Table, {
+              pagination: false,
+              rowKey: 'field',
+              data: fields.map((field) => ({ field })),
+              columns: [
+                {
+                  title: '系统字段',
+                  width: 180,
+                  render: (_, r) =>
+                    fieldLabel(r.field) + (['name', 'phone'].includes(r.field) ? '（必填）' : ''),
+                },
+                {
+                  title: 'Excel列',
+                  width: 230,
+                  render: (_, r) =>
+                    h(A.Select, {
+                      value: mapping[r.field],
+                      allowClear: !['name', 'phone'].includes(r.field),
+                      disabled: r.field === 'quantity' && quantityMode === 'uniform',
+                      placeholder: '请选择对应列',
+                      options,
+                      onChange: (index) =>
+                        changed(() => setMapping((v) => ({ ...v, [r.field]: index }))),
+                      'aria-label': fieldLabel(r.field) + '对应列',
+                    }),
+                },
+                {
+                  title: '原文件样例',
+                  width: 180,
+                  render: (_, r) =>
+                    mapping[r.field] === undefined
+                      ? '—'
+                      : preview
+                          .slice(header, header + 3)
+                          .map((row) => String(row[mapping[r.field]] ?? ''))
+                          .join(' / '),
+                },
+              ],
+              scroll: { x: 600 },
+            }),
+            h(
+              A.Space,
+              { wrap: true, style: { margin: '16px 0' } },
+              h(A.Select, {
+                value: quantityMode,
+                onChange: (v) => changed(() => setQuantityMode(v)),
+                style: { width: 220 },
+                options: C.options({ column: '读取开卡数量列', uniform: '每位客户使用统一数量' }),
+              }),
+              quantityMode === 'uniform' &&
+                h(A.InputNumber, {
+                  value: quantity,
+                  onChange: (v) => changed(() => setQuantity(v)),
+                  min: 1,
+                  max: 100000,
+                  placeholder: '请输入每人张数',
+                }),
+            ),
+            h(A.Alert, {
+              type: 'info',
+              content:
+                '资源方客户编号仅留存，不用于系统关联。性别、年龄、职业可不选列；存在已有资料时仅补充空缺。',
+            }),
+            h(
+              A.Button,
+              {
+                type: 'primary',
+                onClick: validate,
+                disabled: !headers.length || ['queued', 'validating'].includes(current.status),
+                loading: busy,
+                style: { marginTop: 16 },
+              },
+              '确认列对应并校验',
+            ),
+          ),
+          ['validated', 'confirmed'].includes(current.status) &&
+            h(
+              C.Panel,
+              { title: '校验结果' },
+              h(C.Facts, {
+                data: current,
+                fields: ['total_rows', 'processed_rows', 'error_rows', 'total_cards'],
+              }),
+              dirty &&
+                h(A.Alert, {
+                  type: 'warning',
+                  content: '列配置已修改，请重新校验；旧校验结果不可用于提交订单。',
+                }),
+              h(
+                A.Space,
+                { wrap: true, style: { margin: '16px 0' } },
+                h(
+                  A.Button,
+                  {
+                    onClick: () =>
+                      C.download(
+                        base + 'imports/' + id + '/errors.xlsx',
+                        '导入异常清单.xlsx',
+                      ).catch((e) => setError(e)),
+                  },
+                  '下载错误 Excel',
+                ),
+                h(
+                  A.Button,
+                  {
+                    type: 'primary',
+                    disabled: dirty || current.error_rows > 0 || current.status === 'confirmed',
+                    loading: busy,
+                    onClick: confirm,
+                  },
+                  current.status === 'confirmed' ? '已确认导入' : '确认本次导入',
+                ),
+                current.status === 'confirmed' &&
+                  h(
+                    A.Button,
+                    {
+                      onClick: () =>
+                        C.form({
+                          title: '保存机构导入格式',
+                          fields: [{ name: 'name', label: '格式名称' }],
+                          hint: '仅保存列结构，不保存客户样例；下次应用时仍须人工核对。',
+                          onSubmit: (v) =>
+                            C.api(base + 'import-formats', 'POST', { batch_id: id, ...v }),
+                        }),
+                    },
+                    '保存为机构格式',
+                  ),
+              ),
+              h(Rows, { id }),
+            ),
+        ),
+    );
   };
 })();
