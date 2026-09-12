@@ -57,7 +57,7 @@ def date_field(page, label, value):
     element.press('Tab')
 
 
-def exercise(pages, report, worker):
+def exercise(pages, report, worker, fixture):
     resource, platform, clinic = pages['resource'], pages['platform'], pages['clinic']
     completed = []
     try:
@@ -156,8 +156,36 @@ def exercise(pages, report, worker):
         close(clinic)
         completed.append('clinic appointment confirmation persisted')
 
+        # A partial offline receipt records money but cannot prematurely settle the bill.
+        menu(clinic, '门诊账单')
+        clinic.get_by_role('button', name='详情', exact=True).first.click()
+        clinic.get_by_role('button', name='上传付款凭证', exact=True).click()
+        fill(clinic, '付款金额（元）', 10)
+        from datetime import datetime
+        today = datetime.now().strftime('%Y-%m-%d')
+        date_field(clinic, '付款时间', today+' 08:00')
+        fill(clinic, '付款方名称', '合成门诊付款方')
+        fill(clinic, '付款流水号', 'SYNTHETIC-CLINIC-PARTIAL')
+        upload(clinic, report)
+        clinic.get_by_role('button', name='提交付款凭证', exact=True).click()
+        clinic.wait_for_timeout(400)
+        close(clinic)
+        menu(platform, '门诊账单')
+        platform.get_by_role('button', name='详情', exact=True).first.click()
+        platform.get_by_role('tab', name='收款凭证', exact=True).click()
+        platform.get_by_role('button', name='凭证详情', exact=True).first.click()
+        platform.get_by_role('button', name='审核确认', exact=True).click()
+        fill(platform, '操作原因', '合成部分收款，不得提前结清整单')
+        dialog(platform).get_by_role('button', name='保存', exact=True).click()
+        platform.wait_for_timeout(400)
+        partial = read(platform, '/api/v1/clinic-bills')['results'][0]
+        assert partial['received_cents'] == 1000 and partial['status'] != 'settled'
+        close(platform)
+        completed.append('clinic uploads partial receipt and platform review preserves unsettled bill')
+
         # Synthetic payment goes through payment service/ledger, with an explicit confirmation.
         menu(clinic, '门诊账单')
+        clinic.get_by_role('button', name='刷新', exact=True).click()
         clinic.get_by_role('button', name='详情', exact=True).first.click()
         clinic.get_by_role('button', name='微信扫码支付', exact=True).click()
         clinic.get_by_role('button', name='模拟微信支付成功', exact=True).click()
@@ -276,6 +304,36 @@ def exercise(pages, report, worker):
         assert field(resource, '身份').locator('.arco-select-disabled').count() == 1
         dialog(resource).get_by_role('button', name='取消', exact=True).click()
         completed.append('resource administrator creates staff and cannot change protected administrator role')
+
+        # Both ordinary delayed redemption and the special automatic-completion reversal branch.
+        for kind in ['overdue', 'supplement']:
+            event = fixture(kind)
+            appointment = read(clinic, '/api/v1/appointments/'+event['appointment_id'])
+            menu(clinic, '预约管理')
+            clinic.locator('.arco-table-tr').filter(has_text=appointment['customer_name']).get_by_role('button', name='详情', exact=True).click()
+            dialog(clinic).get_by_role('button', name='补充核销' if kind=='supplement' else '扫码核销', exact=True).click()
+            clinic.get_by_label('权益二维码内容', exact=True).fill(event['credential'])
+            clinic.get_by_role('button', name='读取预约', exact=True).click()
+            clinic.get_by_role('button', name='核对核销费用', exact=True).click()
+            clinic.get_by_text('客户已完成本次服务，确认核销', exact=True).click()
+            clinic.get_by_role('button', name='确认核销', exact=True).click()
+            clinic.wait_for_timeout(400)
+            redeemed = read(clinic, '/api/v1/appointments/'+event['appointment_id'])
+            assert redeemed['redemption_id'] and redeemed['settlement_status']=='unsettled'
+            clinic.get_by_role('tab', name='核销与费用', exact=True).click()
+            clinic.get_by_role('button', name='撤销核销', exact=True).first.click()
+            fill(clinic, '操作原因', '合成回归撤销错误核销')
+            dialog(clinic).get_by_role('button', name='保存', exact=True).click()
+            clinic.wait_for_timeout(400)
+            restored = read(clinic, '/api/v1/appointments/'+event['appointment_id'])
+            assert restored['redemption_id'] is None and restored['settlement_status']=='not_charged'
+            if kind=='supplement':
+                assert restored['status']=='completed' and restored['completion_source']=='system'
+                assert restored['restoration_pending'] and not restored['reserved']
+            else:
+                assert restored['status']=='success' and restored['reserved']
+            close(clinic)
+            completed.append(kind+' redemption quote confirmation and correct reversal state')
         for role, page in pages.items():
             page.screenshot(path=str(report/f'{role}-workflow.png'), full_page=True, animations='disabled')
     except Exception:

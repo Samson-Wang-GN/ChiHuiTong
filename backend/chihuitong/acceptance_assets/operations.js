@@ -23,6 +23,9 @@
     date: '日期',
   });
   Object.assign(C.labels, {
+    open: '待处理',
+    resolved: '已处理',
+    'contract.expiring': '合同即将到期',
     accepted: '已受理（不等于送达）',
     sending: '发送中',
     unknown: '结果待核实',
@@ -35,12 +38,22 @@
     'bill.reminder': '付款提醒',
     'bill.overdue': '逾期提醒',
   });
-  C.pages.notifications = () =>
+  C.openNotification = r => {
+    if (r.object_type === 'contract' && r.contract_version_id) {
+      C.open('contract', {id:r.contract_version_id,canManage:C.role==='channel'||C.role==='platform'});
+      return;
+    }
+    const type={appointment:'appointment',clinicbill:'clinicBill',partnerbill:'partnerBill',salesorder:'sale',clinic:'clinic'}[r.object_type];
+    if(type&&C.dialogs[type])C.open(type,{id:r.object_id});
+    else C.showTasks('all');
+  };
+  C.NotificationList = ({initialStatus='all'}) =>
     h(
       C.Panel,
       { title: '站内消息' },
       h(C.List, {
         path: base + 'notifications',
+        initialStatus,
         columns: ['title', 'created_at', 'status'].map((k) => C.column(k)),
         actions: (r) => [
           r.status === 'unread' &&
@@ -52,20 +65,11 @@
                 A.Message.error(e.message);
               }
             }),
-          C.button('查看事项', () => {
-            const type = {
-              appointment: 'appointment',
-              clinicbill: 'clinicBill',
-              partnerbill: 'partnerBill',
-              salesorder: 'sale',
-              clinic: 'clinic',
-            }[r.object_type];
-            if (type && C.dialogs[type]) C.open(type, { id: r.object_id });
-            else C.navigate('tasks');
-          }),
+          C.button('查看事项', () => C.openNotification(r)),
         ],
       }),
     );
+  C.pages.notifications = () => h(C.NotificationList);
   C.pages.sms = () =>
     h(
       C.Panel,

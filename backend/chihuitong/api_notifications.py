@@ -9,13 +9,17 @@ from .api_sales import command
 from .crypto import masked_phone
 from .errors import require
 from .identity import request_actor
-from .models import BusinessCalendar, Notification, Outbox, SmsDelivery, SmsTemplate
+from .models import BusinessCalendar, ContractVersion, Notification, Outbox, SmsDelivery, SmsTemplate
 from .services import notifications, scheduler
 from .services.common import audit
 from .services.finance_queries import iso
 
 
 def notification_projection(item):
+    contract_version = (
+        ContractVersion.objects.filter(contract_id=item.object_id).order_by('-revision').values_list('id', flat=True).first()
+        if item.object_type == 'contract' else None
+    )
     return {
         "id": str(item.id),
         "kind": item.kind,
@@ -26,6 +30,7 @@ def notification_projection(item):
         "read_at": iso(item.read_at),
         "created_at": iso(item.created_at),
         "version": item.version,
+        "contract_version_id": str(contract_version) if contract_version else None,
     }
 
 

@@ -62,7 +62,7 @@
       }),
       h(C.Panel, { title: '全部付款凭证' }, h(C.Attachments, { ids: r.attachment_ids })),
       C.role === 'platform' &&
-        r.status === 'pending' &&
+      r.status === 'pending' &&
         h(
           A.Button,
           {
@@ -178,7 +178,7 @@
       { title: '账单异议详情', onClose, width: 760 },
       h(C.Facts, { data: r }),
       C.role === 'platform' &&
-        r.status === 'pending' &&
+        r.status === 'open' &&
         h(
           A.Button,
           {

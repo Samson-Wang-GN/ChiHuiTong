@@ -309,7 +309,16 @@
     { name: 'contact_phone', label: '合同联系电话' },
     { name: 'attachment_ids', label: '完整合同附件', type: 'files', purpose: 'contract' },
   ];
-  function contractForm(orgId, row) {
+  async function contractForm(orgId, row, renewFrom) {
+    if (!row && !renewFrom) {
+      try {
+        const history = await C.api(base + 'organizations/' + orgId + '/contracts?page_size=1');
+        renewFrom = history.results[0];
+      } catch (error) {
+        A.Message.error(error.message);
+        return;
+      }
+    }
     C.form({
       title: row ? '修改合同草稿' : '登记合同 / 续签',
       fields: row
@@ -317,7 +326,7 @@
         : contractFields,
       initial: row
         ? { ...row, contact_name: row.contact.name, contact_phone: row.contact.phone }
-        : { settlement_cycle: 'monthly' },
+        : { settlement_cycle: renewFrom?.settlement_cycle || 'monthly', number: renewFrom?.number || '' },
       hint: '三方门诊合同由渠道提交、平台审核。月结付款期限为出账次日起5个自然日，周结为3个自然日；新周期适用于尚未出账交易。',
       onSubmit: (v) => {
         const { number, reason, contact_name, contact_phone, ...values } = v;
@@ -383,6 +392,8 @@
               canManage &&
                 r.status === 'draft' &&
                 C.button('修改草稿', () => contractForm(r.organization_id, r)),
+              canManage && r.status !== 'draft' && r.status !== 'pending' &&
+                C.button(r.status === 'rejected' ? '修改并重新登记' : '登记续签版本', () => contractForm(r.organization_id, null, r)),
               canManage &&
                 r.status === 'draft' &&
                 C.button('提交审核', () =>

@@ -112,7 +112,7 @@ def check_browser(report, release, worker, fixture, headed=False):
             result.append({'role':role, 'menus':titles, 'errors':errors})
             page.set_viewport_size({'width':1440, 'height':1000})
         from web_workflows import exercise
-        exercise(pages, report, worker)
+        exercise(pages, report, worker, fixture)
         if headed:
             from web_reminder import exercise_reminder
             exercise_reminder(pages['clinic'], fixture, report)
@@ -171,8 +171,8 @@ def main():
         def worker():
             with (report/'worker.log').open('a') as log:
                 run([python,'manage.py','run_worker','--no-tick','--limit','100'], cwd=release/'backend', env=env, stdout=log, stderr=subprocess.STDOUT)
-        def fixture():
-            result = run([python, release/'scripts/web_business_fixture.py'], env=env, capture_output=True)
+        def fixture(kind='new'):
+            result = run([python, release/'scripts/web_business_fixture.py', kind], env=env, capture_output=True)
             return json.loads(result.stdout)
         with (report/'server.log').open('w') as log:
             server = subprocess.Popen([str(python),str(Path(__file__).resolve()),'--serve'], env=env, stdout=log, stderr=subprocess.STDOUT)
