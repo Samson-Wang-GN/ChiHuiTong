@@ -203,6 +203,42 @@ def exercise(pages, report, worker):
             assert read(partner, '/api/v1/partner-bills/'+bill['id'])['status'] == 'completed'
             close(partner)
             completed.append(role+' monthly statement confirm platform proof and receipt')
+
+        # Channel edits an approved clinic, platform rejects without overwriting published data.
+        channel = pages['channel']
+        original = read(channel, '/api/v1/clinics')['results'][0]
+        menu(channel, '门诊管理')
+        channel.get_by_role('button', name='详情', exact=True).first.click()
+        channel.get_by_role('button', name='维护门诊资料', exact=True).click()
+        fill(channel, '业务联系人', '合成变更待审核')
+        channel.get_by_role('button', name='提交变更审核', exact=True).click()
+        channel.wait_for_timeout(400)
+        unchanged = read(channel, '/api/v1/clinics/'+original['id'])
+        assert unchanged['profile']['business_contact'] == original['profile']['business_contact']
+        close(channel)
+        menu(platform, '门诊管理')
+        platform.get_by_role('button', name='刷新', exact=True).click()
+        platform.get_by_role('button', name='详情', exact=True).first.click()
+        platform.get_by_role('tab', name='资料变更审核', exact=True).click()
+        platform.get_by_role('button', name='对照详情', exact=True).first.click()
+        platform.get_by_text('合成变更待审核', exact=True).first.wait_for()
+        platform.get_by_role('button', name='审核资料', exact=True).click()
+        select(platform, '审核结果', '退回修改')
+        fill(platform, '操作原因', '合成回归：退回后必须保留此前生效资料')
+        dialog(platform).get_by_role('button', name='保存', exact=True).click()
+        platform.wait_for_timeout(400)
+        assert read(platform, '/api/v1/clinics/'+original['id'])['profile']['business_contact'] == original['profile']['business_contact']
+        changes = read(platform, '/api/v1/clinics/'+original['id']+'/profile-changes')['results']
+        assert changes[0]['status'] == 'rejected'
+        close(platform)
+        completed.append('channel clinic amendment and platform rejection preserve published profile')
+
+        # Geometry math is checked against center invariance and invertible pixel translation.
+        point = platform.evaluate('() => CHT.mapPoint({latitude:39.9,longitude:116.3},17,0,0)')
+        assert point == {'latitude':'39.900000', 'longitude':'116.300000'}
+        restored = platform.evaluate('() => CHT.mapPoint(CHT.mapPoint({latitude:39.9,longitude:116.3},17,100,-100),17,-100,100)')
+        assert abs(float(restored['latitude'])-39.9) < 0.000002
+        assert abs(float(restored['longitude'])-116.3) < 0.000002
         for role, page in pages.items():
             page.screenshot(path=str(report/f'{role}-workflow.png'), full_page=True, animations='disabled')
     except Exception:

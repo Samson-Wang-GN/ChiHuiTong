@@ -32,6 +32,7 @@ urlpatterns = [
     path("organizations/<uuid:org_id>/cooperation", catalog.cooperation),
     path("files", catalog.upload),
     path("files/<uuid:asset_id>", catalog.download),
+    path("files/<uuid:asset_id>/details", catalog.file_details),
     path("organizations/<uuid:org_id>/contracts", catalog.contract_list),
     path("contract-versions/<uuid:version_id>/submit", catalog.contract_submit),
     path("contract-versions/<uuid:version_id>", catalog.contract_detail),

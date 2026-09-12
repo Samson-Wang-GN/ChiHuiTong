@@ -14,6 +14,25 @@ from .models import (
     SourceBrand,
 )
 from .services import appointments, clinics, contracts, finance, imports, organizations, sales
+from .services.common import RESOURCE_KINDS
+
+
+def visible_metadata(actor, value):
+    """Logs must not bypass the transaction projection's fee visibility boundary."""
+    if actor.platform:
+        return value
+    hidden = {"platform_cents", "allocation_snapshot"}
+    if actor.organization.kind not in RESOURCE_KINDS:
+        hidden.add("resource_cents")
+    if actor.organization.kind != "channel":
+        hidden.add("channel_cents")
+    if actor.organization.kind not in {"channel", "clinic"}:
+        hidden.add("fee_cents")
+    if isinstance(value, dict):
+        return {key: visible_metadata(actor, item) for key, item in value.items() if key not in hidden}
+    if isinstance(value, list):
+        return [visible_metadata(actor, item) for item in value]
+    return value
 
 
 def scoped_object(actor, object_type, object_id):
@@ -98,7 +117,7 @@ def object_log(request, object_type, object_id):
                     or ("系统" if not item.organization_id else "历史未记录"),
                     "role": item.actor_role or None,
                     "reason": item.reason,
-                    "metadata": item.metadata,
+                    "metadata": visible_metadata(actor, item.metadata),
                     "request_id": str(item.request_id) if item.request_id else None,
                 }
                 for item in query.order_by("-id")[(page - 1) * size : page * size]

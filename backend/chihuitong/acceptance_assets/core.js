@@ -38,13 +38,14 @@
   C.api = (path,method='GET',body,key) => C.request(path,{method,body,key});
   C.download = async(path,name) => {const blob=await C.request(path,{binary:true});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);};
   C.Error = ({error,retry}) => error?h(A.Alert,{type:'error',content:h('div',null,error.message || String(error),error.requestId&&h('div',{className:'muted'},'问题编号：'+error.requestId),retry&&h(A.Button,{type:'text',onClick:retry},'重新加载'))}):null;
-  C.useQuery = (path) => {
+  C.useQuery = (path,{allPages=false}={}) => {
     const [state,set]=React.useState({data:null,loading:!!path,error:null}),[revision,bump]=React.useReducer(x=>x+1,0);
     const previousPath=React.useRef(null);
     React.useEffect(()=>{const fn=()=>bump();C.events.addEventListener('refresh',fn);return()=>C.events.removeEventListener('refresh',fn);},[]);
-    React.useEffect(()=>{if(!path){set({data:null,loading:false,error:null});return;}const ctl=new AbortController();const same=previousPath.current===path;previousPath.current=path;set(old=>({data:same?old.data:null,loading:true,error:null}));C.request(path,{signal:ctl.signal}).then(data=>set({data,loading:false,error:null})).catch(error=>{if(!ctl.signal.aborted)set({data:null,loading:false,error});});return()=>ctl.abort();},[path,revision]);
+    React.useEffect(()=>{if(!path){set({data:null,loading:false,error:null});return;}const ctl=new AbortController();const same=previousPath.current===path;previousPath.current=path;set(old=>({data:same?old.data:null,loading:true,error:null}));C.request(path,{signal:ctl.signal}).then(async data=>{if(allPages&&Array.isArray(data.results)){let rows=[...data.results],page=data.page||1;while(rows.length<data.total){const part=await C.request(path+(path.includes('?')?'&':'?')+'page='+ ++page,{signal:ctl.signal});if(!part.results.length)break;rows.push(...part.results);}data={...data,results:rows};}if(!ctl.signal.aborted)set({data,loading:false,error:null});}).catch(error=>{if(!ctl.signal.aborted)set({data:null,loading:false,error});});return()=>ctl.abort();},[path,revision,allPages]);
     return {...state,reload:bump};
   };
+  C.useChoices = path => C.useQuery(path,{allPages:true});
   C.Panel = ({title,extra,children}) => h('section',{className:'panel'},(title||extra)&&h('div',{className:'toolbar'},h('h2',null,title),extra),children);
   C.Facts = ({data={},fields}) => h(A.Descriptions,{column:1,border:true,size:'small',data:(fields||Object.keys(data).filter(k=>C.names[k])).filter(k=>data[k]!==undefined).map(k=>({label:C.names[k]||k,value:typeof data[k]==='object'&&data[k]!==null?h(C.Facts,{data:data[k]}):C.text(k,data[k])}))});
   C.column = (key,title,width=160) => ({title:title||C.names[key]||key,dataIndex:key,width,align:key.endsWith('_cents')?'right':undefined,render:v=>['status','display_status','service_status','review_status'].includes(key)?h(C.Tag,{value:v}):C.text(key,v)});
@@ -56,7 +57,7 @@
     return h('div',{className:'business-list'},
       h(C.Error,{error:q.error,retry:q.reload}),
       q.data?.reason&&h(A.Alert,{type:'warning',content:q.data.reason}),
-      q.data?.counts&&h(A.Tabs,{activeTab:status,onChange:v=>{setStatus(v);setPage(1);},overflow:'scroll'},Object.entries(q.data.counts).sort(([a],[b])=>a==='all'?-1:b==='all'?1:0).map(([k,v])=>h(A.Tabs.TabPane,{key:k,title:(statusLabels[k]||C.label(k))+'（'+v+'）'}))),
+      q.data&&h(A.Tabs,{activeTab:status,onChange:v=>{setStatus(v);setPage(1);},overflow:'scroll'},Object.entries(q.data.counts||{all:q.data.total||0}).sort(([a],[b])=>a==='all'?-1:b==='all'?1:0).map(([k,v])=>h(A.Tabs.TabPane,{key:k,title:(statusLabels[k]||C.label(k))+'（'+v+'）'}))),
       h('div',{className:'toolbar'},h(A.Space,{wrap:true},
         search&&h(A.Input.Search,{value:searchText,onChange:v=>{setSearchText(v);if(!v){setKeyword('');setPage(1);}},onSearch:v=>{setKeyword(v);setPage(1);},allowClear:true,placeholder:'输入名称搜索','aria-label':'搜索名称',style:{width:260}}),
         typeof toolbar==='function'?toolbar(filters):toolbar,
@@ -74,7 +75,7 @@
     const retry=React.useRef({key:crypto.randomUUID(),payload:null});
     async function submit(){let values;try{const validated=await form.validate();values=Object.fromEntries(fields.filter(f=>validated[f.name]!==undefined).map(f=>[f.name,validated[f.name]]));}catch{return;}const payload=JSON.stringify(values);if(retry.current.payload && retry.current.payload!==payload)retry.current.key=crypto.randomUUID();retry.current.payload=payload;setBusy(true);setError(null);try{const result=await onSubmit(values,retry.current.key);if(result===false)return;C.refresh();A.Message.success('操作已完成');onClose();}catch(e){setError(e);}finally{setBusy(false);}}
     function close(){if(busy)return;const values=form.getFieldsValue();if(fields.some(f=>JSON.stringify(values[f.name]??'')!==JSON.stringify(initial[f.name]??'')))A.Modal.confirm({title:'放弃未保存的内容？',content:'关闭后，本次尚未提交的输入不会保存。',onOk:onClose});else onClose();}
-    return h(C.FormShell,{title,onClose:close,width,compact:fields.length<=4&&!fields.some(f=>f.type==='files'||f.render),footer:h(A.Space,null,h(A.Button,{disabled:busy,onClick:close},'取消'),h(A.Button,{type:'primary',loading:busy,onClick:submit},submitText))},hint&&h(A.Alert,{type:'info',content:hint}),h(C.Error,{error}),h(A.Form,{form,layout:'vertical',initialValues:initial,disabled:busy,className:'business-form'},fields.map(f=>h(A.Form.Item,{key:f.name,field:f.name,label:f.label||C.names[f.name]||f.name,extra:f.hint,rules:f.rules||[{required:!f.optional,message:'请填写'+(f.label||C.names[f.name]||f.name)}]},f.render?f.render(form):f.type==='select'?h(A.Select,{options:f.options,allowClear:!!f.optional,disabled:f.disabled,'aria-label':f.label||C.names[f.name]}):f.type==='number'?h(A.InputNumber,{min:f.min??0,max:f.max,precision:f.precision??0,style:{width:'100%'},suffix:f.suffix,disabled:f.disabled}):f.type==='date'?h(A.DatePicker,{showTime:!!f.time,style:{width:'100%'},format:f.time?'YYYY-MM-DD HH:mm':'YYYY-MM-DD'}):f.type==='textarea'?h(A.Input.TextArea,{maxLength:f.max||10000,autoSize:{minRows:3,maxRows:10}}):f.type==='boolean'?h(A.Select,{options:[{label:'是',value:true},{label:'否',value:false}],disabled:f.disabled}):f.type==='files'?h(C.FileInput,{purpose:f.purpose,multiple:f.multiple!==false}):h(A.Input,{maxLength:f.max||200,disabled:f.disabled,autoComplete:'off'})))));
+    return h(C.FormShell,{title,onClose:close,width,compact:width<=760&&fields.length<=4&&!fields.some(f=>f.type==='files'||f.render),footer:h(A.Space,null,h(A.Button,{disabled:busy,onClick:close},'取消'),h(A.Button,{type:'primary',loading:busy,onClick:submit},submitText))},hint&&h(A.Alert,{type:'info',content:hint}),h(C.Error,{error}),h(A.Form,{form,layout:'vertical',initialValues:initial,disabled:busy,className:'business-form'},fields.map(f=>h(A.Form.Item,{key:f.name,field:f.name,label:f.label||C.names[f.name]||f.name,extra:f.hint,rules:f.rules||[{required:!f.optional,message:'请填写'+(f.label||C.names[f.name]||f.name)}]},f.render?f.render(form):f.type==='select'?h(A.Select,{options:f.options,allowClear:!!f.optional,disabled:f.disabled,'aria-label':f.label||C.names[f.name]}):f.type==='number'?h(A.InputNumber,{min:f.min??0,max:f.max,precision:f.precision??0,style:{width:'100%'},suffix:f.suffix,disabled:f.disabled}):f.type==='date'?h(A.DatePicker,{showTime:!!f.time,style:{width:'100%'},format:f.time?'YYYY-MM-DD HH:mm':'YYYY-MM-DD'}):f.type==='textarea'?h(A.Input.TextArea,{maxLength:f.max||10000,autoSize:{minRows:3,maxRows:10}}):f.type==='boolean'?h(A.Select,{options:[{label:'是',value:true},{label:'否',value:false}],disabled:f.disabled}):f.type==='files'?h(C.FileInput,{purpose:f.purpose,multiple:f.multiple!==false}):h(A.Input,{maxLength:f.max||200,disabled:f.disabled,autoComplete:'off'})))));
   };
   C.FileInput = function({value=[],onChange,purpose,multiple=true}) {
     const [error,setError]=React.useState(null),[files,setFiles]=React.useState([]);
@@ -100,13 +101,60 @@
     }),value?.length>0&&h(C.Attachments,{ids:value}),
     (value||[]).filter(id=>!present.has(id)).map((id,i)=>h(A.Button,{key:id,type:'text',status:'danger',onClick:()=>update(ids.current.filter(item=>item!==id))},'移除原附件 '+(i+1))));
   };
-  C.Attachments = function({ids=[]}) {
-    const [preview,setPreview]=React.useState(null),[error,setError]=React.useState(null),[loading,setLoading]=React.useState(null);
-    React.useEffect(()=>()=>{if(preview)URL.revokeObjectURL(preview.url);},[preview]);
-    async function open(id){setLoading(id);setError(null);try{const blob=await C.request('/api/v1/files/'+id,{binary:true});if(blob.type.startsWith('image/'))setPreview({url:URL.createObjectURL(blob),id});else await C.download('/api/v1/files/'+id,'附件-'+id+(blob.type==='application/pdf'?'.pdf':'.xlsx'));}catch(e){setError(e);}finally{setLoading(null);}}
-    return h('div',null,h(C.Error,{error}),h(A.Space,{wrap:true},ids.map((id,i)=>h(A.Button,{key:id,loading:loading===id,onClick:()=>open(id)},'查看附件 '+(i+1)))),!ids.length&&h(A.Empty,{description:'未上传附件'}),preview&&h(A.Image.Preview,{src:preview.url,visible:true,onVisibleChange:v=>{if(!v)setPreview(null);}}));
+  C.AttachmentItem=function({id,index,onOpen}){
+    const q=C.useQuery('/api/v1/files/'+id+'/details');
+    return h('div',{className:'attachment-item'},h(A.Button,{disabled:!q.data,onClick:()=>onOpen(id,q.data)},'查看附件 '+(index+1)),
+      q.data&&h('span',{className:'muted'},q.data.name+' · '+Math.ceil(q.data.size/1024)+' KB'),
+      h(C.Error,{error:q.error,retry:q.reload}));
   };
-  C.Logs = ({type,id}) => h(C.List,{path:'/api/v1/objects/'+type+'/'+id+'/logs',columns:['occurred_at','actor','organization','role','action','reason'].map(k=>C.column(k))});
+  C.Attachments = function({ids=[]}) {
+    const [preview,setPreview]=React.useState(null),[error,setError]=React.useState(null),[loading,setLoading]=React.useState(false);
+    React.useEffect(()=>()=>{if(preview)URL.revokeObjectURL(preview.url);},[preview]);
+    async function open(id,details){
+      setLoading(true);setError(null);
+      try{
+        const blob=await C.request('/api/v1/files/'+id,{binary:true});
+        if(blob.type.startsWith('image/')||blob.type==='application/pdf')setPreview({url:URL.createObjectURL(blob),id,type:blob.type,name:details.name});
+        else await C.download('/api/v1/files/'+id,details.name);
+      }catch(e){setError(e);}finally{setLoading(false);}
+    }
+    return h('div',null,h(C.Error,{error}),h(A.Spin,{loading,style:{width:'100%'}},
+      h(A.Space,{direction:'vertical',style:{width:'100%'}},ids.map((id,i)=>h(C.AttachmentItem,{key:id,id,index:i,onOpen:open})))),
+      !ids.length&&h(A.Empty,{description:'未上传附件'}),
+      preview&&(preview.type==='application/pdf'?
+        h(A.Modal,{title:preview.name,visible:true,onCancel:()=>setPreview(null),footer:h(A.Button,{href:preview.url,download:preview.name},'下载 PDF'),style:{width:Math.min(1000,window.innerWidth-24)}},
+          h(A.Alert,{type:'info',content:'静态 PDF 预览；若浏览器不支持内嵌显示，请下载查看完整文件。'}),
+          h('iframe',{title:preview.name,src:preview.url,style:{width:'100%',height:'65vh',border:0}})):
+        h(A.Image.Preview,{src:preview.url,visible:true,onVisibleChange:v=>{if(!v)setPreview(null);}})));
+  };
+  const actionNames={
+    appointment:{confirmed:'确认预约',cancelled:'取消预约',clinic_absent:'反馈患者未到诊',customer_feedback:'客户反馈履约情况',redeemed:'完成核销',redemption_reversed:'撤销核销',reschedule_created:'发起改期',reschedule_reviewed:'审核改期',restored:'恢复关联权益',reversal_restored:'恢复撤销后权益',pending_expired:'待确认超时取消',system_completed:'72小时系统处理'},
+    bill:{collection_contacted:'记录催收',feedback_responded:'回复账单异议',feedback_submitted:'提交账单异议',generated:'生成门诊账单',receipt_reviewed:'审核门诊付款凭证',receipt_submitted:'提交门诊付款凭证',redemption_removed:'移除撤销交易',settled:'门诊账单结清'},
+    partner_bill:{confirmed:'合作方确认对账',generated:'生成合作方结算单',paid:'平台登记付款',received:'合作方确认收款'},
+    clinic:{channel_changed:'变更所属渠道',confirmation_hours:'调整待确认时限',contract_created:'登记三方合同',contract_reviewed:'审核三方合同',contract_terminated:'终止三方合同',created:'建立门诊档案',product_status:'调整门诊推广产品',profile_reviewed:'审核门诊资料',profile_submitted:'提交门诊资料修改',service_status:'调整门诊上线状态',location_candidate_requested:'请求地址定位'},
+    contract:{draft_updated:'修改合同草稿',product_configured:'配置合同推广产品',reviewed:'审核合同',submitted:'提交合同审核',terminated:'终止合同',version_created:'登记合同版本'},
+    organization:{created:'创建机构',resubmitted:'重新提交机构审核',reviewed:'审核机构',status:'调整机构启停状态',updated:'修改机构资料'},
+    membership:{created:'创建登录账号',updated:'修改账号身份或状态'},
+    sales:{issuance_failed:'开卡处理失败',issuance_queued:'开卡进入队列',issuance_reaffirmed:'重新确认开卡',issued:'完成开卡',receipt_reviewed:'审核采购付款凭证',receipt_submitted:'提交采购付款凭证',refund_recorded:'登记采购退款',rejected:'退回开卡审核',shipped:'登记实体卡寄送',stop_requested:'申请取消或停止',stop_reviewed:'审核取消或停止',submitted:'提交销售订单'},
+    import:{format_saved:'保存机构Excel格式',mapping_changed:'修改Excel列对应',mapping_confirmed:'确认Excel列对应',retry_requested:'重试Excel处理',uploaded:'上传客户Excel'},
+    payment:{closed:'关闭支付记录',created:'创建支付记录',external_refund_detected:'发现外部退款',observed:'核对支付结果',preparation_retried:'重试支付准备'},
+    card:{frozen:'冻结卡片',unfrozen:'解除卡片冻结'},file:{downloaded:'查看或下载附件',uploaded:'上传附件'},
+    product:{saved:'保存推广产品'},source_brand:{saved:'保存来源展示名'},sms_template:{configured:'配置短信模板'},job:{retried:'重试系统任务'}
+  };
+  C.actionName=action=>{const [kind,verb]=String(action).split('.');return actionNames[kind]?.[verb]||'业务操作';};
+  Object.assign(C.names,{metadata:'操作详情',request_id:'操作追踪编号',redemption_id:'核销编号',feedback_id:'异议编号',payment_id:'付款记录编号',version_id:'合同版本编号',contract_version:'合同版本编号',changed_fields:'修改字段',fields:'涉及字段',profile_version:'资料版本',change_id:'变更申请编号',simulated:'模拟处理',count:'记录数量',hours:'待确认时限（小时）',approved:'审核通过',provider:'服务提供方',requires_confirmation:'需要人工确认',initial_admin:'初始管理员编号',source:'处理来源'});
+  C.Metadata=function({value}){
+    if(Array.isArray(value))return h(A.Space,{direction:'vertical'},value.map((v,i)=>h(C.Metadata,{key:i,value:v})));
+    if(value&&typeof value==='object')return h(A.Descriptions,{column:1,border:true,size:'small',data:Object.entries(value).map(([key,v])=>({label:C.names[key]||key,value:typeof v==='object'?h(C.Metadata,{value:v}):C.text(key,v)}))});
+    return h('span',null,C.names[value]||C.label(value));
+  };
+  C.Logs = ({type,id}) => h(C.List,{path:'/api/v1/objects/'+type+'/'+id+'/logs',
+    columns:['occurred_at','actor','organization','role'].map(k=>C.column(k)).concat([{title:'操作',width:200,render:(_,r)=>C.actionName(r.action)},C.column('reason')]),
+    actions:r=>C.button('操作详情',()=>C.open('auditDetail',{row:r}))});
+  C.dialogs.auditDetail=({row:r,onClose})=>h(C.Drawer,{title:C.actionName(r.action)+' · 操作详情',onClose,width:760},
+    h(C.Facts,{data:r,fields:['occurred_at','actor','organization','role','reason','request_id']}),
+    h(C.Panel,{title:'记录的业务变化'},Object.keys(r.metadata||{}).length?h(C.Metadata,{value:r.metadata}):h(A.Empty,{description:'本次操作没有附加业务字段'})),
+    h('p',{className:'muted'},'操作类型：'+r.action+'。资料变更原值与申请值请在对应变更审核记录中核对。'));
   C.Reason = {name:'reason',label:'操作原因',type:'textarea',max:500};
   C.reviewFields = [{name:'approved',label:'审核结果',type:'select',options:[{label:'审核通过',value:true},{label:'退回修改',value:false}]},C.Reason];
   C.options = object => Object.entries(object).map(([value,label])=>({value,label}));
