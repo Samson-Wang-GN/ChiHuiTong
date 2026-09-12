@@ -66,6 +66,16 @@ def main():
                     menu.nth(n).click()
                     page.wait_for_timeout(500)
                     assert not page.locator('.arco-alert-error').count(), role+' menu '+str(n)
+                if role == 'resource':
+                    menu.filter(has_text=re.compile('^推广产品销售$')).click()
+                    page.get_by_role('button', name='创建销售订单', exact=True).click()
+                    page.get_by_label('销售方式', exact=True).click()
+                    page.locator('.arco-select-popup:visible .arco-select-option').filter(has_text='记名非实体卡 · 批量Excel').click()
+                    page.get_by_role('button', name='下一步', exact=True).click()
+                    page.get_by_text('上传后自动匹配列名。', exact=False).wait_for()
+                    assert page.get_by_role('button', name='读取 Excel', exact=True).count() == 0
+                    page.get_by_role('button', name='取消', exact=True).click()
+                    report['checks'].append({'automatic_excel_ui':True,'business_records_created':False})
                 title='预约管理' if role in {'platform','clinic'} else '预约与核销明细'
                 menu.filter(has_text=re.compile('^'+title+'$')).click()
                 page.locator('tbody tr').first.wait_for()
