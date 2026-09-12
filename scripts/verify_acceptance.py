@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
+import time
 from datetime import datetime, timezone
 import urllib.error
 import urllib.request
@@ -24,7 +26,7 @@ def main():
     stamp=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     output=ROOT/'test-results'/f'{stamp}-acceptance-browser'
     output.mkdir()
-    report={'url':BASE+'/', 'checks':[], 'passed':False}
+    report={'url':BASE+'/', 'deployed_commit':json.loads((runtime/'deployment.json').read_text())['commit'], 'verification_commit':Path(__file__).resolve().parents[1].name, 'checks':[], 'passed':False}
     try:
         for url,expected in [(BASE+'/',401),('http://127.0.0.1:18243/api/v1/health',403)]:
             try:
@@ -81,6 +83,25 @@ def main():
             response=urllib.request.urlopen('https://dev-public.chihui-ai.com'+path,timeout=20)
             assert response.status==200
             report['checks'].append({'existing_site':path,'status':response.status})
+        sql="SELECT 'account',id::text FROM chihuitong_account UNION ALL SELECT 'appointment',id::text FROM chihuitong_appointment UNION ALL SELECT 'clinic_bill',id::text FROM chihuitong_clinicbill UNION ALL SELECT 'partner_bill',id::text FROM chihuitong_partnerbill ORDER BY 1,2"
+        command=['/usr/lib/postgresql/16/bin/psql','-h',str(ROOT/'runtime'/'pgsocket'),'-p','55432','-d','chihuitong_acceptance','-Atc',sql]
+        before=subprocess.run(command,check=True,capture_output=True,text=True,timeout=20).stdout
+        subprocess.run(['sudo','-n','systemctl','restart','chihuitong-acceptance.service'],check=True,timeout=30)
+        import base64
+        authorization=base64.b64encode((creds['username']+':'+creds['password']).encode()).decode()
+        ready=False
+        for attempt in range(10):
+            try:
+                request=urllib.request.Request(BASE+'/api/v1/health',headers={'Authorization':'Basic '+authorization})
+                with urllib.request.urlopen(request,timeout=5) as response:
+                    ready=response.status==200
+                if ready:break
+            except urllib.error.URLError:
+                time.sleep(0.5)
+        assert ready,'acceptance service did not recover'
+        after=subprocess.run(command,check=True,capture_output=True,text=True,timeout=20).stdout
+        assert before==after,'persistent records changed after app restart'
+        report['checks'].append({'app_restart':True,'persistent_record_ids_unchanged':True,'record_count':len(after.splitlines())})
         report['passed']=True
     finally:
         (output/'summary.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
