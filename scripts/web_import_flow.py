@@ -51,6 +51,11 @@ def exercise(page, worker, report):
         page.get_by_text('必填项已匹配，核对无误后点击底部“下一步”。', exact=True).wait_for()
         assert '手机号码' in page.get_by_label('客户手机号对应列', exact=True).inner_text()
         page.screenshot(path=str(report/'excel-auto-ten-rows.png'), full_page=True)
+        page.get_by_text('工作表与表头设置（识别不准确时调整）', exact=True).click()
+        page.get_by_label('表头行', exact=True).fill('2')
+        page.get_by_label('表头行', exact=True).fill('20')
+        page.get_by_text('必填项已匹配，核对无误后点击底部“下一步”。', exact=True).wait_for()
+        assert page.locator('.import-preview tbody .arco-table-tr').count() == 10
         next_validated()
         page.get_by_role('button', name='上一步', exact=True).click()
         page.get_by_text('原文件预览 · 前10条数据', exact=True).wait_for()

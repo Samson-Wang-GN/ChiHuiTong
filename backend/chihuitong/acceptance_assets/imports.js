@@ -266,7 +266,8 @@
       return '';
     }
     const problems = fields.filter((field) => issue(field)),
-      ready = !!headers.length && !matching && current?.status !== 'queued';
+      hasPreview = !!headers.length && current?.status !== 'queued',
+      ready = hasPreview && !matching;
     async function prepare() {
       if (!ready) throw new Error('请先上传文件，等待自动读取和匹配完成');
       if (problems.length) {
@@ -434,7 +435,7 @@
           tip: '正在读取文件并自动匹配列名…',
           style: { width: '100%', minHeight: 100 },
         }),
-      ready &&
+      hasPreview &&
         h(
           'div',
           null,
@@ -499,7 +500,7 @@
                 A.Checkbox,
                 {
                   checked: quantityMode === 'uniform',
-                  disabled: busy,
+                  disabled: busy || matching,
                   onChange: (checked) =>
                     changed(() => setQuantityMode(checked ? 'uniform' : 'column')),
                 },
@@ -511,7 +512,7 @@
                   min: 1,
                   max: 100000,
                   precision: 0,
-                  disabled: busy,
+                  disabled: busy || matching,
                   onChange: (v) => changed(() => setQuantity(v)),
                   placeholder: '请输入每人张数',
                   'aria-label': '每位客户开卡数量',
