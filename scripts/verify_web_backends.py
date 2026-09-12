@@ -46,7 +46,7 @@ def serve(release):
         server.serve_forever()
 
 
-def check_browser(report, release):
+def check_browser(report, release, worker):
     from playwright.sync_api import sync_playwright
     result = []
     with sync_playwright() as playwright:
@@ -106,7 +106,7 @@ def check_browser(report, release):
             result.append({'role':role, 'menus':titles, 'errors':errors})
             page.set_viewport_size({'width':1440, 'height':1000})
         from web_workflows import exercise
-        exercise(pages, report)
+        exercise(pages, report, worker)
         for page in pages.values():
             page.get_by_role('button', name='退出登录', exact=True).click()
             page.get_by_role('button', name='登录', exact=True).wait_for()
@@ -153,8 +153,12 @@ def main():
     run([PG/'createdb', *dbargs, name])
     try:
         with (report/'setup.log').open('w') as log:
+            run([python, release/'scripts/web_fixture_files.py', report], stdout=log, stderr=subprocess.STDOUT)
             for command in [['migrate','--noinput'], ['initialize_configuration'], ['seed_acceptance'], ['initialize_simulation']]:
                 run([python,'manage.py',*command], cwd=release/'backend', env=env, stdout=log, stderr=subprocess.STDOUT)
+        def worker():
+            with (report/'worker.log').open('a') as log:
+                run([python,'manage.py','run_worker','--no-tick','--limit','100'], cwd=release/'backend', env=env, stdout=log, stderr=subprocess.STDOUT)
         with (report/'server.log').open('w') as log:
             server = subprocess.Popen([str(python),str(Path(__file__).resolve()),'--serve'], env=env, stdout=log, stderr=subprocess.STDOUT)
             for _ in range(40):
@@ -164,7 +168,7 @@ def main():
                 if server.poll() is not None:
                     raise RuntimeError('Test gateway failed; inspect server.log')
                 time.sleep(.25)
-            summary['roles'] = check_browser(report, release)
+            summary['roles'] = check_browser(report, release, worker)
             summary['passed'] = True
     finally:
         if server:

@@ -36,7 +36,7 @@ def read(page, path):
     return page.evaluate('path => window.CHT.api(path)', path)
 
 
-def exercise(pages, report):
+def exercise(pages, report, worker):
     resource, platform, clinic = pages['resource'], pages['platform'], pages['clinic']
     completed = []
     try:
@@ -90,6 +90,38 @@ def exercise(pages, report):
         resource.get_by_text('合成单客回归', exact=True).wait_for()
         close(resource)
         completed.append('named single sales with source customer number')
+
+        # Excel is uploaded/parsed by the real server; deliberately ambiguous phone columns.
+        resource.get_by_role('button', name='创建销售订单', exact=True).click()
+        select(resource, '销售方式', '记名非实体卡 · 批量Excel')
+        resource.get_by_role('button', name='下一步', exact=True).click()
+        with resource.expect_response(lambda response: response.url.endswith('/api/v1/files') and response.request.method=='POST') as uploaded:
+            resource.locator('.arco-drawer-wrapper').last.locator('input[type=file]').set_input_files(report/'synthetic-customers.xlsx')
+        assert uploaded.value.status == 201
+        resource.get_by_role('button', name='读取 Excel', exact=True).click()
+        resource.get_by_text('等待读取', exact=True).wait_for()
+        worker()
+        resource.get_by_text('待确认列', exact=True).wait_for(timeout=15000)
+        resource.get_by_role('button', name='识别列对应关系', exact=True).click()
+        resource.get_by_text('以下字段存在多个候选列', exact=False).wait_for()
+        phone_row = resource.locator('.arco-drawer-wrapper').last.locator('.arco-table-tr').filter(has_text='客户手机号（必填）')
+        phone_row.locator('.arco-select').click()
+        resource.locator('.arco-select-popup:visible .arco-select-option').filter(has_text=re.compile('^B · 手机号$')).click()
+        resource.get_by_role('button', name='确认列对应并校验', exact=True).click()
+        resource.get_by_text('正在校验', exact=True).wait_for()
+        worker()
+        resource.get_by_role('button', name='确认本次导入', exact=True).wait_for(timeout=15000)
+        resource.get_by_role('button', name='确认本次导入', exact=True).click()
+        resource.get_by_role('button', name='已确认导入', exact=True).wait_for()
+        resource.get_by_role('button', name='下一步', exact=True).click()
+        select(resource, '推广产品')
+        select(resource, '对客户展示的权益来源')
+        resource.get_by_role('button', name='提交开卡订单', exact=True).click()
+        resource.get_by_role('tab', name='Excel导入依据', exact=True).wait_for()
+        newest = read(resource, '/api/v1/sales-orders')['results'][0]
+        assert newest['quantity'] == 5 and newest['entry'] == 'excel'
+        close(resource)
+        completed.append('Excel upload ambiguous column mapping validation and five-card order')
 
         # Clinic confirmation: read only identifies a seeded pending record, operation uses UI.
         pending = read(clinic, '/api/v1/appointments?status=pending')['results'][0]

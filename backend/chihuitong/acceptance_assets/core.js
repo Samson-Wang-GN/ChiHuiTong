@@ -40,8 +40,9 @@
   C.Error = ({error,retry}) => error?h(A.Alert,{type:'error',content:h('div',null,error.message || String(error),error.requestId&&h('div',{className:'muted'},'问题编号：'+error.requestId),retry&&h(A.Button,{type:'text',onClick:retry},'重新加载'))}):null;
   C.useQuery = (path) => {
     const [state,set]=React.useState({data:null,loading:!!path,error:null}),[revision,bump]=React.useReducer(x=>x+1,0);
+    const previousPath=React.useRef(null);
     React.useEffect(()=>{const fn=()=>bump();C.events.addEventListener('refresh',fn);return()=>C.events.removeEventListener('refresh',fn);},[]);
-    React.useEffect(()=>{if(!path){set({data:null,loading:false,error:null});return;}const ctl=new AbortController();set({data:null,loading:true,error:null});C.request(path,{signal:ctl.signal}).then(data=>set({data,loading:false,error:null})).catch(error=>{if(!ctl.signal.aborted)set({data:null,loading:false,error});});return()=>ctl.abort();},[path,revision]);
+    React.useEffect(()=>{if(!path){set({data:null,loading:false,error:null});return;}const ctl=new AbortController();const same=previousPath.current===path;previousPath.current=path;set(old=>({data:same?old.data:null,loading:true,error:null}));C.request(path,{signal:ctl.signal}).then(data=>set({data,loading:false,error:null})).catch(error=>{if(!ctl.signal.aborted)set({data:null,loading:false,error});});return()=>ctl.abort();},[path,revision]);
     return {...state,reload:bump};
   };
   C.Panel = ({title,extra,children}) => h('section',{className:'panel'},(title||extra)&&h('div',{className:'toolbar'},h('h2',null,title),extra),children);
