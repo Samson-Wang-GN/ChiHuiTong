@@ -66,7 +66,27 @@
   };
   C.FileInput = function({value=[],onChange,purpose,multiple=true}) {
     const [error,setError]=React.useState(null),[files,setFiles]=React.useState([]);
-    return h('div',null,h(C.Error,{error}),h(A.Upload,{multiple,limit:multiple?20:1,fileList:files,accept:purpose==='sales_excel'?'.xlsx,.xls':purpose==='cover'?'.jpg,.jpeg,.png':'.jpg,.jpeg,.png,.pdf',onChange:setFiles,onRemove:f=>{onChange((value||[]).filter(id=>id!==f.response?.id));return true;},customRequest:option=>{const controller=new AbortController();const body=new FormData();body.append('file',option.fileItem.originFile);body.append('purpose',purpose);C.request('/api/v1/files',{method:'POST',body,signal:controller.signal}).then(data=>{setError(null);onChange(multiple?[...(value||[]),data.id]:[data.id]);option.onSuccess(data);}).catch(e=>{if(!controller.signal.aborted){setError(e);option.onError(e);}});return {abort:()=>controller.abort()};}}),value?.length>0&&h(C.Attachments,{ids:value}));
+    const ids=React.useRef(value||[]);
+    ids.current=value||[];
+    function update(next){ids.current=next;onChange(next);}
+    const present=new Set(files.map(f=>f.response?.id).filter(Boolean));
+    return h('div',null,h(C.Error,{error}),h(A.Upload,{
+      multiple,autoUpload:true,limit:multiple?20:1,fileList:files,
+      accept:purpose==='sales_excel'?'.xlsx':purpose==='cover'?'.jpg,.jpeg,.png':'.jpg,.jpeg,.png,.pdf',
+      onChange:setFiles,
+      onRemove:f=>{update(ids.current.filter(id=>id!==f.response?.id));return true;},
+      customRequest:option=>{
+        const controller=new AbortController();
+        const body=new FormData();
+        body.append('file',option.file);
+        body.append('purpose',purpose);
+        C.request('/api/v1/files',{method:'POST',body,signal:controller.signal})
+          .then(data=>{setError(null);update(multiple?[...new Set([...ids.current,data.id])]:[data.id]);option.onSuccess(data);})
+          .catch(e=>{if(!controller.signal.aborted){setError(e);option.onError(e);}});
+        return {abort:()=>controller.abort()};
+      }
+    }),value?.length>0&&h(C.Attachments,{ids:value}),
+    (value||[]).filter(id=>!present.has(id)).map((id,i)=>h(A.Button,{key:id,type:'text',status:'danger',onClick:()=>update(ids.current.filter(item=>item!==id))},'移除原附件 '+(i+1))));
   };
   C.Attachments = function({ids=[]}) {
     const [preview,setPreview]=React.useState(null),[error,setError]=React.useState(null),[loading,setLoading]=React.useState(null);

@@ -59,7 +59,7 @@ def check_browser(report, release, worker):
             pages[role] = page
             contexts.append(context)
             errors = []
-            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.on('pageerror', lambda error, captured=errors: captured.append(str(error)))
             page.goto(f'http://127.0.0.1:{PORT}/chihuitong/{role}/')
             page.get_by_label('手机号', exact=True).fill(phone)
             page.get_by_role('button', name='获取验证码', exact=True).click()
@@ -107,6 +107,8 @@ def check_browser(report, release, worker):
             page.set_viewport_size({'width':1440, 'height':1000})
         from web_workflows import exercise
         exercise(pages, report, worker)
+        for item in result:
+            assert not item['errors'], f"{item['role']}: {item['errors']}"
         for page in pages.values():
             page.get_by_role('button', name='退出登录', exact=True).click()
             page.get_by_role('button', name='登录', exact=True).wait_for()
