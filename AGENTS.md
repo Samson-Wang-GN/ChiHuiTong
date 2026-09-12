@@ -65,6 +65,8 @@
 - 本地 `D:\My work\ChiHuiTong` 是 Git 工作仓库/镜像，负责与 `Samson-Wang-GN/ChiHuiTong` 通信；服务器不建立该项目 `.git`、不配置GitHub凭据、不执行clone/pull/push。使用按提交打包并校验SHA-256的SSH传输。
 - 服务器项目目录 `/home/ubuntu/ChiHuiTong`；代码版本、独立测试环境和测试产物分离。禁止修改齿慧公共服务、Study System、现有数据库/Redis及共享Nginx配置来迁就本项目；未经另行批准不开放新的公网端口。具体流程见 `docs/operations/development.md`。
 
+- 2026-09-12专项授权例外（REQ-044）：允许在现有开发HTTPS站点增加且仅维护 `/chihuitong/` 的独立受保护验收路由和专属include，先备份/检查再平滑重载；不得改动其他既有路由，不新增公网端口。允许本项目独立验收库、应用服务与任务timer；其他共享服务及数据边界不变。操作和回退见 `docs/operations/acceptance.md`。
+
 - 每个功能必须有自动化测试；暂时无法自动化时，必须在任务文档中写出可复现的人工验证步骤、预期结果和限制。
 - 优先测试业务规则、权限边界、租户隔离、异常路径、重复提交、数据迁移和外部依赖失败。
 - 提交前按项目实际工具尽可能运行：格式化、lint、类型检查、单元测试、集成测试、迁移检查、构建和启动冒烟测试。
