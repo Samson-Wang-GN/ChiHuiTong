@@ -53,7 +53,7 @@ def serve(release):
         server.serve_forever()
 
 
-def check_browser(report, release, worker, fixture, headed=False):
+def check_browser(report, release, worker, fixture, headed=False, imports_only=False):
     from playwright.sync_api import expect, sync_playwright
     result = []
     with sync_playwright() as playwright:
@@ -117,8 +117,12 @@ def check_browser(report, release, worker, fixture, headed=False):
             assert not errors, f'{role}: {errors}'
             result.append({'role':role, 'menus':titles, 'errors':errors})
             page.set_viewport_size({'width':1440, 'height':1000})
-        from web_workflows import exercise
-        exercise(pages, report, worker, fixture)
+        if imports_only:
+            from web_import_flow import exercise
+            exercise(pages['resource'], worker, report)
+        else:
+            from web_workflows import exercise
+            exercise(pages, report, worker, fixture)
         if headed:
             from web_reminder import exercise_reminder
             exercise_reminder(pages['clinic'], fixture, report)
@@ -137,6 +141,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--serve', action='store_true')
     parser.add_argument('--headed', action='store_true')
+    parser.add_argument('--imports-only', action='store_true')
     args = parser.parse_args()
     if sys.platform != 'linux' or socket.gethostname() != 'VM-0-12-ubuntu' or os.getuid() == 0:
         raise SystemExit('Only approved development host as ubuntu')
@@ -189,7 +194,7 @@ def main():
                 if server.poll() is not None:
                     raise RuntimeError('Test gateway failed; inspect server.log')
                 time.sleep(.25)
-            summary['roles'] = check_browser(report, release, worker, fixture, args.headed)
+            summary['roles'] = check_browser(report, release, worker, fixture, args.headed, args.imports_only)
             summary['passed'] = True
     finally:
         if server:

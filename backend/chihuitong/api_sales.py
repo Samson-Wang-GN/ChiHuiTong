@@ -410,8 +410,15 @@ def import_list(request):
 @api_view(["GET"])
 def import_detail(request, batch_id):
     batch = imports.get_import(request_actor(request), batch_id)
-    return Response({**import_projection(batch), "preview": batch.preview,
-                     "recommendation": imports.recommend_import(batch) if batch.status == "mapping" else None})
+    return Response(
+        {
+            **import_projection(batch),
+            "preview": batch.preview,
+            "recommendation": imports.recommend_import(batch)
+            if batch.status == "mapping"
+            else None,
+        }
+    )
 
 
 class MappingInput(VersionInput):

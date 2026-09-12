@@ -29,7 +29,9 @@ class ImportRecommendationTests(TestCase):
             sheet.append(row)
         output = io.BytesIO()
         book.save(output)
-        asset = files.upload_file(self.resource, data=output.getvalue(), filename="自动匹配.xlsx", purpose="sales_excel")
+        asset = files.upload_file(
+            self.resource, data=output.getvalue(), filename="自动匹配.xlsx", purpose="sales_excel"
+        )
         batch = imports.create_import(self.resource, asset.id)
         jobs.run_one()
         batch.refresh_from_db()
@@ -37,7 +39,9 @@ class ImportRecommendationTests(TestCase):
 
     def test_sheet_header_twenty_and_ten_raw_rows(self):
         rows = [[f"合成客户{i}", f"13900000{i:03d}", 2] for i in range(12)]
-        batch = self.inspect(["客户 姓名：", "ＰＨＯＮＥ＿ＮＵＭＢＥＲ", "购卡张数"], rows, 19, True)
+        batch = self.inspect(
+            ["客户 姓名：", "ＰＨＯＮＥ＿ＮＵＭＢＥＲ", "购卡张数"], rows, 19, True
+        )
         response = api_client(self.resource).get(f"/api/v1/imports/{batch.id}")
         self.assertEqual(response.status_code, 200)
         result = response.json()
@@ -59,15 +63,29 @@ class ImportRecommendationTests(TestCase):
         self.assertNotIn("uniform_quantity", result)
 
     def test_same_institution_format_reordered_and_conflicts_are_visible(self):
-        structure = {"headers": ["称呼", "联络号码", "采购张数"], "field_headers": {"name": "称呼", "phone": "联络号码", "quantity": "采购张数"}}
-        ImportFormat.objects.create(organization=self.other.organization, name="其他机构格式", structure=structure)
+        structure = {
+            "headers": ["称呼", "联络号码", "采购张数"],
+            "field_headers": {"name": "称呼", "phone": "联络号码", "quantity": "采购张数"},
+        }
+        ImportFormat.objects.create(
+            organization=self.other.organization, name="其他机构格式", structure=structure
+        )
         batch = self.inspect(["采购张数", "称呼", "联络号码"], [[2, "合成客户", "13900000101"]])
         self.assertEqual(imports.recommend_import(batch)["mapping"], {})
-        ImportFormat.objects.create(organization=self.resource.organization, name="本机构格式", structure=structure)
+        ImportFormat.objects.create(
+            organization=self.resource.organization, name="本机构格式", structure=structure
+        )
         result = imports.recommend_import(batch)
         self.assertEqual(result["mapping"], {"name": 1, "phone": 2, "quantity": 0})
         self.assertTrue(result["saved_format"])
-        ImportFormat.objects.create(organization=self.resource.organization, name="冲突格式", structure={**structure, "field_headers": {"name": "联络号码", "phone": "称呼", "quantity": "采购张数"}})
+        ImportFormat.objects.create(
+            organization=self.resource.organization,
+            name="冲突格式",
+            structure={
+                **structure,
+                "field_headers": {"name": "联络号码", "phone": "称呼", "quantity": "采购张数"},
+            },
+        )
         result = imports.recommend_import(batch)
         self.assertNotIn("phone", result["mapping"])
         self.assertEqual(result["ambiguous"]["phone"], [1, 2])

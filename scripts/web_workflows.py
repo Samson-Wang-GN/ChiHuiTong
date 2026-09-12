@@ -125,7 +125,7 @@ def exercise(pages, report, worker, fixture):
         worker()
         resource.get_by_text('原文件预览 · 前10条数据', exact=True).wait_for(timeout=15000)
         resource.get_by_text('有多个候选列，请选择正确的一列', exact=True).wait_for()
-        assert resource.locator('.import-preview .arco-table-tr').count() == 2
+        assert resource.locator('.import-preview tbody .arco-table-tr').count() == 2
         assert resource.get_by_role('button', name='读取 Excel', exact=True).count() == 0
         phone_row = dialog(resource).locator('.arco-table-tr').filter(has_text='客户手机号（必填）')
         phone_row.locator('.arco-select').click()

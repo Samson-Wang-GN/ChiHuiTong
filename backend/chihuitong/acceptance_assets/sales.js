@@ -453,7 +453,14 @@
                 { name: 'age', type: 'number', max: 150, optional: true },
                 { name: 'occupation', optional: true },
               ]
-            : [{ name: 'import', label: '上传客户Excel', optional: true, render: () => h(C.ImportEditor, { prepareRef: prepareImport }) }];
+            : [
+                {
+                  name: 'import',
+                  label: '上传客户Excel',
+                  optional: true,
+                  render: () => h(C.ImportEditor, { prepareRef: prepareImport }),
+                },
+              ];
     else
       fields = [
         {
