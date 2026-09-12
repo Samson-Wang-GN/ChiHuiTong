@@ -20,6 +20,14 @@ PHONE_INDEX_KEY = required("CHT_PHONE_INDEX_KEY")
 ENVIRONMENT = os.environ.get("CHT_ENVIRONMENT", "production")
 if ENVIRONMENT not in {"production", "development", "test"}:
     raise ImproperlyConfigured("CHT_ENVIRONMENT不合法")
+ACCEPTANCE_ENABLED = os.environ.get("CHT_ACCEPTANCE_ENABLED", "false").lower() == "true"
+ACCEPTANCE_PROXY_TOKEN = os.environ.get("CHT_ACCEPTANCE_PROXY_TOKEN", "")
+if ACCEPTANCE_ENABLED and (
+    ENVIRONMENT == "production"
+    or not os.environ.get("CHT_DB_NAME", "").startswith("chihuitong_acceptance")
+    or len(ACCEPTANCE_PROXY_TOKEN) < 40
+):
+    raise ImproperlyConfigured("验收模式必须使用独立验收库、非生产环境和私有代理令牌")
 DEBUG = False
 ALLOWED_HOSTS = required("CHT_ALLOWED_HOSTS").split(",")
 if "*" in ALLOWED_HOSTS:
@@ -40,6 +48,7 @@ DATABASES = {
 INSTALLED_APPS = ["django.contrib.contenttypes", "rest_framework", "chihuitong"]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "chihuitong.acceptance.GateMiddleware",
     "chihuitong.http.RequestContextMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -87,6 +96,8 @@ OTP_COOLDOWN_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 SESSION_SECONDS = 8 * 60 * 60
 WECHAT_PAY_ENABLED = os.environ.get("CHT_WECHAT_PAY_ENABLED", "false").lower() == "true"
+if ACCEPTANCE_ENABLED and WECHAT_PAY_ENABLED:
+    raise ImproperlyConfigured("合成验收环境禁止真实支付")
 WECHAT_PAY = {
     key: os.environ.get("CHT_WXPAY_" + key.upper(), "")
     for key in [
