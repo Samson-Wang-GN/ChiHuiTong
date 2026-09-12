@@ -326,7 +326,10 @@
         : contractFields,
       initial: row
         ? { ...row, contact_name: row.contact.name, contact_phone: row.contact.phone }
-        : { settlement_cycle: renewFrom?.settlement_cycle || 'monthly', number: renewFrom?.number || '' },
+        : {
+            settlement_cycle: renewFrom?.settlement_cycle || 'monthly',
+            number: renewFrom?.number || '',
+          },
       hint: '三方门诊合同由渠道提交、平台审核。月结付款期限为出账次日起5个自然日，周结为3个自然日；新周期适用于尚未出账交易。',
       onSubmit: (v) => {
         const { number, reason, contact_name, contact_phone, ...values } = v;
@@ -365,7 +368,8 @@
   C.dialogs.contract = function ({ id, canManage = false, onClose }) {
     const q = C.useChoices(base + 'contract-versions/' + id),
       r = q.data;
-    canManage = canManage && (C.role === 'platform' || (C.role === 'channel' && r?.kind === 'clinic'));
+    canManage =
+      canManage && (C.role === 'platform' || (C.role === 'channel' && r?.kind === 'clinic'));
     return h(
       C.Drawer,
       { title: '合同详情', onClose, width: 1000 },
@@ -393,8 +397,12 @@
               canManage &&
                 r.status === 'draft' &&
                 C.button('修改草稿', () => contractForm(r.organization_id, r)),
-              canManage && r.status !== 'draft' && r.status !== 'pending' &&
-                C.button(r.status === 'rejected' ? '修改并重新登记' : '登记续签版本', () => contractForm(r.organization_id, null, r)),
+              canManage &&
+                r.status !== 'draft' &&
+                r.status !== 'pending' &&
+                C.button(r.status === 'rejected' ? '修改并重新登记' : '登记续签版本', () =>
+                  contractForm(r.organization_id, null, r),
+                ),
               canManage &&
                 r.status === 'draft' &&
                 C.button('提交审核', () =>
@@ -482,9 +490,7 @@
     const editable = C.role === 'platform' && ['draft', 'approved'].includes(contract.status);
     return h(C.List, {
       path: base + 'contract-versions/' + contract.id + '/products',
-      toolbar:
-        editable &&
-        h(A.Button, { type: 'primary', onClick: () => edit() }, '添加推广产品'),
+      toolbar: editable && h(A.Button, { type: 'primary', onClick: () => edit() }, '添加推广产品'),
       columns: [
         {
           title: '推广产品',

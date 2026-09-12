@@ -38,16 +38,25 @@
     'bill.reminder': '付款提醒',
     'bill.overdue': '逾期提醒',
   });
-  C.openNotification = r => {
+  C.openNotification = (r) => {
     if (r.object_type === 'contract' && r.contract_version_id) {
-      C.open('contract', {id:r.contract_version_id,canManage:C.role==='channel'||C.role==='platform'});
+      C.open('contract', {
+        id: r.contract_version_id,
+        canManage: C.role === 'channel' || C.role === 'platform',
+      });
       return;
     }
-    const type={appointment:'appointment',clinicbill:'clinicBill',partnerbill:'partnerBill',salesorder:'sale',clinic:'clinic'}[r.object_type];
-    if(type&&C.dialogs[type])C.open(type,{id:r.object_id});
+    const type = {
+      appointment: 'appointment',
+      clinicbill: 'clinicBill',
+      partnerbill: 'partnerBill',
+      salesorder: 'sale',
+      clinic: 'clinic',
+    }[r.object_type];
+    if (type && C.dialogs[type]) C.open(type, { id: r.object_id });
     else C.showTasks('all');
   };
-  C.NotificationList = ({initialStatus='all'}) =>
+  C.NotificationList = ({ initialStatus = 'all' }) =>
     h(
       C.Panel,
       { title: '站内消息' },

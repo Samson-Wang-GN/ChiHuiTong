@@ -101,8 +101,18 @@ def transaction_projection(actor, record):
         "customer_name": customer.name,
         "phone": phone,
         "product_id": str(product.id),
-        "internal_name": record.snapshot.get("internal_name", appointment.benefit.card.order.product_snapshot.get("internal_name", product.internal_name)),
-        "external_name": record.snapshot.get("external_name", appointment.benefit.card.order.product_snapshot.get("external_name", product.external_name)),
+        "internal_name": record.snapshot.get(
+            "internal_name",
+            appointment.benefit.card.order.product_snapshot.get(
+                "internal_name", product.internal_name
+            ),
+        ),
+        "external_name": record.snapshot.get(
+            "external_name",
+            appointment.benefit.card.order.product_snapshot.get(
+                "external_name", product.external_name
+            ),
+        ),
         "clinic_id": str(appointment.clinic_id),
         "clinic_name": appointment.clinic.organization.name,
         "source_name": appointment.benefit.card.order.source_name,

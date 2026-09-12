@@ -62,7 +62,7 @@
       }),
       h(C.Panel, { title: '全部付款凭证' }, h(C.Attachments, { ids: r.attachment_ids })),
       C.role === 'platform' &&
-      r.status === 'pending' &&
+        r.status === 'pending' &&
         h(
           A.Button,
           {

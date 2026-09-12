@@ -71,7 +71,7 @@
       null,
       h(C.Error, { error: q.error, retry: q.reload }),
       C.role === 'clinic' && C.ReminderControl && h(C.ReminderControl),
-      h(C.NotificationList, {initialStatus:'unread'}),
+      h(C.NotificationList, { initialStatus: 'unread' }),
       h(
         A.Spin,
         { loading: q.loading, style: { width: '100%' } },

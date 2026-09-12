@@ -169,9 +169,21 @@ def paginated(request, queryset, projection, *, status_field="status", states=()
     ordering = request.query_params.get("ordering", "-created_at")
     sort_field = ordering.removeprefix("-")
     sortable = {
-        "created_at", "scheduled_at", "requested_at", "amount_cents", "fee_cents",
-        "quantity", "total_cents", "received_cents", "due_at", "issued_on",
-        "starts_at", "ends_at", "validity_days", "redemption_units", "unit_price_cents",
+        "created_at",
+        "scheduled_at",
+        "requested_at",
+        "amount_cents",
+        "fee_cents",
+        "quantity",
+        "total_cents",
+        "received_cents",
+        "due_at",
+        "issued_on",
+        "starts_at",
+        "ends_at",
+        "validity_days",
+        "redemption_units",
+        "unit_price_cents",
     }
     fields = {field.name for field in queryset.model._meta.get_fields()}
     fields.update(queryset.query.annotations)

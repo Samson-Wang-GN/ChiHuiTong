@@ -400,7 +400,8 @@
         ),
     );
   C.dialogs.saleWizard = function ({ onClose }) {
-    const [previewPrice,setPreviewPrice]=React.useState(0),[previewUnits,setPreviewUnits]=React.useState(1);
+    const [previewPrice, setPreviewPrice] = React.useState(0),
+      [previewUnits, setPreviewUnits] = React.useState(1);
     const [step, setStep] = React.useState(1),
       [draft, setDraft] = React.useState({ selection: 'physical' });
     const org = C.actor.organization_id,
@@ -469,11 +470,28 @@
           type: 'select',
           options: (brands.data?.results || []).map((b) => ({ value: b.id, label: b.name })),
         },
-        { name: 'units_per_card', label: '每张卡绑定权益份数', render:()=>h(A.InputNumber,{min:1,max:10000,precision:0,style:{width:'100%'},onChange:setPreviewUnits}) },
+        {
+          name: 'units_per_card',
+          label: '每张卡绑定权益份数',
+          render: () =>
+            h(A.InputNumber, {
+              min: 1,
+              max: 10000,
+              precision: 0,
+              style: { width: '100%' },
+              onChange: setPreviewUnits,
+            }),
+        },
         {
           name: 'price',
           label: '单卡采购价（元，资源方向平台支付）',
-          render:()=>h(A.InputNumber,{min:0,precision:2,style:{width:'100%'},onChange:setPreviewPrice}),
+          render: () =>
+            h(A.InputNumber, {
+              min: 0,
+              precision: 2,
+              style: { width: '100%' },
+              onChange: setPreviewPrice,
+            }),
         },
         {
           name: 'responsible_id',
@@ -503,7 +521,20 @@
           h(A.Steps.Step, { title: '客户与开卡数量' }),
           h(A.Steps.Step, { title: '产品与采购价' }),
         ),
-        step===3&&h(A.Alert,{type:'info',content:'采购汇总：'+total+' 张 × '+C.money(Math.round((previewPrice||0)*100))+'/张 = '+C.money(total*Math.round((previewPrice||0)*100))+'；合计 '+total*(previewUnits||0)+' 份权益。'}),
+        step === 3 &&
+          h(A.Alert, {
+            type: 'info',
+            content:
+              '采购汇总：' +
+              total +
+              ' 张 × ' +
+              C.money(Math.round((previewPrice || 0) * 100)) +
+              '/张 = ' +
+              C.money(total * Math.round((previewPrice || 0) * 100)) +
+              '；合计 ' +
+              total * (previewUnits || 0) +
+              ' 份权益。',
+          }),
         h(
           'p',
           null,

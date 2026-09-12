@@ -37,7 +37,9 @@ def appointment_projection(actor, item):
         "clinic_name": item.clinic.organization.name,
         "benefit_id": str(item.benefit_id),
         "product_id": str(item.benefit.product_id),
-        "internal_name": order.product_snapshot.get("internal_name", item.benefit.product.internal_name),
+        "internal_name": order.product_snapshot.get(
+            "internal_name", item.benefit.product.internal_name
+        ),
         "external_name": order.product_snapshot["external_name"],
         "source_name": order.source_name,
         "units": item.units,

@@ -62,15 +62,21 @@ class FinanceTests(TestCase):
     def test_transaction_names_remain_frozen_after_product_rename(self):
         from chihuitong.api_appointments import appointment_projection
         from chihuitong.services.finance_queries import transaction_projection
+
         snapshot = dict(self.redemption.snapshot)
         self.product.internal_name = "修改后的内部名称"
         self.product.external_name = "修改后的外部名称"
         self.product.save(update_fields=["internal_name", "external_name"])
-        record = Redemption.objects.select_related("appointment__benefit__product").get(pk=self.redemption.id)
+        record = Redemption.objects.select_related("appointment__benefit__product").get(
+            pk=self.redemption.id
+        )
         row = transaction_projection(self.platform, record)
         self.assertEqual(row["internal_name"], snapshot["internal_name"])
         self.assertEqual(row["external_name"], snapshot["external_name"])
-        self.assertEqual(appointment_projection(self.platform, record.appointment)["internal_name"], self.card.order.product_snapshot["internal_name"])
+        self.assertEqual(
+            appointment_projection(self.platform, record.appointment)["internal_name"],
+            self.card.order.product_snapshot["internal_name"],
+        )
 
     def test_calendar_deadlines_and_idempotent_issue(self):
         self.assertEqual(
