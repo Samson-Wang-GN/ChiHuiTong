@@ -844,7 +844,12 @@
                 title: preview.name,
                 visible: true,
                 onCancel: () => setPreview(null),
-                footer: h(A.Button, { href: preview.url, download: preview.name }, '下载 PDF'),
+                footer: h(
+                  A.Space,
+                  null,
+                  h(A.Button, { onClick: () => setPreview(null) }, '关闭预览'),
+                  h(A.Button, { href: preview.url, download: preview.name }, '下载 PDF'),
+                ),
                 style: { width: Math.min(1000, window.innerWidth - 24) },
               },
               h(A.Alert, {
