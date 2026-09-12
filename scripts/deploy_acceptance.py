@@ -17,7 +17,8 @@ HOST = 'dev-public.chihui-ai.com'
 PORT = 18243
 PG = Path('/usr/lib/postgresql/16/bin')
 RUNTIME = ROOT / 'runtime' / 'acceptance'
-SITE = Path('/etc/nginx/sites-available/study-system')
+# This server uses a regular file in sites-enabled, not the usual symlink.
+SITE = Path('/etc/nginx/sites-enabled/study-system')
 INCLUDE = Path('/etc/nginx/chihuitong-acceptance.locations.conf')
 SERVICES = ['chihui-public.service', 'study-system-web.service', 'study-system-syncthing.service', 'nginx.service']
 
@@ -102,6 +103,12 @@ location ^~ /chihuitong/ {
     old_site=run(['sudo','-n','cat',SITE],capture_output=True).stdout
     needle='    server_name dev-public.chihui-ai.com;'
     directive=f'    include {INCLUDE};'
+    inactive = Path('/etc/nginx/sites-available/study-system')
+    if inactive.exists() and inactive.resolve() != SITE.resolve():
+        inactive_text = run(['sudo','-n','cat',inactive],capture_output=True).stdout
+        if directive + '\n' in inactive_text:
+            # Remove only our earlier include from the inactive file; preserve all other bytes.
+            install(inactive_text.replace(directive + '\n','',1),inactive)
     if needle not in old_site or 'listen 443 ssl' not in old_site:
         raise SystemExit('Unexpected Nginx site; manual review required')
     backup=RUNTIME/f'nginx-before-{stamp}.conf'
