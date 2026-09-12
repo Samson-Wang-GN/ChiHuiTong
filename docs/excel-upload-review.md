@@ -10,6 +10,10 @@
 
 修复版对用户原文件只读解析结果为3×4、表头1、3项必要字段全部自动匹配；未改该批次或任何客户数据。新增合法无dimension模板的页面流程，以及缺失/低报/高报维度、真实坐标超限、旧批次下一步恢复的后端回归。最终证据见TASK-092。
 
+后端167项通过/覆盖率89%：`/home/ubuntu/ChiHuiTong/test-results/20260912T095824Z-dc3b32ade795-backend/summary.json`；模板与全部Excel专项：`/home/ubuntu/ChiHuiTong/test-results/20260912T095839Z-dc3b32ade795-web/summary.json`通过。应用1ccf62b5c4fcbc37d9c37b41f508baa94e0d0cc1已部署，格式化后服务文件与该测试副本SHA-256相同；无迁移，旧版回退候选19b4c00，保留私有数据库备份及原文件。
+
+部署后`/home/ubuntu/ChiHuiTong/test-results/20260912T100251Z-acceptance-browser/summary.json`通过，业务数据保留。原上传页可直接再点下一步；若已离开未提交向导，重新上传同一文件即可自动识别，不要求修改Excel或手工指定表头。
+
 ## 交互与决定
 
 - 只改正式客户资源方后台记名批量销售；实体卡、单客、付款、平台审核与小程序不变。

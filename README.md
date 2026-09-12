@@ -14,6 +14,8 @@
 
 ## 当前状态
 
+最新修正TASK-092（应用1ccf62b）：兼容省略dimension的合法Excel模板，按真实单元格计算行列数，不再错误识别0×0。工作表/表头仍自动识别，正常文件一次下一步；旧未提交批次可直接重试。167项后端测试及模板上传页面专项通过，细节见[Excel交付记录](docs/excel-upload-review.md)。以下REQ-046首版记录保留历史验证范围。
+
 REQ-045 / TASK-090：四角色完整Web已开发部署，原账号/数据/口令保留。当前应用19b4c00包含REQ-046 / TASK-091的Excel上传简化：上传自动读取/匹配，原表头及前10行预览，必需字段缺失/歧义提示，底部一次下一步完成校验与确认。164项后端测试、89%覆盖率、Excel专项/完整跨角色及真实HTTPS回归通过。详见[Excel交付记录](docs/excel-upload-review.md)、[验收指引](docs/web-acceptance-guide.md)；四后台范围见[完整Web实施清单](docs/web-backend-plan.md)，自主决定见[ADR-0028](docs/decisions/0028-complete-web-backends.md)。
 
 本期按用户要求启用显式非生产模拟支付/短信：`CHT_ACCEPTANCE_SIMULATED_EXTERNALS=true`仅在独立验收环境有效；支付通过真实业务账本返回模拟成功，短信记录模拟受理，不发起实际微信付款或短信发送。生产和真实支付启用时拒绝此开关，不能自动降级模拟。地图仍须本项目腾讯地图Key才能验证真实底图。
