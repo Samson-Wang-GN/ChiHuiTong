@@ -66,7 +66,7 @@ def main():
                 page.get_by_role('button',name='详情',exact=True).first.click()
                 page.get_by_text('业务详情（真实接口结果）',exact=True).wait_for()
                 page.screenshot(path=str(output/(role+'-details.png')),full_page=True)
-                page.keyboard.press('Escape')
+                page.get_by_role('button',name='关闭详情',exact=True).click()
                 page.locator('.arco-drawer-wrapper').wait_for(state='hidden')
                 page.set_viewport_size({'width':768,'height':900})
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),role+' overflow'
@@ -74,6 +74,7 @@ def main():
                 page.get_by_role('button',name='登录',exact=True).wait_for()
                 assert not errors, role+' browser script errors'
                 report['checks'].append({'role':role,'menus':count,'login':True,'details':True,'logout':True,'script_errors':0})
+                print('ROLE_PASSED='+role,flush=True)
                 context.close()
             browser.close()
         for path in ['/','/study-system/']:
