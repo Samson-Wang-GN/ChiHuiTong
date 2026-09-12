@@ -123,8 +123,12 @@ def worksheet_shape(source):
                 row_number = int(element.get("r", row_number + 1))
             except ValueError as exc:
                 raise BusinessError("invalid_excel", "Excel行位置不合法，请重新导出", 400) from exc
-            require(0 < row_number <= 10020 and row_count <= 10020,
-                    "excel_limit", "单表超过10000条数据，请拆分上传", 400)
+            require(
+                0 < row_number <= 10020 and row_count <= 10020,
+                "excel_limit",
+                "单表超过10000条数据，请拆分上传",
+                400,
+            )
             maximum_row = max(maximum_row, row_number)
             cell_count = 0
         elif name == "c":
@@ -137,8 +141,12 @@ def worksheet_shape(source):
                 cell_row = int(match[2])
             else:
                 column, cell_row = cell_count, row_number
-            require(0 < column <= 200 and cell_count <= 200 and 0 < cell_row <= 10020,
-                    "excel_limit", "单表超过10000条数据或200列，请拆分上传", 400)
+            require(
+                0 < column <= 200 and cell_count <= 200 and 0 < cell_row <= 10020,
+                "excel_limit",
+                "单表超过10000条数据或200列，请拆分上传",
+                400,
+            )
             maximum_row = max(maximum_row, cell_row)
             maximum_column = max(maximum_column, column)
     return {"rows": maximum_row, "columns": maximum_column}
@@ -184,10 +192,16 @@ def read_import_metadata(batch):
         for sheet in book:
             shape = book.cht_shapes[sheet.title]
             sheets.append({"name": sheet.title, **shape})
-            preview[sheet.title] = [
-                [safe_cell(cell) for cell in row]
-                for row in sheet.iter_rows(max_row=min(30, shape["rows"]), max_col=shape["columns"])
-            ] if shape["rows"] and shape["columns"] else []
+            preview[sheet.title] = (
+                [
+                    [safe_cell(cell) for cell in row]
+                    for row in sheet.iter_rows(
+                        max_row=min(30, shape["rows"]), max_col=shape["columns"]
+                    )
+                ]
+                if shape["rows"] and shape["columns"]
+                else []
+            )
     finally:
         book.close()
     return sheets, preview
@@ -228,8 +242,12 @@ def configure_import(
         # Heal an unconsumed legacy 0x0 cache during the authorized write, not a GET.
         batch.sheets, batch.preview = read_import_metadata(batch)
         sheet_meta = next((item for item in batch.sheets if item["name"] == sheet), None)
-    require(sheet_meta and sheet_meta["rows"] and sheet_meta["columns"],
-            "empty_import", "识别的工作表没有可读取的数据，请检查文件内容后重新上传", 400)
+    require(
+        sheet_meta and sheet_meta["rows"] and sheet_meta["columns"],
+        "empty_import",
+        "识别的工作表没有可读取的数据，请检查文件内容后重新上传",
+        400,
+    )
     require(
         sheet_meta and type(header_row) is int and 1 <= header_row <= min(20, sheet_meta["rows"]),
         "invalid_header",
@@ -323,8 +341,10 @@ def validate_import(batch_id, expected_version):
         sheet = book[config["sheet"]]
         shape = book.cht_shapes[sheet.title]
         for number, cells in enumerate(
-            sheet.iter_rows(min_row=config["header_row"] + 1, max_row=shape["rows"], max_col=shape["columns"]),
-            start=config["header_row"] + 1
+            sheet.iter_rows(
+                min_row=config["header_row"] + 1, max_row=shape["rows"], max_col=shape["columns"]
+            ),
+            start=config["header_row"] + 1,
         ):
             if all(cell.value in (None, "") for cell in cells):
                 continue
