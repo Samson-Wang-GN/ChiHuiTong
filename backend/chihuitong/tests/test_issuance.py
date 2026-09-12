@@ -1,8 +1,7 @@
 from unittest.mock import patch
 
-from django.utils import timezone
-
 from django.test import TestCase
+from django.utils import timezone
 
 from chihuitong.errors import BusinessError
 from chihuitong.models import Card, CardRange, Outbox

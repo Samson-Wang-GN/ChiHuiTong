@@ -11,8 +11,8 @@ from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string
 from openpyxl.utils.exceptions import InvalidFileException
 
-from chihuitong.errors import BusinessError, require
 from chihuitong.crypto import digest
+from chihuitong.errors import BusinessError, require
 from chihuitong.models import Customer, ImportBatch, ImportFormat, ImportRow, SalesOrder
 
 from .common import RESOURCE_KINDS, advance, audit, check_version
@@ -373,7 +373,9 @@ def validate_import(batch_id, expected_version):
         book.close()
     # Identity is platform-wide; only compare names internally, never expose matches.
     # Bounded queries preserve cross-resource conflict detection without N+1 lookups.
-    indexes = list({digest(row.normalized["phone"], purpose="phone") for row in values if not row.errors})
+    indexes = list(
+        {digest(row.normalized["phone"], purpose="phone") for row in values if not row.errors}
+    )
     existing_names = {}
     for offset in range(0, len(indexes), 500):
         existing_names.update(
@@ -386,7 +388,10 @@ def validate_import(batch_id, expected_version):
             existing_name = existing_names.get(digest(row.normalized["phone"], purpose="phone"))
             if existing_name and existing_name != row.normalized["name"]:
                 row.errors.append(
-                    {"code": "customer_conflict", "message": "手机号与姓名不一致，请核对当前上传资料"}
+                    {
+                        "code": "customer_conflict",
+                        "message": "手机号与姓名不一致，请核对当前上传资料",
+                    }
                 )
                 row.status = "invalid"
         if row.normalized.get("phone") in duplicate_phones:
