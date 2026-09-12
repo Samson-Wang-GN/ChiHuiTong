@@ -74,7 +74,7 @@ def main():
     else:
         run([PG/'createdb',*dbargs,cfg['CHT_DB_NAME']])
     python=ROOT/'.venv-backend'/'bin'/'python'
-    for command in [['migrate','--noinput'],['initialize_configuration'],['seed_acceptance'],['check']]:
+    for command in [['migrate','--noinput'],['initialize_configuration'],['seed_acceptance'],['initialize_simulation'],['check']]:
         run([python,'manage.py',*command], cwd=release/'backend', env=env)
     creds_path = RUNTIME/'access.json'
     if not creds_path.exists():

@@ -144,7 +144,7 @@ def main():
     run([PG/'createdb', *dbargs, name])
     try:
         with (report/'setup.log').open('w') as log:
-            for command in [['migrate','--noinput'], ['initialize_configuration'], ['seed_acceptance']]:
+            for command in [['migrate','--noinput'], ['initialize_configuration'], ['seed_acceptance'], ['initialize_simulation']]:
                 run([python,'manage.py',*command], cwd=release/'backend', env=env, stdout=log, stderr=subprocess.STDOUT)
         with (report/'server.log').open('w') as log:
             server = subprocess.Popen([str(python),str(Path(__file__).resolve()),'--serve'], env=env, stdout=log, stderr=subprocess.STDOUT)

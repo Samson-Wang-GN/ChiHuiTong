@@ -132,9 +132,15 @@ def asset(request, name):
     if not enabled():
         return HttpResponse(status=404)
     if name in {
-        "app.js", "style.css", "core.js", "catalog.js", "clinics.js", "workbench.js",
+        "app.js",
+        "style.css",
+        "core.js",
+        "catalog.js",
+        "clinics.js",
+        "workbench.js",
         "appointments.js",
         "finance.js",
+        "operations.js",
     }:
         path = Path(__file__).resolve().parent / "acceptance_assets" / name
     elif name in {"react.min.js", "react-dom.min.js", "arco.min.js", "arco.min.css"}:
