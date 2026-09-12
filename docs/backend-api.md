@@ -4,6 +4,10 @@
 
 ## 公共约定
 
+REQ-045补充：完整Web界面位于`backend/chihuitong/acceptance_assets/`，受保护验收代理前缀为`/chihuitong`，浏览器以`X-CHT-Authorization`传业务Bearer，由专属代理转为标准Authorization，避免覆盖第一层访问保护。通用列表支持白名单`ordering`（减号表示倒序），不支持任意关联字段排序。`GET /files/{id}/details`返回同一访问边界内的附件名、类型、大小，不返回存储路径。`POST /clinics/map-preview`接受门诊ID（新建时可省）、经纬度和缩放3～18，返回固定600×360 PNG；缺Key不返回虚构地图。通知中的`contract_version_id`指向当前可查看合同版本，合同明细仍独立校验权限。
+
+`GET /payments/configuration`告知是否启用显式模拟；仅非生产独立验收允许。用户本期明确要求真实微信调用和短信发送为空壳模拟成功，模拟记录不能等同于真实到账/送达。实际规则与保护见ADR-0028。
+
 - Web前缀`/api/v1`，JSON请求；上传为multipart，字段`file`及`purpose`。不接受未知字段或非对象JSON。
 - 先`POST /auth/code`提交`phone`，再`POST /auth/login`提交`phone/code`。成功返回不透明token和机构身份；业务请求同时携带`Authorization: Bearer <token>`、`X-Membership-ID: <membership UUID>`。一个手机号可有多个机构身份，客户端明确选择，不把手机号当租户。
 - `GET /auth/me`列当前可用身份；`POST /auth/logout`撤销当前会话。停用账号、身份或机构后下一次请求立即拒绝。平台初始账号通过服务器交互命令创建，不提供公开自注册后台管理员。

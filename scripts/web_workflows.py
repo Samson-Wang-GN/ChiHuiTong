@@ -334,6 +334,29 @@ def exercise(pages, report, worker, fixture):
                 assert restored['status']=='success' and restored['reserved']
             close(clinic)
             completed.append(kind+' redemption quote confirmation and correct reversal state')
+
+        # Every metric opens its server-backed trend; Excel export is an actual workbook download.
+        for role in ['platform', 'resource']:
+            page = pages[role]
+            menu(page, '客户与权益概览')
+            page.locator('.metric-button').first.wait_for()
+            for index in range(8):
+                with page.expect_response(lambda response: '/customer-overview/trend?' in response.url) as trend:
+                    page.locator('.metric-button').nth(index).click()
+                assert trend.value.status == 200
+                page.get_by_role('tab', name='指标明细', exact=True).wait_for()
+                if index == 0:
+                    dialog(page).locator('.arco-select').first.click()
+                    with page.expect_response(lambda response: '/customer-overview/trend?' in response.url and 'granularity=week' in response.url) as weekly:
+                        page.locator('.arco-select-popup:visible .arco-select-option').filter(has_text='按周').click()
+                    assert weekly.value.status == 200
+                    with page.expect_download() as exported:
+                        dialog(page).get_by_role('button', name='下载 Excel', exact=True).click()
+                    import zipfile
+                    with zipfile.ZipFile(exported.value.path()) as workbook:
+                        assert 'xl/workbook.xml' in workbook.namelist()
+                close(page)
+            completed.append(role+' eight metric trends weekly switch and authenticated Excel download')
         for role, page in pages.items():
             page.screenshot(path=str(report/f'{role}-workflow.png'), full_page=True, animations='disabled')
     except Exception:

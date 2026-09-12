@@ -365,6 +365,7 @@
   C.dialogs.contract = function ({ id, canManage = false, onClose }) {
     const q = C.useChoices(base + 'contract-versions/' + id),
       r = q.data;
+    canManage = canManage && (C.role === 'platform' || (C.role === 'channel' && r?.kind === 'clinic'));
     return h(
       C.Drawer,
       { title: '合同详情', onClose, width: 1000 },
@@ -478,10 +479,11 @@
   };
   function Terms({ contract }) {
     const edit = (row) => C.open('termForm', { contract, row });
+    const editable = C.role === 'platform' && ['draft', 'approved'].includes(contract.status);
     return h(C.List, {
       path: base + 'contract-versions/' + contract.id + '/products',
       toolbar:
-        C.role === 'platform' &&
+        editable &&
         h(A.Button, { type: 'primary', onClick: () => edit() }, '添加推广产品'),
       columns: [
         {
@@ -510,7 +512,7 @@
         },
         C.column('status'),
       ],
-      actions: C.role === 'platform' ? (r) => C.button('修改配置', () => edit(r)) : null,
+      actions: editable ? (r) => C.button('修改配置', () => edit(r)) : null,
     });
   }
   C.dialogs.termForm = function ({ contract, row, onClose }) {
