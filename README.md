@@ -14,7 +14,7 @@
 
 ## 当前状态
 
-REQ-045 / TASK-090：四角色业务界面、机构内合同及推广产品配置、资料审核、销售/Excel、预约核销、双向账单、账号与待办、概览趋势和真实预约提醒窗已接入并部署（应用01475e0）。160项后端测试、88%覆盖率、跨角色页面流程及真实HTTPS回归通过，原账号/数据/口令保留。入口与操作步骤见[验收指引](docs/web-acceptance-guide.md)；准确覆盖边界及证据见[完整Web实施清单](docs/web-backend-plan.md)，自主决定见[ADR-0028](docs/decisions/0028-complete-web-backends.md)。
+REQ-045 / TASK-090：四角色完整Web已开发部署，原账号/数据/口令保留。当前应用19b4c00包含REQ-046 / TASK-091的Excel上传简化：上传自动读取/匹配，原表头及前10行预览，必需字段缺失/歧义提示，底部一次下一步完成校验与确认。164项后端测试、89%覆盖率、Excel专项/完整跨角色及真实HTTPS回归通过。详见[Excel交付记录](docs/excel-upload-review.md)、[验收指引](docs/web-acceptance-guide.md)；四后台范围见[完整Web实施清单](docs/web-backend-plan.md)，自主决定见[ADR-0028](docs/decisions/0028-complete-web-backends.md)。
 
 本期按用户要求启用显式非生产模拟支付/短信：`CHT_ACCEPTANCE_SIMULATED_EXTERNALS=true`仅在独立验收环境有效；支付通过真实业务账本返回模拟成功，短信记录模拟受理，不发起实际微信付款或短信发送。生产和真实支付启用时拒绝此开关，不能自动降级模拟。地图仍须本项目腾讯地图Key才能验证真实底图。
 

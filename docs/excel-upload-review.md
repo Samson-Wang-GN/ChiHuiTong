@@ -20,4 +20,6 @@ Excel页面专项：`/home/ubuntu/ChiHuiTong/test-results/20260912T045721Z-b3d74
 
 ## 发布边界
 
+部署后真实HTTPS报告`/home/ubuntu/ChiHuiTong/test-results/20260912T050512Z-acceptance-browser/summary.json`通过：四角色、新Excel入口、41个菜单、越权拒绝、窄屏、退出及应用重启。8类核心业务对象共65条ID摘要升级前后一致，访问口令不变。辅助验证及文档提交86332e0不改变运行应用19b4c00；GitHub及服务器文档同步以最终交付提交为准。
+
 无数据库迁移。保留持久验收库、访问口令和订单；自动化写入只在临时独立库。按原授权部署同一受保护HTTPS入口，回退可使用上一已测应用01475e0及现存私有备份，不删除新批次或历史记录。真实支付/短信/地图等边界不变。
