@@ -6,6 +6,8 @@ from pathlib import Path
 
 from openpyxl import Workbook
 from PIL import Image, ImageDraw
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 
 if socket.gethostname() != 'VM-0-12-ubuntu':
@@ -24,3 +26,11 @@ book.save(directory/'synthetic-customers.xlsx')
 image = Image.new('RGB', (640, 360), 'white')
 ImageDraw.Draw(image).text((30, 100), 'SYNTHETIC TEST ONLY - NOT A REAL PAYMENT / LICENSE', fill='black')
 image.save(directory/'synthetic-proof.png')
+pdf = PdfWriter()
+page = pdf.add_blank_page(width=400, height=300)
+font = DictionaryObject({NameObject('/Type'):NameObject('/Font'), NameObject('/Subtype'):NameObject('/Type1'), NameObject('/BaseFont'):NameObject('/Helvetica')})
+page[NameObject('/Resources')] = DictionaryObject({NameObject('/Font'):DictionaryObject({NameObject('/F1'):pdf._add_object(font)})})
+stream = DecodedStreamObject()
+stream.set_data(b'BT /F1 18 Tf 30 230 Td (SYNTHETIC TEST ONLY) Tj ET')
+page[NameObject('/Contents')] = pdf._add_object(stream)
+pdf.write(directory/'synthetic-static.pdf')

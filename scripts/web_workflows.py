@@ -41,9 +41,9 @@ def read(page, path):
     return page.evaluate('path => window.CHT.api(path)', path)
 
 
-def upload(page, report):
+def upload(page, report, filename='synthetic-proof.png'):
     with page.expect_response(lambda response: response.url.endswith('/api/v1/files') and response.request.method == 'POST') as response:
-        dialog(page).locator('input[type=file]').set_input_files(report/'synthetic-proof.png')
+        dialog(page).locator('input[type=file]').set_input_files(report/filename)
     assert response.value.status == 201
     dialog(page).get_by_role('button', name='查看附件 1', exact=True).wait_for()
 
@@ -166,7 +166,13 @@ def exercise(pages, report, worker, fixture):
         date_field(clinic, '付款时间', today+' 08:00')
         fill(clinic, '付款方名称', '合成门诊付款方')
         fill(clinic, '付款流水号', 'SYNTHETIC-CLINIC-PARTIAL')
-        upload(clinic, report)
+        upload(clinic, report, 'synthetic-static.pdf')
+        clinic.get_by_role('button', name='查看附件 1', exact=True).click()
+        clinic.locator('iframe[title="synthetic-static.pdf"]').wait_for()
+        assert clinic.locator('iframe[title="synthetic-static.pdf"]').get_attribute('src').startswith('blob:')
+        clinic.wait_for_timeout(700)
+        clinic.screenshot(path=str(report/'clinic-pdf-preview.png'))
+        clinic.locator('.arco-modal:visible .arco-modal-close-btn').click()
         clinic.get_by_role('button', name='提交付款凭证', exact=True).click()
         clinic.wait_for_timeout(400)
         close(clinic)
@@ -304,6 +310,29 @@ def exercise(pages, report, worker, fixture):
         assert field(resource, '身份').locator('.arco-select-disabled').count() == 1
         dialog(resource).get_by_role('button', name='取消', exact=True).click()
         completed.append('resource administrator creates staff and cannot change protected administrator role')
+
+        # Newly created staff signs in with its own random code and cannot see institutional totals.
+        staff_context = resource.context.browser.new_context(viewport={'width':1280, 'height':900})
+        staff = staff_context.new_page()
+        staff.goto(resource.url)
+        staff.get_by_label('手机号', exact=True).fill('13800000991')
+        staff.get_by_role('button', name='获取验证码', exact=True).click()
+        staff.get_by_role('button', name='查看测试短信箱', exact=True).click()
+        sms = staff.get_by_text('本次验证码：', exact=False)
+        sms.wait_for()
+        code = re.search(r'本次验证码：(\d{6})', sms.inner_text()).group(1)
+        staff.get_by_label('验证码', exact=True).fill(code)
+        staff.get_by_role('button', name='登录', exact=True).click()
+        staff.get_by_role('button', name='退出登录', exact=True).wait_for()
+        assert staff.locator('.sidebar .arco-menu-item').filter(has_text='账号管理').count() == 0
+        assert read(staff, '/api/v1/sales-orders')['total'] == 0
+        menu(staff, '本人结算明细')
+        denied = staff.evaluate("async()=>{try{await CHT.api('/api/v1/partner-bills');return 200;}catch(error){return error.status;}}")
+        assert denied == 403
+        staff.screenshot(path=str(report/'resource-staff-scope.png'))
+        staff.get_by_role('button', name='退出登录', exact=True).click()
+        staff_context.close()
+        completed.append('new staff OTP login only own sales and institutional statement denied')
 
         # Both ordinary delayed redemption and the special automatic-completion reversal branch.
         for kind in ['overdue', 'supplement']:

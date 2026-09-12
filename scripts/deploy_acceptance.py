@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 ROOT = Path('/home/ubuntu/ChiHuiTong')
 HOST = 'dev-public.chihui-ai.com'
 PORT = 18243
+CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-src blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
 PG = Path('/usr/lib/postgresql/16/bin')
 RUNTIME = ROOT / 'runtime' / 'acceptance'
 # This server uses a regular file in sites-enabled, not the usual symlink.
@@ -100,7 +101,7 @@ location ^~ /chihuitong/ {
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy no-referrer always;
     add_header X-Robots-Tag "noindex, nofollow" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-src blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'none'" always;
+    add_header Content-Security-Policy "{CSP}" always;
 }
 '''.replace('PROXY_TOKEN',cfg['CHT_ACCEPTANCE_PROXY_TOKEN'])
     old_site=run(['sudo','-n','cat',SITE],capture_output=True).stdout

@@ -26,6 +26,7 @@ def serve(release):
     os.environ['DJANGO_SETTINGS_MODULE'] = 'config.settings'
     from django.core.wsgi import get_wsgi_application
     app = get_wsgi_application()
+    from deploy_acceptance import CSP
 
     def gateway(env, start):
         # Private test gateway mirrors the approved HTTPS proxy's path/header handling.
@@ -38,7 +39,11 @@ def serve(release):
         env['HTTP_AUTHORIZATION'] = env.get('HTTP_X_CHT_AUTHORIZATION', '')
         if env.get('HTTP_ORIGIN') == f'http://127.0.0.1:{PORT}':
             env['HTTP_ORIGIN'] = f'https://127.0.0.1:{PORT}'
-        return app(env, start)
+        def secured_start(status, headers, exc_info=None):
+            if any(key.lower()=='content-type' and value.startswith('text/html') for key,value in headers):
+                headers.append(('Content-Security-Policy', CSP))
+            return start(status, headers, exc_info)
+        return app(env, secured_start)
 
     class QuietHandler(WSGIRequestHandler):
         def log_message(self, format, *args):
