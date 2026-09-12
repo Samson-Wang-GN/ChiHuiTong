@@ -44,6 +44,15 @@ def exercise(page, worker, report):
 
     try:
         begin()
+        load('synthetic-no-dimension.xlsx')
+        page.get_by_text('必填项已匹配，核对无误后点击底部“下一步”。', exact=True).wait_for()
+        assert page.locator('.import-preview tbody .arco-table-tr').count() == 2
+        assert page.get_by_label('工作表', exact=True).count() == 0
+        page.screenshot(path=str(report/'excel-template-auto.png'), full_page=True)
+        next_validated()
+        finish(5)
+        results.append('template without dimensions auto sheet/header/columns then one next; 2 customers5 cards')
+        begin()
         load('synthetic-auto.xlsx')
         rows = page.locator('.import-preview tbody .arco-table-tr')
         assert rows.count() == 10

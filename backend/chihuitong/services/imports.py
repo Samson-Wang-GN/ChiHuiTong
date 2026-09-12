@@ -1,11 +1,14 @@
 import hashlib
 import io
 import json
+import re
 import unicodedata
+from xml.etree import ElementTree
 
 from django.db import transaction
 from django.utils import timezone
 from openpyxl import load_workbook
+from openpyxl.utils.cell import column_index_from_string
 from openpyxl.utils.exceptions import InvalidFileException
 
 from chihuitong.errors import BusinessError, require
@@ -106,14 +109,60 @@ def create_import(actor, asset_id):
     return batch
 
 
+def worksheet_shape(source):
+    """Count actual XML coordinates, not optional/untrusted dimension metadata."""
+    maximum_row = maximum_column = row_number = row_count = cell_count = 0
+    for event, element in ElementTree.iterparse(source, events=("start", "end")):
+        name = element.tag.rsplit("}", 1)[-1]
+        if event == "end":
+            element.clear()
+            continue
+        if name == "row":
+            row_count += 1
+            try:
+                row_number = int(element.get("r", row_number + 1))
+            except ValueError as exc:
+                raise BusinessError("invalid_excel", "Excel行位置不合法，请重新导出", 400) from exc
+            require(0 < row_number <= 10020 and row_count <= 10020,
+                    "excel_limit", "单表超过10000条数据，请拆分上传", 400)
+            maximum_row = max(maximum_row, row_number)
+            cell_count = 0
+        elif name == "c":
+            cell_count += 1
+            position = element.get("r")
+            if position:
+                match = re.fullmatch(r"([A-Z]{1,3})([1-9][0-9]{0,6})", position)
+                require(match, "invalid_excel", "Excel单元格位置不合法，请重新导出", 400)
+                column = column_index_from_string(match[1])
+                cell_row = int(match[2])
+            else:
+                column, cell_row = cell_count, row_number
+            require(0 < column <= 200 and cell_count <= 200 and 0 < cell_row <= 10020,
+                    "excel_limit", "单表超过10000条数据或200列，请拆分上传", 400)
+            maximum_row = max(maximum_row, cell_row)
+            maximum_column = max(maximum_column, column)
+    return {"rows": maximum_row, "columns": maximum_column}
+
+
 def open_book(batch):
     data = file_bytes(batch.asset)
     checked_xlsx(data)
     try:
         book = load_workbook(io.BytesIO(data), read_only=True, data_only=False, keep_links=False)
         require(0 < len(book.sheetnames) <= 20, "sheet_limit", "工作表过多，请拆分上传", 400)
+        try:
+            book.cht_shapes = {}
+            for sheet in book:
+                # Read-only openpyxl exposes the worksheet archive path internally;
+                # this narrow pinned-version boundary is covered by XML shape tests.
+                with book._archive.open(sheet._worksheet_path) as source:
+                    book.cht_shapes[sheet.title] = worksheet_shape(source)
+                sheet.reset_dimensions()
+        except Exception:
+            book.close()
+            raise
         return book
-    except (InvalidFileException, ValueError, KeyError) as exc:
+    except (InvalidFileException, ValueError, KeyError, ElementTree.ParseError) as exc:
         raise BusinessError("invalid_excel", "工作簿无法读取，请重新导出xlsx", 400) from exc
 
 
@@ -128,29 +177,27 @@ def safe_cell(cell):
     return str(value)
 
 
-def inspect_import(batch_id, expected_version):
-    batch = ImportBatch.objects.select_related("asset").get(pk=batch_id)
-    if batch.version != expected_version or batch.status != "queued":
-        return
+def read_import_metadata(batch):
     book = open_book(batch)
     sheets, preview = [], {}
     try:
         for sheet in book:
-            require(
-                (sheet.max_row or 0) <= 10020 and (sheet.max_column or 0) <= 200,
-                "excel_limit",
-                "单表超过10000条数据或200列，请拆分上传",
-                400,
-            )
-            sheets.append(
-                {"name": sheet.title, "rows": sheet.max_row or 0, "columns": sheet.max_column or 0}
-            )
+            shape = book.cht_shapes[sheet.title]
+            sheets.append({"name": sheet.title, **shape})
             preview[sheet.title] = [
                 [safe_cell(cell) for cell in row]
-                for row in sheet.iter_rows(max_row=min(30, sheet.max_row or 0))
-            ]
+                for row in sheet.iter_rows(max_row=min(30, shape["rows"]), max_col=shape["columns"])
+            ] if shape["rows"] and shape["columns"] else []
     finally:
         book.close()
+    return sheets, preview
+
+
+def inspect_import(batch_id, expected_version):
+    batch = ImportBatch.objects.select_related("asset").get(pk=batch_id)
+    if batch.version != expected_version or batch.status != "queued":
+        return
+    sheets, preview = read_import_metadata(batch)
     with transaction.atomic():
         batch = ImportBatch.objects.select_for_update().get(pk=batch_id)
         if batch.version != expected_version:
@@ -177,10 +224,16 @@ def configure_import(
         "请等待工作簿读取完成",
     )
     sheet_meta = next((item for item in batch.sheets if item["name"] == sheet), None)
+    if sheet_meta and (not sheet_meta["rows"] or not sheet_meta["columns"]):
+        # Heal an unconsumed legacy 0x0 cache during the authorized write, not a GET.
+        batch.sheets, batch.preview = read_import_metadata(batch)
+        sheet_meta = next((item for item in batch.sheets if item["name"] == sheet), None)
+    require(sheet_meta and sheet_meta["rows"] and sheet_meta["columns"],
+            "empty_import", "识别的工作表没有可读取的数据，请检查文件内容后重新上传", 400)
     require(
         sheet_meta and type(header_row) is int and 1 <= header_row <= min(20, sheet_meta["rows"]),
         "invalid_header",
-        "请选择工作表和前20行内的表头",
+        "识别的表头不在有效数据范围内，请核对预览或展开设置修正",
         400,
     )
     require(
@@ -238,6 +291,8 @@ def configure_import(
     advance(
         batch,
         "configuration",
+        "sheets",
+        "preview",
         "mapping_digest",
         "confirmed_at",
         "status",
@@ -266,8 +321,10 @@ def validate_import(batch_id, expected_version):
     values, seen, duplicate_phones = [], {}, set()
     try:
         sheet = book[config["sheet"]]
+        shape = book.cht_shapes[sheet.title]
         for number, cells in enumerate(
-            sheet.iter_rows(min_row=config["header_row"] + 1), start=config["header_row"] + 1
+            sheet.iter_rows(min_row=config["header_row"] + 1, max_row=shape["rows"], max_col=shape["columns"]),
+            start=config["header_row"] + 1
         ):
             if all(cell.value in (None, "") for cell in cells):
                 continue

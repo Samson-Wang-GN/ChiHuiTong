@@ -1,9 +1,12 @@
 import io
+import zipfile
+from xml.etree import ElementTree
 
 from django.test import TestCase
 from openpyxl import Workbook
 
 from chihuitong.models import Card, Customer, ImportFormat
+from chihuitong.errors import BusinessError
 from chihuitong.services import files, imports, jobs
 
 from .support import api_client
@@ -14,7 +17,7 @@ class ImportRecommendationTests(TestCase):
     def setUp(self):
         sales_setup(self)
 
-    def inspect(self, headers, rows=None, prefix=0, extra_sheet=False):
+    def inspect(self, headers, rows=None, prefix=0, extra_sheet=False, dimension="original"):
         book = Workbook()
         sheet = book.active
         sheet.title = "客户"
@@ -29,13 +32,71 @@ class ImportRecommendationTests(TestCase):
             sheet.append(row)
         output = io.BytesIO()
         book.save(output)
+        data = output.getvalue()
+        if dimension != "original":
+            rewritten = io.BytesIO()
+            with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(rewritten, "w", zipfile.ZIP_DEFLATED) as target:
+                for info in source.infolist():
+                    content = source.read(info.filename)
+                    if info.filename.startswith("xl/worksheets/") and info.filename.endswith(".xml"):
+                        root = ElementTree.fromstring(content)
+                        element = root.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}dimension")
+                        if element is not None:
+                            if dimension is None:
+                                root.remove(element)
+                            else:
+                                element.set("ref", dimension)
+                        content = ElementTree.tostring(root)
+                    target.writestr(info, content)
+            data = rewritten.getvalue()
         asset = files.upload_file(
-            self.resource, data=output.getvalue(), filename="自动匹配.xlsx", purpose="sales_excel"
+            self.resource, data=data, filename="自动匹配.xlsx", purpose="sales_excel"
         )
         batch = imports.create_import(self.resource, asset.id)
         jobs.run_one()
         batch.refresh_from_db()
         return batch
+
+    def test_optional_or_incorrect_dimensions_do_not_change_real_data(self):
+        for dimension in [None, "A1:A1", "A1:XFD1048576"]:
+            with self.subTest(dimension=dimension):
+                batch = self.inspect(["客户姓名", "手机号", "数量", "客户编号"],
+                    [["合成甲", "13900000101", 2, "001"], ["合成乙", "13900000102", 3, "002"]],
+                    dimension=dimension)
+                self.assertEqual(batch.sheets, [{"name": "客户", "rows": 3, "columns": 4}])
+                suggestion = imports.recommend_import(batch)
+                self.assertEqual(suggestion["header_row"], 1)
+                response = api_client(self.resource).post(f"/api/v1/imports/{batch.id}/mapping", {
+                    "version": batch.version, "sheet": suggestion["sheet"],
+                    "header_row": suggestion["header_row"], "mapping": suggestion["mapping"],
+                    "quantity_mode": "column",
+                }, format="json", HTTP_IDEMPOTENCY_KEY=f"dimension-{batch.id}")
+                self.assertEqual(response.status_code, 200, response.content)
+                jobs.run_one()
+                batch.refresh_from_db()
+                self.assertEqual((batch.status, batch.total_rows, batch.total_cards, batch.error_rows),
+                                 ("validated", 2, 5, 0))
+
+    def test_legacy_zero_shape_heals_on_next_without_reupload(self):
+        batch = self.inspect(["姓名", "手机号", "数量"], dimension=None)
+        batch.sheets = [{"name": "客户", "rows": 0, "columns": 0}]
+        batch.save(update_fields=["sheets"])
+        batch = imports.configure_import(self.resource, batch.id, version=batch.version,
+            sheet="客户", header_row=1, mapping={"name": 0, "phone": 1, "quantity": 2}, quantity_mode="column")
+        self.assertEqual(batch.sheets[0]["rows"], 2)
+        jobs.run_one()
+        batch.refresh_from_db()
+        self.assertEqual(batch.total_cards, 2)
+        self.assertEqual(Customer.objects.count(), 0)
+        self.assertEqual(Card.objects.count(), 0)
+
+    def test_actual_shape_limits_apply_even_without_dimensions(self):
+        for content in [b'<worksheet><row r="10021"><c r="A10021"/></row></worksheet>',
+                        b'<worksheet><row r="1"><c r="GS1"/></row></worksheet>']:
+            with self.assertRaises(BusinessError):
+                imports.worksheet_shape(io.BytesIO(content))
+        self.assertEqual(imports.worksheet_shape(io.BytesIO(b'<worksheet><sheetData/></worksheet>')),
+                         {"rows": 0, "columns": 0})
 
     def test_sheet_header_twenty_and_ten_raw_rows(self):
         rows = [[f"合成客户{i}", f"13900000{i:03d}", 2] for i in range(12)]
