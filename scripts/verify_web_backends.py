@@ -83,7 +83,7 @@ def check_browser(report, release):
                 page.get_by_role('button', name='新建推广产品', exact=True).click()
                 drawer = page.locator('.arco-drawer-wrapper').last
                 def fill(label, value):
-                    drawer.locator('.arco-form-item').filter(has=page.locator('.arco-form-item-label', has_text=re.compile('^'+re.escape(label)))).locator('input,textarea').first.fill(value)
+                    drawer.locator('.arco-form-item').filter(has=page.locator('.arco-form-item-label', has_text=label)).locator('input,textarea').first.fill(value)
                 fill('内部展示名称', '自动回归专用产品')
                 fill('外部展示名称', '洁牙福利回归')
                 fill('使用规则', '仅用于合成回归，不可兑换实际服务')

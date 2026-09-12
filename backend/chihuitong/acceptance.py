@@ -119,7 +119,7 @@ def index(request, role=None):
 def asset(request, name):
     if not enabled():
         return HttpResponse(status=404)
-    if name in {"app.js", "style.css", "core.js", "catalog.js", "workbench.js"}:
+    if name in {"app.js", "style.css", "core.js", "catalog.js", "clinics.js", "workbench.js"}:
         path = Path(__file__).resolve().parent / "acceptance_assets" / name
     elif name in {"react.min.js", "react-dom.min.js", "arco.min.js", "arco.min.css"}:
         path = Path(__file__).resolve().parents[2] / "prototypes" / "shared" / "vendor" / name
