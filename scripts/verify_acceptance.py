@@ -53,7 +53,7 @@ def main():
                 page.get_by_role('button',name='退出账号',exact=True).wait_for()
                 page.wait_for_timeout(500)
                 assert not page.locator('.arco-alert-error').count(), role+' workbench error'
-                page.screenshot(path=str(output/(role+'-workbench.png')),full_page=True)
+                page.screenshot(path=str(output/(role+'-workbench.png')),full_page=True,animations='disabled')
                 menu=page.locator('nav button')
                 count=menu.count()
                 for n in range(count):
@@ -65,7 +65,7 @@ def main():
                 assert page.locator('tbody tr').count()>0
                 page.get_by_role('button',name='详情',exact=True).first.click()
                 page.get_by_text('业务详情（真实接口结果）',exact=True).wait_for()
-                page.screenshot(path=str(output/(role+'-details.png')),full_page=True)
+                page.screenshot(path=str(output/(role+'-details.png')),full_page=True,animations='disabled')
                 page.get_by_role('button',name='关闭详情',exact=True).click()
                 page.locator('.arco-drawer-wrapper').wait_for(state='hidden')
                 page.set_viewport_size({'width':768,'height':900})

@@ -8,6 +8,13 @@
   const phones = {platform:'13800000001',resource:'13800000002',channel:'13800000003',clinic:'13800000004'};
   const labels = {all:'全部',pending:'待确认',success:'成功',completed:'完成',cancelled:'取消',active:'生效',disabled:'停用',approved:'已通过',rejected:'已退回',pending_review:'待审核',pending_payment:'待付款',pending_confirmation:'待对账确认',pending_receipt:'待确认收款',settled:'已结清',overdue:'逾期',no_payment:'无需付款',payment_review:'付款待核实',disputed:'异议处理',draft:'草稿',online:'上线',offline:'下线',issued:'已开卡'};
   const fieldNames = {id:'编号',name:'名称',title:'待处理事项',customer_name:'客户',phone:'手机号',internal_name:'推广产品',external_name:'外部名称',clinic_name:'门诊',organization_name:'机构',status:'状态',display_status:'状态',scheduled_at:'预约时间',requested_at:'意向时间',due_at:'截止时间',issued_on:'出账日期',total_cents:'金额（元）',received_cents:'已收（元）',quantity:'数量',source_name:'权益来源',version:'版本',kind:'类型',category:'类型',description:'说明',settlement_status:'门诊结算',month:'账期'};
+  Object.assign(labels,{processed:'已处理',pending_approval:'待开卡审核',issuing:'开卡中',issue_failed:'开卡失败',cancel_pending:'取消待审核',stop_pending:'停止待审核',stopped:'已停止',unsettled:'未结清',not_charged:'未计费'});
+  function display(k,v) {
+    if(v===null||v===undefined||v==='') return '—';
+    if(k.endsWith('_cents')) return (Number(v)/100).toFixed(2);
+    if(k.endsWith('_at') && !Number.isNaN(Date.parse(v))) return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(v));
+    return labels[v]||String(v);
+  }
   let token = '', membership = null;
   async function api(path, method='GET', body) {
     if (!/^\/(api\/v1\/|acceptance\/sms$)/.test(path) || path.includes('..') || path.includes('\\') || path.includes('#')) throw new Error('仅可请求本验收环境API');
@@ -23,7 +30,7 @@
   function App() {
     const [phone,setPhone]=React.useState(phones[role]||''), [code,setCode]=React.useState(''), [sms,setSms]=React.useState('');
     const [logged,setLogged]=React.useState(false), [busy,setBusy]=React.useState(false), [error,setError]=React.useState('');
-    const [section,setSection]=React.useState('/api/v1/workbench/tasks'), [data,setData]=React.useState(null), [status,setStatus]=React.useState('all'), [page,setPage]=React.useState(1), [detail,setDetail]=React.useState(null);
+    const [section,setSection]=React.useState('/api/v1/workbench/tasks'), [data,setData]=React.useState(null), [status,setStatus]=React.useState('pending'), [page,setPage]=React.useState(1), [detail,setDetail]=React.useState(null);
     const [rawPath,setRawPath]=React.useState('/api/v1/workbench'), [rawMethod,setRawMethod]=React.useState('GET'), [rawBody,setRawBody]=React.useState('{}'), [rawResult,setRawResult]=React.useState(null);
     const sequence = React.useRef(0);
     async function act(fn) { setBusy(true);setError('');try {await fn();} catch(e){setError(e.message);} finally {setBusy(false);} }
@@ -46,7 +53,7 @@
     if(role!=='platform')menu.push(['合同与推广产品','/api/v1/organizations/'+membership.organization_id+'/cooperation']);
     const rows=data?.results||[];
     const preferred=['title','name','customer_name','internal_name','clinic_name','source_name','quantity','total_cents','received_cents','scheduled_at','issued_on','display_status','status','settlement_status','id'];
-    let columns=preferred.filter(k=>rows.some(r=>r[k]!==undefined)).slice(0,7).map(k=>({title:fieldNames[k]||k,dataIndex:k,width:k==='id'?250:150,render:v=>k.endsWith('_cents')?(Number(v)/100).toFixed(2):labels[v]||String(v??'—')}));
+    let columns=preferred.filter(k=>rows.some(r=>r[k]!==undefined)).slice(0,7).map(k=>({title:fieldNames[k]||k,dataIndex:k,width:k==='id'?250:150,render:v=>display(k,v)}));
     const showDetails=(row)=>act(async()=>{let endpoint=row.detail_endpoint;if(!endpoint&&row.id&&!['/api/v1/workbench/tasks','/api/v1/products'].includes(section))endpoint=section+'/'+row.id;setDetail(endpoint?await api(endpoint):row);});
     columns.push({title:'操作',width:95,fixed:'right',render:(_,row)=>h(Button,{size:'small',onClick:()=>showDetails(row)},'详情')});
     function rawSend(){const perform=()=>act(async()=>setRawResult(await api(rawPath,rawMethod,rawMethod==='GET'?undefined:JSON.parse(rawBody))));if(rawMethod==='GET')perform();else Modal.confirm({title:'确认操作演示数据',content:'将以当前角色提交真实后端操作，并持久保存和记录日志。请核对目标和版本。',onOk:perform});}
