@@ -103,20 +103,3 @@ export async function attachment(id:string): Promise<void> {
   const file = await download('/files/'+id);
   await new Promise<void>((resolve,reject)=>wx.openDocument({filePath:file,showMenu:false,success:()=>resolve(),fail:()=>wx.previewImage({urls:[file],success:()=>resolve(),fail:()=>reject(new Error('附件无法预览，请在后台查看'))})}));
 }
-export async function exportBill(id:string): Promise<void> {
-  requireAdmin();
-  if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('账单编号不合法');
-  if (!await confirm('下载账单全部交易明细，包含客户资料，请妥善保管，勿向无关人员转发。')) return;
-  const file=await download('/bills/'+id+'/export.xlsx');
-  await new Promise<void>((resolve,reject)=>wx.openDocument({filePath:file,fileType:'xlsx',showMenu:true,success:()=>resolve(),fail:()=>reject(new Error('Excel已下载但无法预览，请在门诊后台下载'))}));
-}
-export async function uploadReceipt(): Promise<string> {
-  requireAdmin();
-  const chosen = await new Promise<WechatMiniprogram.ChooseMediaSuccessCallbackResult>((resolve,reject)=>wx.chooseMedia({count:1,mediaType:['image'],sizeType:['compressed'],success:resolve,fail:()=>reject(new Error('未选择付款凭证'))}));
-  const file = chosen.tempFiles[0];
-  if (!file || file.size > 5*1024*1024) throw new Error('请选择不超过5MB的图片');
-  configured(); const revision=generation;
-  const header = headers(); delete header['Content-Type'];
-  return new Promise((resolve,reject)=>wx.uploadFile({url:endpoint('/files'),filePath:file.tempFilePath,name:'file',formData:{purpose:'payment'},header,timeout:30000,
-    success:r=>{try {if(revision!==generation) throw new Error('身份已改变'); const data=JSON.parse(r.data);if(r.statusCode!==201) throw safeError(data,r.statusCode);resolve(data.id);}catch(e){reject(e);}},fail:()=>reject(new Error('凭证上传失败，请重试'))}));
-}

@@ -202,6 +202,7 @@ def owned_appointments(customer):
 def appointment_projection(item):
     order, card = item.benefit.card.order, item.benefit.card
     effective = item.redemptions.filter(status="active").first()
+    pending_change = item.reschedules.filter(status="pending").first()
     qr = (
         card.credential
         if item.reserved
@@ -210,7 +211,7 @@ def appointment_projection(item):
         and not effective
         and not item.restoration_pending
         and not item.conflict
-        and not item.reschedules.filter(status="pending").exists()
+        and not pending_change
         and item.scheduled_at
         and item.benefit.expires_at
         and timezone.localdate(item.scheduled_at) <= timezone.localdate(item.benefit.expires_at)
@@ -240,9 +241,11 @@ def appointment_projection(item):
         "conflict": item.conflict,
         "clinic_settled": bool(effective and effective.settled_at),
         "cancellation_reason": item.cancellation_reason,
-        "pending_reschedule": item.reschedules.filter(status="pending")
-        .values("id", "proposed_at", "expires_at")
-        .first(),
+        "pending_reschedule": {
+            "id": str(pending_change.id),
+            "proposed_at": iso(pending_change.proposed_at),
+            "expires_at": iso(pending_change.expires_at),
+        } if pending_change else None,
     }
 
 
@@ -364,6 +367,19 @@ def message_read(request, message_id):
         item.read_at = timezone.now()
         item.save(update_fields=["read_at"])
     return Response({"read": True, "business_status": item.status})
+
+
+@api_view(["GET"])
+def clinic_payment_history(request, bill_id):
+    from .services.finance import get_bill
+
+    actor = request_actor(request)
+    actor.require_admin()
+    bill = get_bill(actor, bill_id)
+    return paginated(
+        request, bill.payment_attempts.all(), payments.projection,
+        states=["creating", "pending", "unknown", "success", "closed"],
+    )
 
 
 @api_view(["POST"])

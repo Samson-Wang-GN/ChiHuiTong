@@ -160,6 +160,7 @@ urlpatterns = [
     path("mini/clinic/bills/<uuid:bill_id>/export.xlsx", finance.clinic_bill_export),
     path("mini/clinic/bills/<uuid:bill_id>/receipts", finance.clinic_receipts),
     path("mini/clinic/bills/<uuid:bill_id>/payment", mini.clinic_payment),
+    path("mini/clinic/bills/<uuid:bill_id>/payments", mini.clinic_payment_history),
     path("mini/clinic/bills/<uuid:bill_id>/feedback", finance.bill_feedback, {"partner": False}),
     path("mini/clinic/payments/<uuid:attempt_id>/<str:action>", payments.payment_action),
     path("mini/clinic/organizations/<uuid:org_id>/cooperation", catalog.cooperation),

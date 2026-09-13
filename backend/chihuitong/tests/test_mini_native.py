@@ -9,6 +9,8 @@ from chihuitong.services import appointments
 
 from .test_appointments import appointment_setup, confirmed_appointment
 from .test_mini import MINI_SETTINGS, mini_client
+from .test_finance import FinanceTests
+from .support import actor_fixture
 
 
 @override_settings(MINI_PROGRAMS=MINI_SETTINGS)
@@ -113,3 +115,21 @@ class NativeApiTests(TestCase):
         self.assertEqual(products.data["results"][0]["external_name"], self.product.external_name)
         for state in ["draft", "pending", "effective", "not_started", "expired", "superseded", "rejected", "terminated"]:
             self.assertEqual(clinic.get(response.data["history_endpoint"], {"status": state}).status_code, 200)
+
+
+@override_settings(MINI_PROGRAMS=MINI_SETTINGS)
+class NativeBillTests(TestCase):
+    setUp = FinanceTests.setUp
+
+    def test_payment_history_export_and_receipt_are_admin_only(self):
+        admin, _ = mini_client("clinic", self.clinic_actor.account.phone)
+        employee = actor_fixture("clinic", "13900000779", "staff", self.clinic_actor.organization)
+        staff, _ = mini_client("clinic", employee.account.phone)
+        base = f"/api/v1/mini/clinic/bills/{self.bill.id}"
+        for suffix in ("/payments", "/export.xlsx", "/receipts", "/lines"):
+            self.assertEqual(admin.get(base + suffix).status_code, 200, suffix)
+            self.assertEqual(staff.get(base + suffix).status_code, 403, suffix)
+        result = admin.post(base + "/payments", {}, format="json")
+        self.assertEqual(result.status_code, 405)
+        self.assertEqual(admin.get(base + "/lines?status=active").status_code, 200)
+        self.assertEqual(admin.get(base + "/lines?status=disabled").status_code, 200)
