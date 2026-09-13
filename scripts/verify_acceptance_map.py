@@ -85,6 +85,10 @@ def main():
                     expect(page.get_by_text('已确认门诊位置；地址改变后须重新定位。', exact=True)).to_be_visible()
                     assert key not in page.content()
                     page.get_by_role('button', name='取消', exact=True).last.click()
+                    discard = page.locator('.arco-modal:visible').filter(has_text='放弃未保存的内容？')
+                    expect(discard).to_be_visible()
+                    discard.get_by_role('button', name='确定', exact=True).click()
+                    expect(page.get_by_role('button', name='按地址定位', exact=True)).not_to_be_visible()
                     assert not writes
                     report['checks'].append({'channel_address_lookup': True, 'real_png': True, 'map_click_changes_coordinates': True, 'form_confirmation': True, 'cancel_without_saving': True})
                 else:
