@@ -1,5 +1,7 @@
 # 系统架构
 
+2026-09-13地图选型确认（REQ-032 / TASK-095）：本期采用腾讯位置服务，复用已有`integrations/tencent_map.py`、服务端`CHT_TENCENT_MAP_KEY`与GCJ-02核对流程，不引入其他地图SDK。用户确认授权；Key尚未配置，真实接入验收待完成。仅传门诊地址/坐标，密钥保存在源码外私有环境配置。
+
 ## REQ-046 Excel自动匹配边界
 
 TASK-094：新Excel请求同步识别和全表校验，不再新建Outbox任务。`create_import`与`configure_import`在已有事务/幂等边界中调用读取器与校验器；保留旧队列处理函数用于过渡。客户匹配每500个HMAC索引查询一次，不暴露已有姓名。正常前端不再等待worker，旧批次仍可恢复，详见[ADR-0029](decisions/0029-synchronous-excel-processing.md)。以下inspect/validate表示业务阶段而非新任务排队。
