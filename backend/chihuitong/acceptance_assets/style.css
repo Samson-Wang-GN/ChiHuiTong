@@ -318,6 +318,19 @@ input {
   height: 100%;
   display: block;
 }
+.location-map-readonly {
+  cursor: default;
+}
+.location-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+@media (max-width: 800px) {
+  .location-comparison {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .location-map-pin {
   position: absolute;
   left: 50%;

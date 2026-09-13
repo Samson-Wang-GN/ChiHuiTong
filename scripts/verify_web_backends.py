@@ -120,6 +120,8 @@ def check_browser(report, release, worker, fixture, headed=False, imports_only=F
         if not imports_only:
             from web_workflows import exercise
             exercise(pages, report, worker, fixture)
+            from web_location_views import exercise as exercise_maps
+            exercise_maps(pages, report)
         from web_import_flow import exercise as exercise_imports
         exercise_imports(pages['resource'], worker, report)
         if headed:

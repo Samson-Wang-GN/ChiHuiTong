@@ -3,10 +3,12 @@ import json
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from PIL import Image
 
 from chihuitong.errors import BusinessError
 from chihuitong.integrations import safe_json, tencent_map
+from chihuitong.models import Clinic, ClinicProfileChange
 from chihuitong.services import clinics, customers
 
 from .support import actor_fixture, api_client
@@ -22,6 +24,84 @@ class LocationTests(TestCase):
             "district": "海淀区",
             "address": "合成测试路1号",
         }
+
+    def saved_location_fixture(self):
+        old = {"status": "confirmed", "longitude": "116.300000", "latitude": "39.900000"}
+        new = {**old, "longitude": "116.400000"}
+        self.clinic.profile["location"] = old
+        self.clinic.save(update_fields=["profile"])
+        return ClinicProfileChange.objects.create(
+            clinic=self.clinic,
+            base_version=self.clinic.profile_version,
+            before={"location": old},
+            after={"location": new},
+            submitted_by=self.channel.membership,
+            due_at=timezone.now(),
+        )
+
+    def test_saved_map_uses_correct_snapshot_and_never_mutates(self):
+        change = self.saved_location_fixture()
+        url = f"/api/v1/clinics/{self.clinic.id}/profile-map"
+        for data, longitude in [
+            ({}, "116.300000"),
+            ({"change_id": str(change.id), "snapshot": "before"}, "116.300000"),
+            ({"change_id": str(change.id), "snapshot": "after"}, "116.400000"),
+        ]:
+            with patch("chihuitong.api_location.static_map", return_value=b"png") as call:
+                response = api_client(self.channel).post(url, data)
+                self.assertEqual(response.status_code, 200)
+                call.assert_called_once_with("39.900000", longitude, 17)
+                self.assertEqual(response["Cache-Control"], "no-store")
+        self.clinic.refresh_from_db()
+        change.refresh_from_db()
+        self.assertEqual(self.clinic.profile["location"]["longitude"], "116.300000")
+        self.assertEqual(change.status, "pending")
+
+    def test_saved_map_scope_and_no_client_coordinates(self):
+        import uuid
+
+        change = self.saved_location_fixture()
+        url = f"/api/v1/clinics/{self.clinic.id}/profile-map"
+        other = actor_fixture("channel", "13900000068")
+        staff = actor_fixture("clinic", "13900000069", "staff", self.clinic_actor.organization)
+        with patch("chihuitong.api_location.static_map", return_value=b"png") as call:
+            for actor, expected in [(self.resource, 404), (other, 404), (staff, 403)]:
+                self.assertEqual(api_client(actor).post(url, {}).status_code, expected)
+            for data, expected in [
+                ({"change_id": str(uuid.uuid4())}, 404),
+                ({"longitude": "116.500000"}, 400),
+                ({"snapshot": "unexpected"}, 400),
+                ({"zoom": 3}, 400),
+            ]:
+                self.assertEqual(api_client(self.channel).post(url, data).status_code, expected)
+            call.assert_not_called()
+            # A legitimate application ID must still belong to the specified clinic.
+            foreign_owner = actor_fixture("clinic", "13900000070")
+            foreign_clinic = Clinic.objects.create(
+                organization=foreign_owner.organization,
+                channel=other.organization,
+                responsible=other.membership,
+            )
+            change.clinic = foreign_clinic
+            change.save(update_fields=["clinic"])
+            self.assertEqual(
+                api_client(self.channel).post(url, {"change_id": str(change.id)}).status_code,
+                404,
+            )
+            for actor in [self.platform, self.clinic_actor]:
+                self.assertEqual(api_client(actor).post(url, {}).status_code, 200)
+
+    def test_saved_map_missing_position_and_provider_failure(self):
+        url = f"/api/v1/clinics/{self.clinic.id}/profile-map"
+        with patch("chihuitong.api_location.static_map") as call:
+            self.assertEqual(api_client(self.channel).post(url, {}).status_code, 409)
+            call.assert_not_called()
+        self.saved_location_fixture()
+        with patch(
+            "chihuitong.api_location.static_map",
+            side_effect=BusinessError("map_unavailable", "地图暂不可用，请稍后重试", 503),
+        ):
+            self.assertEqual(api_client(self.channel).post(url, {}).status_code, 503)
 
     @override_settings(TENCENT_MAP_KEY="synthetic-map-key")
     def test_static_map_is_raster_only_scoped_and_bounded(self):

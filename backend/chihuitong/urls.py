@@ -43,6 +43,7 @@ urlpatterns = [
     path("clinics/geocode", location.locate),
     path("clinics/map-preview", location.map_preview),
     path("clinics/<uuid:clinic_id>", catalog.clinic_detail),
+    path("clinics/<uuid:clinic_id>/profile-map", location.profile_map),
     path("clinics/<uuid:clinic_id>/profile-changes", catalog.profile_changes),
     path("profile-changes/<uuid:change_id>/review", catalog.profile_review),
     path("clinics/<uuid:clinic_id>/service-status", catalog.clinic_service),

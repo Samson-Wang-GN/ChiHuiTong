@@ -30,6 +30,44 @@ class MapInput(StrictSerializer):
     zoom = serializers.IntegerField(min_value=3, max_value=18)
 
 
+class ProfileMapInput(StrictSerializer):
+    change_id = serializers.UUIDField(required=False)
+    snapshot = serializers.ChoiceField(choices=["before", "after"], default="after")
+    zoom = serializers.IntegerField(min_value=4, max_value=18, default=17)
+
+
+@api_view(["POST"])
+def profile_map(request, clinic_id):
+    """Read-only, server-selected saved snapshot; never accepts arbitrary coordinates."""
+    actor = request_actor(request)
+    if actor.organization.kind == "clinic":
+        actor.require_admin()
+    clinic = get_clinic(actor, clinic_id)
+    data = validated(ProfileMapInput, request)
+    profile = clinic.profile
+    if data.get("change_id"):
+        change = clinic.profile_changes.filter(pk=data["change_id"]).first()
+        require(change, "not_found", "资料申请不存在或无权访问", 404)
+        profile = getattr(change, data["snapshot"])
+    location = profile.get("location") or {}
+    require(
+        location.get("status") == "confirmed"
+        and location.get("latitude") is not None
+        and location.get("longitude") is not None,
+        "location_unconfirmed",
+        "此版本尚无已确认的位置，不能显示准确地图",
+        409,
+    )
+    rate_limit(f"map-preview:{actor.membership.id}", seconds=60, maximum=60)
+    response = HttpResponse(
+        static_map(location["latitude"], location["longitude"], data["zoom"]),
+        content_type="image/png",
+    )
+    response["Cache-Control"] = "no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @api_view(["POST"])
 def map_preview(request):
     actor = request_actor(request)
