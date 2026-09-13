@@ -1,0 +1,39 @@
+<view class="page">
+  <view class="headline">{{view.title}}</view>
+  <view wx:if="view.notice" class="notice">{{view.notice}}</view>
+  <view wx:if="error" class="error" role="alert">{{error}}<button size="mini" data-key="retry" bindtap="act" disabled="{{busy}}">重新加载</button></view>
+  <view wx:if="busy" class="loading">正在处理，请稍候…</view>
+  <scroll-view wx:if="view.tabs" scroll-x class="tabs">
+    <button wx:for="{{view.tabs}}" wx:key="key" class="tab {{activeStatus===item.key?'selected':''}}" data-key="{{item.key}}" bindtap="status" disabled="{{busy}}">{{item.label}}</button>
+  </scroll-view>
+  <view wx:if="view.qr" class="card qr-card"><view class="card-title">核销二维码</view><qr-code credential="{{view.qr}}"/><view class="muted">治疗完成后出示给门诊核销，请勿转发此码。</view></view>
+  <image wx:if="view.image" class="cover" src="{{view.image}}" mode="aspectFill"/>
+  <map wx:if="view.latitude" class="map" latitude="{{view.latitude}}" longitude="{{view.longitude}}" markers="{{view.markers}}" scale="16" enable-scroll="{{false}}"/>
+  <view wx:if="view.facts.length" class="card">
+    <view wx:for="{{view.facts}}" wx:key="label" class="fact"><text class="muted">{{item.label}}</text><text selectable>{{item.value}}</text></view>
+  </view>
+  <view wx:if="view.fields.length" class="card">
+    <view wx:for="{{view.fields}}" wx:key="key" class="field">
+      <label class="label">{{item.label}}<text wx:if="item.required" class="required"> *</text></label>
+      <picker wx:if="item.type==='date'||item.type==='time'" mode="{{item.type}}" value="{{form[item.key]}}" data-key="{{item.key}}" bindchange="change"><view class="input">{{form[item.key]||'请选择'}}</view></picker>
+      <picker wx:elif="item.type==='picker'" range="{{item.options}}" data-key="{{item.key}}" data-type="picker" bindchange="change"><view class="input">{{form[item.key]||'请选择'}}</view></picker>
+      <checkbox-group wx:elif="item.type==='checkbox'" data-key="{{item.key}}" data-type="checkbox" bindchange="change"><label class="check"><checkbox value="yes" checked="{{form[item.key]}}" color="#165dff"/>确认</label></checkbox-group>
+      <input wx:else class="input" type="{{item.type==='number'?'number':'text'}}" value="{{form[item.key]}}" maxlength="500" placeholder="请输入{{item.label}}" data-key="{{item.key}}" bindinput="change" disabled="{{busy}}"/>
+    </view>
+  </view>
+  <view wx:if="isLogin" class="card">
+    <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{privacyAgreed}}" color="#165dff"/>我已阅读并同意隐私保护指引</label></checkbox-group>
+    <button wx:if="privacyReady" open-type="agreePrivacyAuthorization" class="secondary">确认微信隐私授权</button>
+    <button class="primary" open-type="getPhoneNumber" bindgetphonenumber="authorize" disabled="{{busy||!privacyReady||!privacyAgreed}}">手机号授权登录</button>
+    <view wx:if="!privacyReady" class="muted">账号及隐私配置待就绪，当前不能真实登录。</view>
+  </view>
+  <view class="actions"><button wx:for="{{view.actions}}" wx:key="key" class="{{item.danger?'danger':'secondary'}}" data-key="{{item.key}}" data-id="{{item.id}}" bindtap="act" disabled="{{busy}}">{{item.label}}</button></view>
+  <button wx:if="view.submitLabel" class="primary" bindtap="submit" loading="{{busy}}" disabled="{{busy}}">{{view.submitLabel}}</button>
+  <view wx:if="view.rows.length===0&&!busy" class="empty">暂无相关记录</view>
+  <view wx:for="{{view.rows}}" wx:key="id" wx:for-item="row" class="card">
+    <view class="card-title">{{row.title}}</view><view wx:if="row.status" class="badge">{{row.status}}</view>
+    <view wx:for="{{row.lines}}" wx:key="index" wx:for-item="line" class="line" selectable>{{line}}</view>
+    <view class="actions"><button wx:for="{{row.actions}}" wx:key="key" class="{{item.danger?'danger':'secondary'}}" data-key="{{item.key}}" data-id="{{item.id}}" bindtap="act" disabled="{{busy}}">{{item.label}}</button></view>
+  </view>
+  <view wx:if="view.total!==undefined" class="pagination"><button data-delta="-1" bindtap="paginate" disabled="{{busy||view.page<=1}}">上一页</button><text>第{{view.page}}页 · 共{{view.total}}条</text><button data-delta="1" bindtap="paginate" disabled="{{busy||view.page*20>=view.total}}">下一页</button></view>
+</view>

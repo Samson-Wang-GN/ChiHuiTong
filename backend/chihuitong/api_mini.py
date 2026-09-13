@@ -208,6 +208,12 @@ def appointment_projection(item):
         and not card.frozen
         and item.status in {"success", "completed"}
         and not effective
+        and not item.restoration_pending
+        and not item.conflict
+        and not item.reschedules.filter(status="pending").exists()
+        and item.scheduled_at
+        and item.benefit.expires_at
+        and timezone.localdate(item.scheduled_at) <= timezone.localdate(item.benefit.expires_at)
         else None
     )
     return {
@@ -227,6 +233,10 @@ def appointment_projection(item):
         "source_name": order.source_name,
         "redemption_qr": qr,
         "restoration_pending": item.restoration_pending,
+        "reserved": item.reserved,
+        "clinic_absent_at": iso(item.clinic_absent_at),
+        "patient_arrived_at": iso(item.patient_arrived_at),
+        "expires_at": iso(item.benefit.expires_at),
         "conflict": item.conflict,
         "clinic_settled": bool(effective and effective.settled_at),
         "cancellation_reason": item.cancellation_reason,

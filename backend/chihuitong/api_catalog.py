@@ -279,7 +279,10 @@ def contract_detail(request, version_id):
     return Response(
         {
             **contract_projection(item),
-            "products": [contracts.term_snapshot(term) for term in item.products.all()],
+            "products": [
+                {**contracts.term_snapshot(term), "external_name": term.product.external_name}
+                for term in item.products.select_related("product")
+            ],
         }
     )
 

@@ -1,0 +1,1 @@
+<view style="display:flex;align-items:center;flex-direction:column;padding:12px"><canvas id="qr" type="2d" style="width:240px;height:240px"/><view wx:if="error" style="color:#cb272d;font-size:14px">{{error}}</view></view>
