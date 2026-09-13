@@ -18,6 +18,10 @@
 - 四角色正式Web隔离回归通过、脚本错误0，临时库已删除；报告`test-results/20260913T094139Z-d445a97180c5-web/summary.json`。不是生产/真实微信验收。
 - 上述mini报告在隔离工作区格式化后测试；格式化输出已取回。后续仅日志中文标签/格式检查与文档收尾，最终源码另跑mini验证；后端代码、测试与Web不变。
 
+最终小程序源码`015c42ea976f40742c57382bf6bb4168bf29d17d`：报告`test-results/20260913T095306Z-015c42ea976f-mini/summary.json`，依赖完整性、Prettier检查、严格TypeScript/未使用检查、双包构建、30/30测试全部通过，release未改。前一轮7b2e801仅格式检查未通过，已机械修正，不把失败轮次标为通过。后端对比d445a97无代码差异，沿用上方181项及Web证据。
+
+最终工程包`test-results/20260913T095306Z-015c42ea976f-mini/native-mini-source.tar.gz`，SHA-256 `7568095be83da98c58be9ee1e4145384389c2854352c8b11bac3ca6f113734ce`；已取回本地`.tmp/mini-delivery/native-mini-source.tar.gz`并校验一致，未在本地运行。包含两份原生工程及逐文件清单，不含依赖安装/测试替身，均为未配置AppID的待接入包。收尾提交仅文档，功能验证始终归属上述明确提交。
+
 构建目录位于mini报告同级`workspace/dist/customer/`和`dist/clinic/`，逐文件校验见`dist/manifest.json`；未配置AppID/API/隐私时禁止真实登录。默认包为touristappid，不含测试替身、后端访问口令或AppSecret。现有Web验收应用保持df52809，本轮只同步源码，不替换服务、不更改验收数据。真实账号授权、微信原生编译/真机/合法域名/API网关及付款联调见交接待验收清单；需本地/手机测试时先确认服务器限定例外。
 
 ## TASK-096 门诊资料与审核对照地图（已开发、验证并部署）
