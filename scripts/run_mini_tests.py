@@ -38,7 +38,7 @@ def main():
         if args.format:
             commands += [('format', [str(node / 'node'), 'node_modules/prettier/bin/prettier.cjs', '--write', 'src/**/*.ts', '*.mjs', '*.json', 'tests/*.cjs'])]
         if not args.lock_only:
-            commands += [('build', [str(node / 'node'), 'build.mjs']), ('unit', [str(node / 'node'), '--test', 'tests/native.test.cjs'])]
+            commands += [('format-check', [str(node / 'node'), 'node_modules/prettier/bin/prettier.cjs', '--check', 'src/**/*.ts', '*.mjs', '*.json', 'tests/*.cjs']), ('build', [str(node / 'node'), 'build.mjs']), ('unit', [str(node / 'node'), '--test', 'tests/native.test.cjs'])]
         for name, command in commands:
             with (report / (name + '.log')).open('w') as log:
                 result = subprocess.run(command, cwd=workspace, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=600)

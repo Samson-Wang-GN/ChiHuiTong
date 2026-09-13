@@ -19,7 +19,12 @@ const routes = JSON.parse(fs.readFileSync(path.join(root, 'routes.json'), 'utf8'
 const publicConfig = process.env.CHT_MINI_BUILD_CONFIG
   ? JSON.parse(fs.readFileSync(process.env.CHT_MINI_BUILD_CONFIG, 'utf8'))
   : {};
-if(publicConfig.customer?.appid && publicConfig.customer.appid!=='touristappid' && publicConfig.customer.appid===publicConfig.clinic?.appid)throw new Error('客户和门诊必须使用不同AppID');
+if (
+  publicConfig.customer?.appid &&
+  publicConfig.customer.appid !== 'touristappid' &&
+  publicConfig.customer.appid === publicConfig.clinic?.appid
+)
+  throw new Error('客户和门诊必须使用不同AppID');
 for (const audience of ['customer', 'clinic']) {
   const folder = path.join(destination, audience);
   fs.mkdirSync(folder, { recursive: true });

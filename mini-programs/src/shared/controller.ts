@@ -103,8 +103,13 @@ export function createPage(name: string, registry: Record<string, Screen>): Enti
     async onShow(this: Entity) {
       this.visible = true;
       const incoming = R.consumeNavigation();
-      if (Object.keys(incoming).length && JSON.stringify(incoming)!==JSON.stringify(this.ctx.params)) {
-        this.ctx.cache={}; this.ctx.form={}; this.ctx.params=incoming;
+      if (
+        Object.keys(incoming).length &&
+        JSON.stringify(incoming) !== JSON.stringify(this.ctx.params)
+      ) {
+        this.ctx.cache = {};
+        this.ctx.form = {};
+        this.ctx.params = incoming;
       }
       await this.reload(true);
     },

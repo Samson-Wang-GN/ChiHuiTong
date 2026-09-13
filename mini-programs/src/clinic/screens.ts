@@ -306,7 +306,10 @@ export const screens: Record<string, Screen> = {
         notice:
           ctx.cache.success ||
           '请扫描客户预约详情的核销二维码，核对信息并确认治疗完成。未核销不记费。',
-        actions: [{ key: 'scan-code', label: '扫描核销二维码' }, ...(ctx.params.appointment_id ? [{key:'scan-all',label:'改为扫描其他预约'}] : [])],
+        actions: [
+          { key: 'scan-code', label: '扫描核销二维码' },
+          ...(ctx.params.appointment_id ? [{ key: 'scan-all', label: '改为扫描其他预约' }] : []),
+        ],
         rows: (ctx.cache.candidates || []).map((a: Entity) => ({
           ...appointmentRow(a),
           actions: [{ key: 'quote', id: a.id, label: '核对并核销' }],
@@ -328,7 +331,12 @@ export const screens: Record<string, Screen> = {
       };
     },
     async action(ctx, key, id) {
-      if (key === 'scan-all') { ctx.params={}; ctx.cache={}; ctx.form={}; return; }
+      if (key === 'scan-all') {
+        ctx.params = {};
+        ctx.cache = {};
+        ctx.form = {};
+        return;
+      }
       if (key === 'scan-code') {
         ctx.cache.quote = null;
         ctx.cache.success = '';
@@ -693,9 +701,25 @@ function logTitle(action: string): string {
     'appointment.customer_feedback': '客户到诊反馈',
     'appointment.redeemed': '完成核销',
     'redemption.reversed': '撤销核销',
+    'appointment.redemption_reversed': '撤销错误核销',
+    'appointment.reschedule_created': '提交或协商改期',
+    'appointment.reschedule_reviewed': '审核客户改期',
+    'appointment.pending_expired': '待确认预约超时取消',
+    'appointment.system_completed': '超过72小时系统自动完成',
     'contract.submitted': '提交合同',
     'contract.reviewed': '审核合同',
+    'contract.created': '创建合同版本',
+    'contract.draft_updated': '更新合同草稿',
+    'contract.terminated': '终止合同',
     'bill.receipt_submitted': '提交付款凭证',
+    'bill.receipt_reviewed': '审核付款凭证',
+    'bill.generated': '生成账单',
+    'bill.settled': '账单结清',
+    'bill.redemption_removed': '撤销核销并移出交易',
+    'bill.lines_exported': '下载交易明细',
+    'bill.feedback_submitted': '提交账单反馈',
+    'bill.feedback_responded': '回复账单反馈',
+    'bill.collection_contacted': '记录收款联系',
   };
   return labels[action] || '业务操作记录';
 }

@@ -34,7 +34,9 @@ function benefitRow(b: Entity): Row {
       '来源：' + b.source_name,
       '使用规则：' + b.usage_rules,
       '可用 ' + b.available + ' 份 · 待领取 ' + b.pending + ' 份 · 预约占用 ' + b.reserved + ' 份',
-      b.expires_at ? '有效期至：' + dateText(b.expires_at) : '领取/激活后起算有效期：' + (b.validity_days || '按卡面约定') + '天',
+      b.expires_at
+        ? '有效期至：' + dateText(b.expires_at)
+        : '领取/激活后起算有效期：' + (b.validity_days || '按卡面约定') + '天',
     ],
     actions: b.can_claim
       ? [{ key: 'claim', id: b.card_id, label: '领取权益' }]
@@ -86,7 +88,16 @@ export const screens: Record<string, Screen> = {
           { key: 'activate', label: '扫码激活实体卡' },
           { key: 'messages', label: '待处理消息（' + m.total + '）' },
         ],
-        rows: b.results.map(benefitRow).concat(m.results.map((message:Entity)=>({id:message.id,title:message.title,lines:[message.appointment.clinic_name],actions:[{key:'appointment',id:message.appointment_id,label:'处理预约结果'}]}))),
+        rows: b.results
+          .map(benefitRow)
+          .concat(
+            m.results.map((message: Entity) => ({
+              id: message.id,
+              title: message.title,
+              lines: [message.appointment.clinic_name],
+              actions: [{ key: 'appointment', id: message.appointment_id, label: '处理预约结果' }],
+            })),
+          ),
       };
     },
     action: claim,
