@@ -84,11 +84,10 @@ def exercise(pages, report):
         platform.set_viewport_size({'width': 1440, 'height': 1000})
         close(platform)
         # Fail once, retry only on a user action; saved data remains unchanged.
-        failed = {'once': True}
+        failed = {'active': True}
 
         def fail_once(route):
-            if failed['once']:
-                failed['once'] = False
+            if failed['active'] and not route.request.post_data_json.get('change_id'):
                 route.fulfill(status=503, content_type='application/json', body=json.dumps({'message': '合成地图加载失败', 'code': 'map_unavailable'}))
             else:
                 fake_map(route)
@@ -96,8 +95,10 @@ def exercise(pages, report):
         channel.unroute('**/profile-map', fake_map)
         channel.route('**/profile-map', fail_once)
         open_detail()
-        expect(channel.get_by_text('合成地图加载失败', exact=True)).to_be_visible()
-        channel.get_by_role('button', name='重新加载', exact=True).click()
+        current_map = channel.get_by_label('当前生效位置地图', exact=True)
+        expect(current_map.locator('.arco-alert-error')).to_contain_text('合成地图加载失败')
+        failed['active'] = False
+        current_map.get_by_role('button', name='重新加载', exact=True).click()
         expect(channel.locator('.saved-location img')).to_have_count(2)
         assert read(channel, path)['profile']['location']['longitude'] == '116.300000'
         close(channel)
