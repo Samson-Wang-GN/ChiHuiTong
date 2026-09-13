@@ -27,7 +27,7 @@
     'business_contact',
     'business_phone',
   ];
-  function SavedLocationMap({ clinicId, changeId, snapshot = 'after', location, title }) {
+  function SavedLocationMap({ clinicId, changeId, profileVersion, snapshot = 'after', location, title }) {
     const [zoom, setZoom] = React.useState(17),
       [result, setResult] = React.useState({}),
       [retry, setRetry] = React.useState(0);
@@ -37,7 +37,7 @@
       setResult({ loading: true });
       C.request(base + 'clinics/' + clinicId + '/profile-map', {
         method: 'POST',
-        body: { ...(changeId ? { change_id: changeId } : {}), snapshot, zoom },
+        body: { ...(changeId ? { change_id: changeId } : { profile_version: profileVersion }), snapshot, zoom },
         binary: true,
         signal: controller.signal,
       })
@@ -54,7 +54,7 @@
         controller.abort();
         if (imageUrl) URL.revokeObjectURL(imageUrl);
       };
-    }, [clinicId, changeId, snapshot, location.longitude, location.latitude, zoom, retry]);
+    }, [clinicId, changeId, profileVersion, snapshot, location.longitude, location.latitude, zoom, retry]);
     return h(
       'div',
       { className: 'saved-location', 'aria-label': title + '地图' },
@@ -98,11 +98,13 @@
     profile = {},
     clinicId,
     changeId,
+    profileVersion,
     snapshot,
     context = 'current',
     reviewStatus,
     pending,
     pendingError,
+    pendingLoading,
   }) {
     const location = profile.location || {},
       confirmed = location.status === 'confirmed';
@@ -121,6 +123,9 @@
             ? '新位置已确认，等待平台审核；'
             : '资料变更正在等待平台审核，本次申请尚未确认地图位置；') +
           (confirmed ? '当前仍使用原生效位置。' : '当前生效资料尚无定位，暂不能准确按距离推荐。');
+      } else if (pendingLoading) {
+        type = 'info';
+        message = '正在核对资料审核状态；下方展示当前生效资料。';
       } else if (pendingError) {
         type = 'warning';
         message = '待审状态暂时无法读取，请重试核对；下方仅展示当前生效资料。';
@@ -142,7 +147,7 @@
       C.Panel,
       { title },
       h(A.Alert, { type, content: message }),
-      confirmed && h(SavedLocationMap, { clinicId, changeId, snapshot, location, title }),
+      confirmed && h(SavedLocationMap, { clinicId, changeId, profileVersion, snapshot, location, title }),
     );
   }
   function ProfileView({ profile = {}, showLocation = true, ...locationProps }) {
@@ -318,7 +323,9 @@
                   profile: r.profile,
                   clinicId: id,
                   pending,
-                  pendingError: pendingQuery.error || pendingQuery.loading,
+                  profileVersion: r.profile_version,
+                  pendingError: pendingQuery.error,
+                  pendingLoading: pendingQuery.loading,
                 }),
                 pending &&
                   h(ProfileLocation, {

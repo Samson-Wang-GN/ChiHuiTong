@@ -34,6 +34,7 @@ class ProfileMapInput(StrictSerializer):
     change_id = serializers.UUIDField(required=False)
     snapshot = serializers.ChoiceField(choices=["before", "after"], default="after")
     zoom = serializers.IntegerField(min_value=4, max_value=18, default=17)
+    profile_version = serializers.IntegerField(min_value=0, required=False)
 
 
 @api_view(["POST"])
@@ -49,6 +50,13 @@ def profile_map(request, clinic_id):
         change = clinic.profile_changes.filter(pk=data["change_id"]).first()
         require(change, "not_found", "资料申请不存在或无权访问", 404)
         profile = getattr(change, data["snapshot"])
+    elif "profile_version" in data:
+        require(
+            data["profile_version"] == clinic.profile_version,
+            "stale_version",
+            "门诊资料已更新，请刷新详情后查看地图",
+            409,
+        )
     location = profile.get("location") or {}
     require(
         location.get("status") == "confirmed"

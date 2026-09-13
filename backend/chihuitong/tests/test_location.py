@@ -72,6 +72,7 @@ class LocationTests(TestCase):
                 ({"longitude": "116.500000"}, 400),
                 ({"snapshot": "unexpected"}, 400),
                 ({"zoom": 3}, 400),
+                ({"profile_version": self.clinic.profile_version + 1}, 409),
             ]:
                 self.assertEqual(api_client(self.channel).post(url, data).status_code, expected)
             call.assert_not_called()
