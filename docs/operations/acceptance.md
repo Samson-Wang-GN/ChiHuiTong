@@ -10,6 +10,8 @@ REQ-045 / TASK-090 / ADR-0028（沿用REQ-044独立部署保护）。仅在开�
 
 ## 本次范围
 
+TASK-096最新应用：`df52809dcdbff107832f7d74efa48ae0746e858e`。门诊生效/待审定位提示、资料与审核对照真实地图已部署；无迁移，备份`runtime/acceptance/before-20260913T035317Z.dump`。门诊资料与全部申请内容摘要发布前后相同。三角色真实HTTPS报告`20260913T035506Z-live-profile-maps`通过，回退应用为d4f39e7（保留数据库及源码外地图Key）。后续文档/验证脚本提交不切换应用。完整证据见[地图页面交付](../clinic-map-review.md)。
+
 TASK-095配置更新（2026-09-13）：腾讯地图Key已安全写入`runtime/acceptance/environment.json`及`service.env`，配置备份后缀`.before-map-20260913T030246Z`；仅重启本项目应用，代码版本仍为d4f39e7，无迁移。真实地址解析与底图预检成功；用户分配额度后，`20260913T031651Z-map-browser`聚焦页面验证通过。详见[地图配置、回退及验收证据](../tencent-map-acceptance.md)。
 
 TASK-094最新应用：`d4f39e71e4e005995820d25a96c795920a1537f5`，Excel识别/校验同步处理，其他任务仍按原timer执行。升级前备份`runtime/acceptance/before-20260912T104359Z.dump`；79条核心业务ID摘要不变，无数据库迁移。真实HTTPS回归`20260912T104425Z-acceptance-browser`通过。上一个可回退应用为下方1ccf62b；后续文档提交不切换已验证应用。
