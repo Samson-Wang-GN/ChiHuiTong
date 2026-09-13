@@ -48,9 +48,11 @@ def main():
                 assert clinics
                 clinic = clinics[0]
                 changes = page.evaluate('(id) => CHT.api("/api/v1/clinics/" + id + "/profile-changes?status=pending")', clinic['id'])['results']
+                if not changes:
+                    changes = page.evaluate('(id) => CHT.api("/api/v1/clinics/" + id + "/profile-changes")', clinic['id'])['results']
                 report['stage'] = role + '_details'
                 page.evaluate('(id) => CHT.open("clinic", {id})', clinic['id'])
-                if changes and changes[0]['after'].get('location', {}).get('status') == 'confirmed':
+                if changes and changes[0]['status'] == 'pending' and changes[0]['after'].get('location', {}).get('status') == 'confirmed':
                     expect(page.get_by_text('新位置已确认，等待平台审核；', exact=False)).to_be_visible()
                     pic = page.get_by_alt_text('本次申请位置腾讯地图')
                     expect(pic).to_be_visible(timeout=20000)
