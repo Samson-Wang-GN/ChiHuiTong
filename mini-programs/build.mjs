@@ -26,7 +26,8 @@ for(const audience of ['customer','clinic']){
   fs.cpSync(path.join(root,'compiled',audience),path.join(folder,'domain'),{recursive:true});
   write('shared/config.js','exports.config = '+JSON.stringify(config)+';\n');
   write('shared/vendor/qrcode.js',fs.readFileSync(path.join(root,'node_modules/qrcode-generator/dist/qrcode.js')));
-  write('LICENSE-qrcode',fs.readFileSync(path.join(root,'node_modules/qrcode-generator/LICENSE')));
+  // Upstream npm tarball embeds its license notice in the distributed source.
+  write('NOTICE-qrcode.txt','qrcode-generator 2.0.4; Copyright (c) 2009 Kazuhiko Arase; MIT.\nThe original notice is retained verbatim in shared/vendor/qrcode.js.\nhttps://github.com/kazuhikoarase/qrcode-generator\n');
   write('app.js',`const runtime=require('./shared/runtime');\nApp({onLaunch(){runtime.clearSession();},onHide(){runtime.cleanFiles();}});\n`);
   write('app.wxss',fs.readFileSync(path.join(root,'native/app.wxss')));
   const tabs=audience==='customer'?[['home','首页'],['benefits','权益'],['appointments','预约'],['mine','我的']]:[['home','工作台'],['appointments','预约'],['scan','核销'],['mine','我的']];

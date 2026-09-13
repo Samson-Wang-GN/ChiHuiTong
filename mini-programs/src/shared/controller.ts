@@ -18,16 +18,19 @@ export function createPage(name:string, registry:Record<string,Screen>):Entity {
   return {
     data:{view:{title:'加载中'},form:{},busy:false,error:'',activeStatus:'all',isLogin:name==='login',privacyReady:config.privacyReady,privacyAgreed:false},
     ctx:{params:{},form:{},status:['tasks','fulfillment','messages'].includes(name)?'pending':'all',page:1,cache:{}} as Context,
-    visible:false,sequence:0,
+    visible:false,sequence:0,identityKey:'',
     onLoad(this:Entity,params:Entity){this.ctx={params,form:{},status:['tasks','fulfillment','messages'].includes(name)?'pending':'all',page:1,cache:{}};},
     async onShow(this:Entity){this.visible=true;this.ctx.params={...this.ctx.params,...R.consumeNavigation()};await this.reload(true);},
-    onHide(this:Entity){this.visible=false;this.sequence++;this.setData({'view.qr':''});},
+    onHide(this:Entity){this.visible=false;this.sequence++;this.setData({view:{title:'加载中'},form:{}});},
     onUnload(this:Entity){this.visible=false;this.sequence++;this.ctx={params:{},form:{},status:'all',page:1,cache:{}};this.setData({view:{},form:{}});},
     async onPullDownRefresh(this:Entity){try{await this.reload(true);}finally{wx.stopPullDownRefresh();}},
     async guard(this:Entity,refresh=false){
       if(screen.public)return true;
       if(!R.current()){wx.reLaunch({url:'/pages/login/index'});return false;}
       if(refresh)await R.refreshIdentity();
+      const identityKey=R.current()!.token+':'+R.current()?.membership?.id+':'+R.current()?.membership?.role;
+      if(this.identityKey&&this.identityKey!==identityKey){this.ctx.cache={};this.ctx.form={};this.setData({view:{},form:{}});}
+      this.identityKey=identityKey;
       if(config.audience==='clinic'&&!R.current()?.membership&&name!=='membership'){wx.reLaunch({url:'/pages/membership/index'});return false;}
       if(screen.admin)R.requireAdmin();
       return true;
@@ -35,7 +38,7 @@ export function createPage(name:string, registry:Record<string,Screen>):Entity {
     async reload(this:Entity,refresh=false){
       const seq=++this.sequence;
       try {
-        this.setData({busy:true,error:''});
+        this.setData({busy:true,error:'',...(refresh?{view:{title:'加载中'}}:{})});
         if(!await this.guard(refresh))return;
         const view:View=await screen.load(this.ctx);
         if(!this.visible||seq!==this.sequence)return;

@@ -157,6 +157,7 @@ urlpatterns = [
     path("mini/clinic/bills", finance.clinic_bills),
     path("mini/clinic/bills/<uuid:bill_id>", finance.clinic_bill_detail),
     path("mini/clinic/bills/<uuid:bill_id>/lines", finance.clinic_bill_lines),
+    path("mini/clinic/bills/<uuid:bill_id>/export.xlsx", finance.clinic_bill_export),
     path("mini/clinic/bills/<uuid:bill_id>/receipts", finance.clinic_receipts),
     path("mini/clinic/bills/<uuid:bill_id>/payment", mini.clinic_payment),
     path("mini/clinic/bills/<uuid:bill_id>/feedback", finance.bill_feedback, {"partner": False}),
