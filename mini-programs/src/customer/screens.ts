@@ -1,28 +1,437 @@
-import {Entity, Row, statuses, dateText} from '../shared/model';
+import { Entity, Row, statuses, dateText } from '../shared/model';
 import * as R from '../shared/runtime';
-import {Screen,Context,list,tabs,field,fact,detail,timeFields,checkTime,required,command,appointmentFacts,listAppointments} from '../shared/screens';
+import {
+  Screen,
+  Context,
+  list,
+  field,
+  fact,
+  detail,
+  timeFields,
+  checkTime,
+  required,
+  command,
+  appointmentFacts,
+  listAppointments,
+} from '../shared/screens';
 
-const benefitStates=['pending_claim','available','reserved','restoring','used','expired','invalid','frozen'];
-function benefitRow(b:Entity):Row {return {id:b.id,title:b.external_name,status:statuses[b.status],lines:['来源：'+b.source_name,'使用规则：'+b.usage_rules,'可用 '+b.available+' 份 · 待领取 '+b.pending+' 份 · 预约占用 '+b.reserved+' 份','有效期至：'+dateText(b.expires_at)],actions:b.can_claim?[{key:'claim',id:b.card_id,label:'领取权益'}]:b.can_book?[{key:'clinics',id:b.id,label:'预约门诊'}]:[]};}
-async function benefit(ctx:Context):Promise<Entity> {
+const benefitStates = [
+  'pending_claim',
+  'available',
+  'reserved',
+  'restoring',
+  'used',
+  'expired',
+  'invalid',
+  'frozen',
+];
+function benefitRow(b: Entity): Row {
+  return {
+    id: b.id,
+    title: b.external_name,
+    status: statuses[b.status],
+    lines: [
+      '来源：' + b.source_name,
+      '使用规则：' + b.usage_rules,
+      '可用 ' + b.available + ' 份 · 待领取 ' + b.pending + ' 份 · 预约占用 ' + b.reserved + ' 份',
+      b.expires_at ? '有效期至：' + dateText(b.expires_at) : '领取/激活后起算有效期：' + (b.validity_days || '按卡面约定') + '天',
+    ],
+    actions: b.can_claim
+      ? [{ key: 'claim', id: b.card_id, label: '领取权益' }]
+      : b.can_book
+        ? [{ key: 'clinics', id: b.id, label: '预约门诊' }]
+        : [],
+  };
+}
+async function benefit(ctx: Context): Promise<Entity> {
   if (ctx.cache.benefit) return ctx.cache.benefit;
   // Benefit lookup remains scoped to the authenticated customer; traverse all pages.
-  let page=1;
-  while(true) {const data=await R.request('/benefits?'+R.query({page,page_size:100}));const item=data.results.find((b:Entity)=>b.id===ctx.params.benefit_id);if(item){ctx.cache.benefit=item;return item;}if(page*100>=data.total)break;page++;}
+  let page = 1;
+  while (true) {
+    const data = await R.request('/benefits?' + R.query({ page, page_size: 100 }));
+    const item = data.results.find((b: Entity) => b.id === ctx.params.benefit_id);
+    if (item) {
+      ctx.cache.benefit = item;
+      return item;
+    }
+    if (page * 100 >= data.total) break;
+    page++;
+  }
   throw new Error('权益不存在或已不可用，请重新选择');
 }
-async function claim(_ctx:Context,key:string,id?:string):Promise<void> {if(key==='claim')await command('/cards/'+id+'/claim',{confirmed:true},'确认领取？有效期从激活领取时起算，请查看使用规则。');else if(key==='clinics')R.go('clinics',{benefit_id:id});}
-export const screens:Record<string,Screen> = {
-  home:{async load(ctx){const [b,m]=await Promise.all([R.request('/benefits?status=pending_claim&page_size=5'),R.request('/messages?status=pending&page_size=5')]);ctx.cache.rows=m.results;return {title:'齿慧通',notice:b.total?'您有 '+b.total+' 项权益待领取，请主动领取后预约。':'领取福利，预约口腔服务',actions:[{key:'benefits',label:'我的权益'},{key:'activate',label:'扫码激活实体卡'},{key:'messages',label:'待处理消息（'+m.total+'）'}],rows:b.results.map(benefitRow)};},action:claim},
-  benefits:{load:ctx=>list(ctx,'/benefits',benefitStates,benefitRow,'我的权益'),action:claim},
-  activate:{async load(){return {title:'激活实体卡',notice:'激活后绑定本人且不可转让。请核对卡面服务说明；激活后的实际权益和有效期以系统为准。',fields:[field('credential','卡片激活凭证')],actions:[{key:'scan-card',label:'扫描卡片二维码'}],submitLabel:'确认激活'};},async action(ctx,key){if(key==='scan-card')ctx.form.credential=await R.scan();},async submit(ctx){const credential=required(ctx.form,'credential','卡片激活凭证');if(await command('/cards/activate',{credential,confirmed:true},'确认将本卡绑定至本人并激活？激活后不能转让。'))R.go('benefits');}},
-  clinics:{async load(ctx){await benefit(ctx);const result=await R.request('/clinics?'+R.query({benefit_id:ctx.params.benefit_id,query:ctx.form.query,page:ctx.page,page_size:20,...ctx.cache.coords}));ctx.cache.rows=result.results;return {title:'选择门诊',notice:ctx.cache.locationError||'仅展示此权益可预约的门诊；距离为直线距离。',fields:[{key:'query',label:'城市、区域或门诊名称',value:ctx.form.query||''}],actions:[{key:'search',label:'搜索'},{key:'locate',label:'按当前位置查找'}],rows:result.results.map((c:Entity)=>({id:c.id,title:c.name,lines:[c.province+c.city+c.district+c.address,c.distance_m===null?'未计算距离':'直线距离 '+(c.distance_m/1000).toFixed(1)+' 公里'],actions:[{key:'clinic',id:c.id,label:'查看门诊并预约'}]})),total:result.total,page:ctx.page};},async action(ctx,key,id){if(key==='locate'){try{const p=await R.pickLocation();ctx.cache.coords={longitude:p.longitude.toFixed(6),latitude:p.latitude.toFixed(6)};ctx.cache.locationError='';}catch(e){ctx.cache.locationError=(e as Error).message;}}else if(key==='clinic')R.go('clinic',{id,benefit_id:ctx.params.benefit_id});ctx.page=1;}},
-  clinic:{async load(ctx){const c=await detail(ctx,'/clinics/'+ctx.params.id+'?'+R.query({benefit_id:ctx.params.benefit_id}));let image='';if(c.cover_available){try{image=await R.download('/clinics/'+c.id+'/cover?'+R.query({benefit_id:ctx.params.benefit_id}));}catch{ctx.cache.coverError='展示图片暂不可用，可继续查看资料和预约';}}const has=c.longitude!==null&&c.latitude!==null;return {title:c.name,notice:ctx.cache.coverError||(!has?'门诊尚无已确认地图位置，请按地址联系门诊。':''),image,facts:[fact('地址',c.province+c.city+c.district+c.address),fact('营业时间',c.business_hours),fact('预约电话',c.frontdesk_phone)],...(has?{longitude:Number(c.longitude),latitude:Number(c.latitude),markers:[{id:1,longitude:Number(c.longitude),latitude:Number(c.latitude),title:c.name}]}:{}),actions:[{key:'book',label:'预约此门诊'},{key:'phone',label:'拨打预约电话'},...(has?[{key:'open-map',label:'在地图中查看'}]:[])]};},async action(ctx,key){const c=ctx.cache.object;if(key==='book')R.go('book',{clinic_id:c.id,benefit_id:ctx.params.benefit_id});if(key==='phone'&&c.frontdesk_phone)wx.makePhoneCall({phoneNumber:c.frontdesk_phone});if(key==='open-map')wx.openLocation({latitude:Number(c.latitude),longitude:Number(c.longitude),name:c.name,address:c.address});}},
-  book:{async load(ctx){const b=await benefit(ctx);return {title:'提交预约',notice:'提交意向时间后等待门诊确认，确认时间可能与意向时间不同。权益到期：'+dateText(b.expires_at),fields:timeFields(),submitLabel:'提交预约'};},async submit(ctx){const b=await benefit(ctx);const me=await R.request('/me');if(me.needs_profile_completion){R.go('profile');throw new Error('请先填写姓名，再返回提交预约');}const requested_at=checkTime(ctx.form,b.expires_at);if(await command('/appointments',{clinic_id:ctx.params.clinic_id,benefit_id:b.id,requested_at},'确认提交预约？相关权益将被预约占用。'))R.go('appointments');}},
-  appointments:{load:listAppointments},
-  appointment:{async load(ctx){const a=await detail(ctx,'/appointments/'+ctx.params.id);const actions:Entity[]=[];if(['pending','success'].includes(a.status))actions.push({key:'cancel',label:'取消预约',danger:true});if(a.status==='success'&&!a.pending_reschedule)actions.push({key:'reschedule',label:'申请改期'});if(a.restoration_pending)actions.push({key:'restore',label:'申请恢复权益'});else if(a.reserved&&!a.patient_arrived_at&&!a.conflict&&((a.status==='completed'&&a.completion_source==='system')||a.clinic_absent_at))actions.push({key:'feedback-no',label:'未到诊，申请恢复权益'},{key:'feedback-yes',label:'已到诊，完成治疗'});let qr=a.redemption_qr||'';if(a.conflict||a.restoration_pending||a.pending_reschedule)qr='';return {title:'预约详情',notice:a.restoration_pending?'该份权益待您申请恢复，有效期不会延长。':a.completion_source==='system'?'预约时间已过72小时，系统自动完成；不代表已经治疗或核销。':a.pending_reschedule?'改期待门诊确认，原预约时间仍有效。':'请按门诊确认的时间就诊，治疗完成后出示核销码。',facts:appointmentFacts(a).concat([fact('使用规则',a.usage_rules)]),qr,actions:actions as any};},async action(ctx,key){const a=ctx.cache.object;R.go('appointment-action',{id:a.id,action:key});}},
-  'appointment-action':{async load(ctx){const a=await detail(ctx,'/appointments/'+ctx.params.id);return {title:{cancel:'取消预约',reschedule:'申请改期',restore:'恢复权益','feedback-no':'未到诊申请','feedback-yes':'到诊反馈'}[ctx.params.action as string]||'预约处理',facts:appointmentFacts(a),fields:ctx.params.action==='reschedule'?timeFields():ctx.params.action==='cancel'?[field('reason','取消原因')]:[],notice:'请如实反馈。恢复权益不延长原有效期；已核销或状态已改变时由系统拒绝重复操作。',submitLabel:'确认提交'};},async submit(ctx){const a=ctx.cache.object,action=ctx.params.action;let endpoint=action,data:Entity={version:a.version};if(action==='reschedule'){data.proposed_at=checkTime(ctx.form,a.expires_at);}else if(action==='cancel')data.reason=required(ctx.form,'reason','取消原因');else if(action==='restore')data.confirmed=true;else{endpoint='feedback';data={...data,arrived:action==='feedback-yes',confirmed:true};}if(await command('/appointments/'+a.id+'/'+endpoint,data,'确认提交本次预约处理？')){wx.navigateBack();}}},
-  messages:{load:ctx=>list(ctx,'/messages',['pending','resolved'],m=>({id:m.id,title:m.title,status:statuses[m.status],lines:[m.appointment.clinic_name,dateText(m.appointment.scheduled_at)],actions:[{key:'message',id:m.id,label:'查看并处理'}]}),'消息'),async action(ctx,key,id){const m=ctx.cache.rows.find((x:Entity)=>x.id===id);await R.request('/messages/'+id+'/read','POST',{},true);R.go('appointment',{id:m.appointment_id});}},
-  mine:{async load(){const me=await R.request('/me');return {title:'我的',facts:[fact('客户编号',me.profile.number),fact('姓名',me.profile.name),fact('手机号',me.profile.phone)],actions:[{key:'profile',label:'修改资料'},{key:'messages',label:'消息'},{key:'privacy',label:'隐私说明'},{key:'logout',label:'退出登录'}]};}},
-  profile:{async load(){const me=await R.request('/me');return {title:'个人资料',notice:'手机号不能修改；性别、年龄、职业选填。',fields:[field('name','姓名','text',me.profile.name||''),{key:'gender',label:'性别',type:'picker',options:['未填写','男','女'],value:me.profile.gender==='male'?'男':me.profile.gender==='female'?'女':'未填写'},{key:'age',label:'年龄',type:'number',value:me.profile.age==null?'':String(me.profile.age)},{key:'occupation',label:'职业',value:me.profile.occupation||''}],submitLabel:'保存资料'};},async submit(ctx){const age=ctx.form.age===''?null:Number(ctx.form.age);if(age!==null&&(!Number.isInteger(age)||age<0||age>150))throw new Error('请填写0～150的整数年龄');await R.request('/profile','POST',{name:required(ctx.form,'name','姓名'),gender:ctx.form.gender==='男'?'male':ctx.form.gender==='女'?'female':'unknown',age,occupation:ctx.form.occupation||''},true);wx.navigateBack();}},
+async function claim(_ctx: Context, key: string, id?: string): Promise<void> {
+  if (key === 'claim')
+    await command(
+      '/cards/' + id + '/claim',
+      { confirmed: true },
+      '确认领取？有效期从激活领取时起算，请查看使用规则。',
+    );
+  else if (key === 'clinics') R.go('clinics', { benefit_id: id });
+}
+export const screens: Record<string, Screen> = {
+  home: {
+    async load(ctx) {
+      const [b, m] = await Promise.all([
+        R.request('/benefits?status=pending_claim&page_size=5'),
+        R.request('/messages?status=pending&page_size=5'),
+      ]);
+      ctx.cache.rows = m.results;
+      return {
+        title: '齿慧通',
+        notice: b.total
+          ? '您有 ' + b.total + ' 项权益待领取，请主动领取后预约。'
+          : '领取福利，预约口腔服务',
+        actions: [
+          { key: 'benefits', label: '我的权益' },
+          { key: 'activate', label: '扫码激活实体卡' },
+          { key: 'messages', label: '待处理消息（' + m.total + '）' },
+        ],
+        rows: b.results.map(benefitRow).concat(m.results.map((message:Entity)=>({id:message.id,title:message.title,lines:[message.appointment.clinic_name],actions:[{key:'appointment',id:message.appointment_id,label:'处理预约结果'}]}))),
+      };
+    },
+    action: claim,
+  },
+  benefits: {
+    load: (ctx) => list(ctx, '/benefits', benefitStates, benefitRow, '我的权益'),
+    action: claim,
+  },
+  activate: {
+    async load() {
+      return {
+        title: '激活实体卡',
+        notice:
+          '激活后绑定本人且不可转让。请核对卡面服务说明；激活后的实际权益和有效期以系统为准。',
+        fields: [field('credential', '卡片激活凭证')],
+        actions: [{ key: 'scan-card', label: '扫描卡片二维码' }],
+        submitLabel: '确认激活',
+      };
+    },
+    async action(ctx, key) {
+      if (key === 'scan-card') ctx.form.credential = await R.scan();
+    },
+    async submit(ctx) {
+      const credential = required(ctx.form, 'credential', '卡片激活凭证');
+      if (
+        await command(
+          '/cards/activate',
+          { credential, confirmed: true },
+          '确认将本卡绑定至本人并激活？激活后不能转让。',
+        )
+      )
+        R.go('benefits');
+    },
+  },
+  clinics: {
+    async load(ctx) {
+      await benefit(ctx);
+      const result = await R.request(
+        '/clinics?' +
+          R.query({
+            benefit_id: ctx.params.benefit_id,
+            query: ctx.form.query,
+            page: ctx.page,
+            page_size: 20,
+            ...ctx.cache.coords,
+          }),
+      );
+      ctx.cache.rows = result.results;
+      return {
+        title: '选择门诊',
+        notice: ctx.cache.locationError || '仅展示此权益可预约的门诊；距离为直线距离。',
+        fields: [{ key: 'query', label: '城市、区域或门诊名称', value: ctx.form.query || '' }],
+        actions: [
+          { key: 'search', label: '搜索' },
+          { key: 'locate', label: '按当前位置查找' },
+        ],
+        rows: result.results.map((c: Entity) => ({
+          id: c.id,
+          title: c.name,
+          lines: [
+            c.province + c.city + c.district + c.address,
+            c.distance_m === null
+              ? '未计算距离'
+              : '直线距离 ' + (c.distance_m / 1000).toFixed(1) + ' 公里',
+          ],
+          actions: [{ key: 'clinic', id: c.id, label: '查看门诊并预约' }],
+        })),
+        total: result.total,
+        page: ctx.page,
+      };
+    },
+    async action(ctx, key, id) {
+      if (key === 'locate') {
+        try {
+          const p = await R.pickLocation();
+          ctx.cache.coords = { longitude: p.longitude.toFixed(6), latitude: p.latitude.toFixed(6) };
+          ctx.cache.locationError = '';
+        } catch (e) {
+          ctx.cache.locationError = (e as Error).message;
+        }
+      } else if (key === 'clinic') R.go('clinic', { id, benefit_id: ctx.params.benefit_id });
+      ctx.page = 1;
+    },
+  },
+  clinic: {
+    async load(ctx) {
+      const c = await detail(
+        ctx,
+        '/clinics/' + ctx.params.id + '?' + R.query({ benefit_id: ctx.params.benefit_id }),
+      );
+      let image = '';
+      if (c.cover_available) {
+        try {
+          image = await R.download(
+            '/clinics/' + c.id + '/cover?' + R.query({ benefit_id: ctx.params.benefit_id }),
+          );
+        } catch {
+          ctx.cache.coverError = '展示图片暂不可用，可继续查看资料和预约';
+        }
+      }
+      const has = c.longitude !== null && c.latitude !== null;
+      return {
+        title: c.name,
+        notice: ctx.cache.coverError || (!has ? '门诊尚无已确认地图位置，请按地址联系门诊。' : ''),
+        image,
+        facts: [
+          fact('地址', c.province + c.city + c.district + c.address),
+          fact('营业时间', c.business_hours),
+          fact('预约电话', c.frontdesk_phone),
+        ],
+        ...(has
+          ? {
+              longitude: Number(c.longitude),
+              latitude: Number(c.latitude),
+              markers: [
+                {
+                  id: 1,
+                  longitude: Number(c.longitude),
+                  latitude: Number(c.latitude),
+                  title: c.name,
+                },
+              ],
+            }
+          : {}),
+        actions: [
+          { key: 'book', label: '预约此门诊' },
+          { key: 'phone', label: '拨打预约电话' },
+          ...(has ? [{ key: 'open-map', label: '在地图中查看' }] : []),
+        ],
+      };
+    },
+    async action(ctx, key) {
+      const c = ctx.cache.object;
+      if (key === 'book') R.go('book', { clinic_id: c.id, benefit_id: ctx.params.benefit_id });
+      if (key === 'phone' && c.frontdesk_phone)
+        wx.makePhoneCall({ phoneNumber: c.frontdesk_phone });
+      if (key === 'open-map')
+        wx.openLocation({
+          latitude: Number(c.latitude),
+          longitude: Number(c.longitude),
+          name: c.name,
+          address: c.address,
+        });
+    },
+  },
+  book: {
+    async load(ctx) {
+      const b = await benefit(ctx);
+      return {
+        title: '提交预约',
+        notice:
+          '提交意向时间后等待门诊确认，确认时间可能与意向时间不同。权益到期：' +
+          dateText(b.expires_at),
+        fields: timeFields(),
+        submitLabel: '提交预约',
+      };
+    },
+    async submit(ctx) {
+      const b = await benefit(ctx);
+      const me = await R.request('/me');
+      if (me.needs_profile_completion) {
+        R.go('profile');
+        throw new Error('请先填写姓名，再返回提交预约');
+      }
+      const requested_at = checkTime(ctx.form, b.expires_at);
+      if (
+        await command(
+          '/appointments',
+          { clinic_id: ctx.params.clinic_id, benefit_id: b.id, requested_at },
+          '确认提交预约？相关权益将被预约占用。',
+        )
+      )
+        R.go('appointments');
+    },
+  },
+  appointments: { load: listAppointments },
+  appointment: {
+    async load(ctx) {
+      const a = await detail(ctx, '/appointments/' + ctx.params.id);
+      const actions: Entity[] = [];
+      if (['pending', 'success'].includes(a.status))
+        actions.push({ key: 'cancel', label: '取消预约', danger: true });
+      if (a.status === 'success' && !a.pending_reschedule)
+        actions.push({ key: 'reschedule', label: '申请改期' });
+      if (a.restoration_pending) actions.push({ key: 'restore', label: '申请恢复权益' });
+      else if (
+        a.reserved &&
+        !a.patient_arrived_at &&
+        !a.conflict &&
+        ((a.status === 'completed' && a.completion_source === 'system') || a.clinic_absent_at)
+      )
+        actions.push(
+          { key: 'feedback-no', label: '未到诊，申请恢复权益' },
+          { key: 'feedback-yes', label: '已到诊，完成治疗' },
+        );
+      let qr = a.redemption_qr || '';
+      if (a.conflict || a.restoration_pending || a.pending_reschedule) qr = '';
+      return {
+        title: '预约详情',
+        notice: a.restoration_pending
+          ? '该份权益待您申请恢复，有效期不会延长。'
+          : a.completion_source === 'system'
+            ? '预约时间已过72小时，系统自动完成；不代表已经治疗或核销。'
+            : a.pending_reschedule
+              ? '改期待门诊确认，原预约时间仍有效。'
+              : '请按门诊确认的时间就诊，治疗完成后出示核销码。',
+        facts: appointmentFacts(a).concat([fact('使用规则', a.usage_rules)]),
+        qr,
+        actions: actions as any,
+      };
+    },
+    async action(ctx, key) {
+      const a = ctx.cache.object;
+      R.go('appointment-action', { id: a.id, action: key });
+    },
+  },
+  'appointment-action': {
+    async load(ctx) {
+      const a = await detail(ctx, '/appointments/' + ctx.params.id);
+      return {
+        title:
+          {
+            cancel: '取消预约',
+            reschedule: '申请改期',
+            restore: '恢复权益',
+            'feedback-no': '未到诊申请',
+            'feedback-yes': '到诊反馈',
+          }[ctx.params.action as string] || '预约处理',
+        facts: appointmentFacts(a),
+        fields:
+          ctx.params.action === 'reschedule'
+            ? timeFields()
+            : ctx.params.action === 'cancel'
+              ? [field('reason', '取消原因')]
+              : [],
+        notice: '请如实反馈。恢复权益不延长原有效期；已核销或状态已改变时由系统拒绝重复操作。',
+        submitLabel: '确认提交',
+      };
+    },
+    async submit(ctx) {
+      const a = ctx.cache.object,
+        action = ctx.params.action;
+      let endpoint = action,
+        data: Entity = { version: a.version };
+      if (action === 'reschedule') {
+        data.proposed_at = checkTime(ctx.form, a.expires_at);
+      } else if (action === 'cancel') data.reason = required(ctx.form, 'reason', '取消原因');
+      else if (action === 'restore') data.confirmed = true;
+      else {
+        endpoint = 'feedback';
+        data = { ...data, arrived: action === 'feedback-yes', confirmed: true };
+      }
+      if (await command('/appointments/' + a.id + '/' + endpoint, data, '确认提交本次预约处理？')) {
+        wx.navigateBack();
+      }
+    },
+  },
+  messages: {
+    load: (ctx) =>
+      list(
+        ctx,
+        '/messages',
+        ['pending', 'resolved'],
+        (m) => ({
+          id: m.id,
+          title: m.title,
+          status: statuses[m.status],
+          lines: [m.appointment.clinic_name, dateText(m.appointment.scheduled_at)],
+          actions: [{ key: 'message', id: m.id, label: '查看并处理' }],
+        }),
+        '消息',
+      ),
+    async action(ctx, _key, id) {
+      const m = ctx.cache.rows.find((x: Entity) => x.id === id);
+      await R.request('/messages/' + id + '/read', 'POST', {}, true);
+      R.go('appointment', { id: m.appointment_id });
+    },
+  },
+  mine: {
+    async load() {
+      const me = await R.request('/me');
+      return {
+        title: '我的',
+        facts: [
+          fact('客户编号', me.profile.number),
+          fact('姓名', me.profile.name),
+          fact('手机号', me.profile.phone),
+        ],
+        actions: [
+          { key: 'profile', label: '修改资料' },
+          { key: 'messages', label: '消息' },
+          { key: 'privacy', label: '隐私说明' },
+          { key: 'logout', label: '退出登录' },
+        ],
+      };
+    },
+  },
+  profile: {
+    async load() {
+      const me = await R.request('/me');
+      return {
+        title: '个人资料',
+        notice: '手机号不能修改；性别、年龄、职业选填。',
+        fields: [
+          field('name', '姓名', 'text', me.profile.name || ''),
+          {
+            key: 'gender',
+            label: '性别',
+            type: 'picker',
+            options: ['未填写', '男', '女'],
+            value:
+              me.profile.gender === 'male'
+                ? '男'
+                : me.profile.gender === 'female'
+                  ? '女'
+                  : '未填写',
+          },
+          {
+            key: 'age',
+            label: '年龄',
+            type: 'number',
+            value: me.profile.age == null ? '' : String(me.profile.age),
+          },
+          { key: 'occupation', label: '职业', value: me.profile.occupation || '' },
+        ],
+        submitLabel: '保存资料',
+      };
+    },
+    async submit(ctx) {
+      const age = ctx.form.age === '' ? null : Number(ctx.form.age);
+      if (age !== null && (!Number.isInteger(age) || age < 0 || age > 150))
+        throw new Error('请填写0～150的整数年龄');
+      await R.request(
+        '/profile',
+        'POST',
+        {
+          name: required(ctx.form, 'name', '姓名'),
+          gender:
+            ctx.form.gender === '男' ? 'male' : ctx.form.gender === '女' ? 'female' : 'unknown',
+          age,
+          occupation: ctx.form.occupation || '',
+        },
+        true,
+      );
+      wx.navigateBack();
+    },
+  },
 };

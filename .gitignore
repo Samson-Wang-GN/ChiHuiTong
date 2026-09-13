@@ -26,6 +26,7 @@ coverage.json
 runtime/
 venv/
 node_modules/
+mini-programs/compiled/
 test-results/
 playwright-report/
 dist/

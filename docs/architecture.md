@@ -1,5 +1,11 @@
 # 系统架构
 
+## REQ-047 正式原生小程序
+
+原生WXML/WXSS/TypeScript两个独立包，客户14页、门诊25页。公共展示和请求源码构建时复制；财务及门诊业务仅进入门诊包。请求限定各自`/api/v1/mini/customer`或`/api/v1/mini/clinic`，微信临时code在服务端换取真实身份，MiniSession仅内存；门诊每次请求携带已授权Membership并由服务端重查。独立构建与验证见[ADR-0030](decisions/0030-native-mini-programs.md)及[接入交接](mini-program-development.md)。
+
+本轮新增只读`GET mini/clinic/bills/{id}/payments`和受管理员权限约束的`export.xlsx`，付款恢复不依赖客户端本地缓存。客户预约投影补充预留/未到/已到事实及权益有效期，待改期对象显式JSON化，并收紧二维码可见条件。不迁移数据库，不改原有业务记账事务。账号和真实API网关未就绪时保留空配置并禁止真实登录，不植入测试身份或后台Basic秘密。
+
 TASK-096：门诊详情/审核只读地图使用`POST /api/v1/clinics/{id}/profile-map`，服务端按门诊ID和可选申请ID、before/after选择已保存位置；不接受客户端自由经纬度。生效地图携带profile_version校验，过期版本提示刷新，避免旧地址与新坐标混用。沿用门诊读取范围（门诊管理员、所属渠道管理员/负责人、平台），Key仅服务端、限流和no-store不变。编辑地图接口和资料审核发布事务不变；前端独立展示当前生效位置与待审申请位置，复用Arco Panel/Alert和静态底图，无SDK/数据库迁移。
 
 2026-09-13地图选型确认（REQ-032 / TASK-095）：本期采用腾讯位置服务，复用已有`integrations/tencent_map.py`、服务端`CHT_TENCENT_MAP_KEY`与GCJ-02核对流程，不引入其他地图SDK。用户确认授权；Key已配置到独立验收服务，真实地址解析/静态图预检通过；用户分配额度后，真实HTTPS渠道地图选点确认及资源方越权检查通过。仅传门诊地址/坐标，密钥保存在源码外私有环境配置。详见[接入记录](tencent-map-acceptance.md)。

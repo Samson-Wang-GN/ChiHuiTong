@@ -1,4 +1,45 @@
 {
-  "customer": ["home","benefits","activate","clinics","clinic","book","appointments","appointment","appointment-action","messages","mine","profile","login","privacy"],
-  "clinic": ["home","tasks","appointments","appointment","appointment-action","reschedule-review","fulfillment","scan","mine","bills","bill","bill-lines","receipts","receipt","payment","bill-feedback","cooperation","contracts","contract","products","logs","notifications","membership","login","privacy"]
+  "customer": [
+    "home",
+    "benefits",
+    "activate",
+    "clinics",
+    "clinic",
+    "book",
+    "appointments",
+    "appointment",
+    "appointment-action",
+    "messages",
+    "mine",
+    "profile",
+    "login",
+    "privacy"
+  ],
+  "clinic": [
+    "home",
+    "tasks",
+    "appointments",
+    "appointment",
+    "appointment-action",
+    "reschedule-review",
+    "fulfillment",
+    "scan",
+    "mine",
+    "bills",
+    "bill",
+    "bill-lines",
+    "receipts",
+    "receipt",
+    "payment",
+    "bill-feedback",
+    "cooperation",
+    "contracts",
+    "contract",
+    "products",
+    "logs",
+    "notifications",
+    "membership",
+    "login",
+    "privacy"
+  ]
 }

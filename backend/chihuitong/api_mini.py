@@ -126,6 +126,7 @@ def benefit_projection(item):
         "usage_rules": order.product_snapshot["usage_rules"],
         "source_name": order.source_name,
         "total": item.total,
+        "validity_days": order.validity_days,
         "pending": item.pending,
         "available": item.available,
         "reserved": item.reserved,
@@ -245,7 +246,9 @@ def appointment_projection(item):
             "id": str(pending_change.id),
             "proposed_at": iso(pending_change.proposed_at),
             "expires_at": iso(pending_change.expires_at),
-        } if pending_change else None,
+        }
+        if pending_change
+        else None,
     }
 
 
@@ -377,7 +380,9 @@ def clinic_payment_history(request, bill_id):
     actor.require_admin()
     bill = get_bill(actor, bill_id)
     return paginated(
-        request, bill.payment_attempts.all(), payments.projection,
+        request,
+        bill.payment_attempts.all(),
+        payments.projection,
         states=["creating", "pending", "unknown", "success", "closed"],
     )
 
