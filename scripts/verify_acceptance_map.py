@@ -67,7 +67,9 @@ def main():
                     expect(pic).to_be_visible(timeout=30000)
                     confirm = page.get_by_role('button', name='确认中心标记为门诊位置', exact=True)
                     expect(confirm).to_be_enabled()
-                    assert pic.evaluate('(img) => img.complete && img.naturalWidth === 600')
+                    # Visibility precedes PNG decoding; wait for the browser image load.
+                    expect(pic).to_have_js_property('complete', True)
+                    expect(pic).to_have_js_property('naturalWidth', 600)
                     report['stage'] = 'map_click'
                     initial = previews[-1].copy()
                     with page.expect_response(lambda r: r.url.endswith('/clinics/map-preview'), timeout=30000) as moved:

@@ -20,7 +20,7 @@
 
 REQ-045 / TASK-090：四角色完整Web已开发部署，原账号/数据/口令保留。当前应用19b4c00包含REQ-046 / TASK-091的Excel上传简化：上传自动读取/匹配，原表头及前10行预览，必需字段缺失/歧义提示，底部一次下一步完成校验与确认。164项后端测试、89%覆盖率、Excel专项/完整跨角色及真实HTTPS回归通过。详见[Excel交付记录](docs/excel-upload-review.md)、[验收指引](docs/web-acceptance-guide.md)；四后台范围见[完整Web实施清单](docs/web-backend-plan.md)，自主决定见[ADR-0028](docs/decisions/0028-complete-web-backends.md)。
 
-本期按用户要求启用显式非生产模拟支付/短信：`CHT_ACCEPTANCE_SIMULATED_EXTERNALS=true`仅在独立验收环境有效；支付通过真实业务账本返回模拟成功，短信记录模拟受理，不发起实际微信付款或短信发送。生产和真实支付启用时拒绝此开关，不能自动降级模拟。地图仍须本项目腾讯地图Key才能验证真实底图。
+本期按用户要求启用显式非生产模拟支付/短信：`CHT_ACCEPTANCE_SIMULATED_EXTERNALS=true`仅在独立验收环境有效；支付通过真实业务账本返回模拟成功，短信记录模拟受理，不发起实际微信付款或短信发送。生产和真实支付启用时拒绝此开关，不能自动降级模拟。2026-09-13已配置本项目腾讯地图Key并通过真实地址解析/底图预检，后续受日配额限制，页面地图验收尚未完成，见[接入记录](docs/tencent-map-acceptance.md)。
 
 服务器页面操作回归：`/home/ubuntu/ChiHuiTong/.venv/bin/python /home/ubuntu/ChiHuiTong/current/scripts/verify_web_backends.py`。真实画中画使用`xvfb-run -a`加`--headed`；每次新建、最后仅删除随机命名的隔离Web测试库，不修改持久验收库。`scripts/verify_acceptance.py`用于部署后的真实受保护HTTPS与数据保留验证。
 

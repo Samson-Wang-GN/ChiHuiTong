@@ -1,6 +1,6 @@
 # 系统架构
 
-2026-09-13地图选型确认（REQ-032 / TASK-095）：本期采用腾讯位置服务，复用已有`integrations/tencent_map.py`、服务端`CHT_TENCENT_MAP_KEY`与GCJ-02核对流程，不引入其他地图SDK。用户确认授权；Key尚未配置，真实接入验收待完成。仅传门诊地址/坐标，密钥保存在源码外私有环境配置。
+2026-09-13地图选型确认（REQ-032 / TASK-095）：本期采用腾讯位置服务，复用已有`integrations/tencent_map.py`、服务端`CHT_TENCENT_MAP_KEY`与GCJ-02核对流程，不引入其他地图SDK。用户确认授权；Key已配置到独立验收服务，真实地址解析/静态图预检通过，后续腾讯返回121（日调用量达上限），页面联调待配额恢复。仅传门诊地址/坐标，密钥保存在源码外私有环境配置。详见[接入记录](tencent-map-acceptance.md)。
 
 ## REQ-046 Excel自动匹配边界
 
