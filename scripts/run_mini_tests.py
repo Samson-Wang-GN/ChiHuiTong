@@ -17,6 +17,7 @@ ROOT = Path('/home/ubuntu/ChiHuiTong')
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--lock-only', action='store_true')
+    parser.add_argument('--format', action='store_true')
     args = parser.parse_args()
     if sys.platform != 'linux' or socket.gethostname() != 'VM-0-12-ubuntu' or os.getuid() == 0:
         raise SystemExit('只能在指定开发服务器以ubuntu身份运行')
@@ -34,6 +35,8 @@ def main():
     print('MINI_REPORT=' + str(report), flush=True)
     try:
         commands = [('dependencies', [str(node / 'npm'), 'install' if args.lock_only else 'ci', '--ignore-scripts', '--no-fund', '--no-audit'])]
+        if args.format:
+            commands += [('format', [str(node / 'node'), 'node_modules/prettier/bin/prettier.cjs', '--write', 'src/**/*.ts', '*.mjs', '*.json', 'tests/*.cjs'])]
         if not args.lock_only:
             commands += [('build', [str(node / 'node'), 'build.mjs']), ('unit', [str(node / 'node'), '--test', 'tests/native.test.cjs'])]
         for name, command in commands:

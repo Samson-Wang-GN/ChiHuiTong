@@ -3,5 +3,5 @@
   "private": true,
   "version": "0.1.0",
   "description": "Two independent native WeChat applications; server-only builds and tests",
-  "devDependencies": {"typescript": "5.9.3", "miniprogram-api-typings": "5.1.1", "qrcode-generator": "2.0.4"}
+  "devDependencies": {"typescript": "5.9.3", "miniprogram-api-typings": "5.1.1", "qrcode-generator": "2.0.4", "prettier":"3.6.2", "jsqr":"1.4.0"}
 }
