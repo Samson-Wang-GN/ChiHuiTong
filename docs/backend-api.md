@@ -1,5 +1,7 @@
 # 后端接口与角色接入约定
 
+TASK-096只读地图：`POST /api/v1/clinics/{clinic_id}/profile-map`返回PNG。请求可含`change_id`（必须属于该门诊）、`snapshot`（before/after，默认after）、`zoom`（4～18，默认17）；不指定申请时读当前生效版，前端携带`profile_version`核对版本。继承门诊资料读取权限；未知/越权门诊或申请404，未确认位置/过期版本409，非法参数400，地图服务不可用503。接口拒绝自由经纬度输入，图片响应no-store，不变更坐标或审核状态；原`/clinics/map-preview`仍只用于有编辑权限的选点流程。
+
 适用：需求0.32、REQ-043；2026-09-12。本文描述已实现后端，不表示旧原型已经接入。完整路由以`backend/chihuitong/urls.py`为准；严格输入字段定义在对应`api*.py`的Serializer中，业务最终校验在`services/`。真实第三方配置和用户验收单独跟踪。
 
 ## 公共约定

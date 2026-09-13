@@ -1,5 +1,7 @@
 # 系统架构
 
+TASK-096：门诊详情/审核只读地图使用`POST /api/v1/clinics/{id}/profile-map`，服务端按门诊ID和可选申请ID、before/after选择已保存位置；不接受客户端自由经纬度。生效地图携带profile_version校验，过期版本提示刷新，避免旧地址与新坐标混用。沿用门诊读取范围（门诊管理员、所属渠道管理员/负责人、平台），Key仅服务端、限流和no-store不变。编辑地图接口和资料审核发布事务不变；前端独立展示当前生效位置与待审申请位置，复用Arco Panel/Alert和静态底图，无SDK/数据库迁移。
+
 2026-09-13地图选型确认（REQ-032 / TASK-095）：本期采用腾讯位置服务，复用已有`integrations/tencent_map.py`、服务端`CHT_TENCENT_MAP_KEY`与GCJ-02核对流程，不引入其他地图SDK。用户确认授权；Key已配置到独立验收服务，真实地址解析/静态图预检通过；用户分配额度后，真实HTTPS渠道地图选点确认及资源方越权检查通过。仅传门诊地址/坐标，密钥保存在源码外私有环境配置。详见[接入记录](tencent-map-acceptance.md)。
 
 ## REQ-046 Excel自动匹配边界

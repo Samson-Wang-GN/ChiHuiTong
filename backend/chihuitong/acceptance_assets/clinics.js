@@ -27,7 +27,14 @@
     'business_contact',
     'business_phone',
   ];
-  function SavedLocationMap({ clinicId, changeId, profileVersion, snapshot = 'after', location, title }) {
+  function SavedLocationMap({
+    clinicId,
+    changeId,
+    profileVersion,
+    snapshot = 'after',
+    location,
+    title,
+  }) {
     const [zoom, setZoom] = React.useState(17),
       [result, setResult] = React.useState({}),
       [retry, setRetry] = React.useState(0);
@@ -37,7 +44,11 @@
       setResult({ loading: true });
       C.request(base + 'clinics/' + clinicId + '/profile-map', {
         method: 'POST',
-        body: { ...(changeId ? { change_id: changeId } : { profile_version: profileVersion }), snapshot, zoom },
+        body: {
+          ...(changeId ? { change_id: changeId } : { profile_version: profileVersion }),
+          snapshot,
+          zoom,
+        },
         binary: true,
         signal: controller.signal,
       })
@@ -54,7 +65,16 @@
         controller.abort();
         if (imageUrl) URL.revokeObjectURL(imageUrl);
       };
-    }, [clinicId, changeId, profileVersion, snapshot, location.longitude, location.latitude, zoom, retry]);
+    }, [
+      clinicId,
+      changeId,
+      profileVersion,
+      snapshot,
+      location.longitude,
+      location.latitude,
+      zoom,
+      retry,
+    ]);
     return h(
       'div',
       { className: 'saved-location', 'aria-label': title + '地图' },
@@ -147,7 +167,8 @@
       C.Panel,
       { title },
       h(A.Alert, { type, content: message }),
-      confirmed && h(SavedLocationMap, { clinicId, changeId, profileVersion, snapshot, location, title }),
+      confirmed &&
+        h(SavedLocationMap, { clinicId, changeId, profileVersion, snapshot, location, title }),
     );
   }
   function ProfileView({ profile = {}, showLocation = true, ...locationProps }) {
