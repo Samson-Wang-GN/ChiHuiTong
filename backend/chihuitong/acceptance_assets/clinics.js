@@ -59,34 +59,68 @@
       'div',
       { className: 'saved-location', 'aria-label': title + '地图' },
       h('p', { className: 'muted' }, location.address_snapshot),
-      h(A.Space, { className: 'detail-actions' },
-        h(A.Button, { disabled: result.loading || zoom >= 18, onClick: () => setZoom((v) => v + 1) }, '放大'),
-        h(A.Button, { disabled: result.loading || zoom <= 4, onClick: () => setZoom((v) => v - 1) }, '缩小'),
+      h(
+        A.Space,
+        { className: 'detail-actions' },
+        h(
+          A.Button,
+          { disabled: result.loading || zoom >= 18, onClick: () => setZoom((v) => v + 1) },
+          '放大',
+        ),
+        h(
+          A.Button,
+          { disabled: result.loading || zoom <= 4, onClick: () => setZoom((v) => v - 1) },
+          '缩小',
+        ),
         h('span', { className: 'muted' }, '只读地图 · 中心标记为已保存位置'),
       ),
       h(C.Error, { error: result.error, retry: () => setRetry((v) => v + 1) }),
-      h(A.Spin, { loading: !!result.loading, style: { width: '100%' } },
-        h('div', { className: 'location-map location-map-readonly' },
+      h(
+        A.Spin,
+        { loading: !!result.loading, style: { width: '100%' } },
+        h(
+          'div',
+          { className: 'location-map location-map-readonly' },
           result.url
             ? h('img', { src: result.url, alt: title + '腾讯地图', draggable: false })
-            : h(A.Empty, { description: result.loading ? '地图加载中' : '地图暂不可用，请重试；已保存位置不会改变' }),
-          result.url && h('span', { className: 'location-map-pin', 'aria-label': '已保存位置标记' }, '●'),
+            : h(A.Empty, {
+                description: result.loading
+                  ? '地图加载中'
+                  : '地图暂不可用，请重试；已保存位置不会改变',
+              }),
+          result.url &&
+            h('span', { className: 'location-map-pin', 'aria-label': '已保存位置标记' }, '●'),
         ),
       ),
     );
   }
-  function ProfileLocation({ profile = {}, clinicId, changeId, snapshot, context = 'current', reviewStatus, pending, pendingError }) {
-    const location = profile.location || {}, confirmed = location.status === 'confirmed';
-    const title = context === 'before' ? '原资料位置' : context === 'after' ? '本次申请位置' : '当前生效位置';
-    let message, type = confirmed ? 'success' : 'warning';
+  function ProfileLocation({
+    profile = {},
+    clinicId,
+    changeId,
+    snapshot,
+    context = 'current',
+    reviewStatus,
+    pending,
+    pendingError,
+  }) {
+    const location = profile.location || {},
+      confirmed = location.status === 'confirmed';
+    const title =
+      context === 'before' ? '原资料位置' : context === 'after' ? '本次申请位置' : '当前生效位置';
+    let message,
+      type = confirmed ? 'success' : 'warning';
     if (context === 'current') {
-      message = confirmed ? '当前生效位置已确认，以下地图用于当前定位。' : '当前生效资料尚无定位，请补充定位并提交审核。';
+      message = confirmed
+        ? '当前生效位置已确认，以下地图用于当前定位。'
+        : '当前生效资料尚无定位，请补充定位并提交审核。';
       if (pending) {
         type = 'warning';
-        message = (pending.after.location?.status === 'confirmed'
-          ? '新位置已确认，等待平台审核；'
-          : '资料变更正在等待平台审核，本次申请尚未确认地图位置；')
-          + (confirmed ? '当前仍使用原生效位置。' : '当前生效资料尚无定位，暂不能准确按距离推荐。');
+        message =
+          (pending.after.location?.status === 'confirmed'
+            ? '新位置已确认，等待平台审核；'
+            : '资料变更正在等待平台审核，本次申请尚未确认地图位置；') +
+          (confirmed ? '当前仍使用原生效位置。' : '当前生效资料尚无定位，暂不能准确按距离推荐。');
       } else if (pendingError) {
         type = 'warning';
         message = '待审状态暂时无法读取，请重试核对；下方仅展示当前生效资料。';
@@ -94,11 +128,19 @@
     } else if (context === 'before') {
       message = confirmed ? '原资料已确认的位置（提交申请时快照）。' : '原资料尚无已确认位置。';
     } else {
-      const state = { pending: '等待平台审核，尚未生效。', approved: '此申请已审核通过；当前生效版本以门诊资料页为准。', rejected: '此申请已退回，未生效；原资料保持不变。' };
+      const state = {
+        pending: '等待平台审核，尚未生效。',
+        approved: '此申请已审核通过；当前生效版本以门诊资料页为准。',
+        rejected: '此申请已退回，未生效；原资料保持不变。',
+      };
       type = reviewStatus === 'pending' || reviewStatus === 'rejected' ? 'warning' : type;
-      message = (confirmed ? '本次申请的位置已确认；' : '本次申请尚未确认地图位置；') + (state[reviewStatus] || '此处仅展示申请快照。');
+      message =
+        (confirmed ? '本次申请的位置已确认；' : '本次申请尚未确认地图位置；') +
+        (state[reviewStatus] || '此处仅展示申请快照。');
     }
-    return h(C.Panel, { title },
+    return h(
+      C.Panel,
+      { title },
       h(A.Alert, { type, content: message }),
       confirmed && h(SavedLocationMap, { clinicId, changeId, snapshot, location, title }),
     );
@@ -215,7 +257,9 @@
     );
   C.dialogs.clinic = function ({ id, onClose, tab = 'info' }) {
     const q = C.useChoices(base + 'clinics/' + id),
-      pendingQuery = C.useChoices(base + 'clinics/' + id + '/profile-changes?status=pending&page_size=1'),
+      pendingQuery = C.useChoices(
+        base + 'clinics/' + id + '/profile-changes?status=pending&page_size=1',
+      ),
       pending = pendingQuery.data?.results?.[0],
       r = q.data;
     return h(
@@ -270,8 +314,20 @@
                   fields: ['review_status', 'service_status', 'confirmation_hours'],
                 }),
                 h(C.Error, { error: pendingQuery.error, retry: pendingQuery.reload }),
-                h(ProfileView, { profile: r.profile, clinicId: id, pending, pendingError: pendingQuery.error || pendingQuery.loading }),
-                pending && h(ProfileLocation, { profile: pending.after, clinicId: id, changeId: pending.id, context: 'after', reviewStatus: pending.status }),
+                h(ProfileView, {
+                  profile: r.profile,
+                  clinicId: id,
+                  pending,
+                  pendingError: pendingQuery.error || pendingQuery.loading,
+                }),
+                pending &&
+                  h(ProfileLocation, {
+                    profile: pending.after,
+                    clinicId: id,
+                    changeId: pending.id,
+                    context: 'after',
+                    reviewStatus: pending.status,
+                  }),
               ),
               h(
                 A.Tabs.TabPane,
@@ -324,9 +380,24 @@
       C.Drawer,
       { title: '门诊资料变更对照', onClose, width: 960 },
       h(C.Facts, { data: row, fields: ['status', 'due_at', 'reason'] }),
-      h('div', { className: 'location-comparison' },
-        h(ProfileLocation, { profile: row.before, clinicId: clinic.id, changeId: row.id, snapshot: 'before', context: 'before' }),
-        h(ProfileLocation, { profile: row.after, clinicId: clinic.id, changeId: row.id, snapshot: 'after', context: 'after', reviewStatus: row.status }),
+      h(
+        'div',
+        { className: 'location-comparison' },
+        h(ProfileLocation, {
+          profile: row.before,
+          clinicId: clinic.id,
+          changeId: row.id,
+          snapshot: 'before',
+          context: 'before',
+        }),
+        h(ProfileLocation, {
+          profile: row.after,
+          clinicId: clinic.id,
+          changeId: row.id,
+          snapshot: 'after',
+          context: 'after',
+          reviewStatus: row.status,
+        }),
       ),
       h(A.Table, {
         rowKey: 'key',

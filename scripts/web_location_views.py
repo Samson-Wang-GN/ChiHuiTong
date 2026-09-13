@@ -97,7 +97,7 @@ def exercise(pages, report):
         channel.route('**/profile-map', fail_once)
         open_detail()
         expect(channel.get_by_text('合成地图加载失败', exact=True)).to_be_visible()
-        channel.get_by_role('button', name='重试', exact=True).click()
+        channel.get_by_role('button', name='重新加载', exact=True).click()
         expect(channel.locator('.saved-location img')).to_have_count(2)
         assert read(channel, path)['profile']['location']['longitude'] == '116.300000'
         close(channel)
