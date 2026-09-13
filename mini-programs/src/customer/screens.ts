@@ -88,16 +88,14 @@ export const screens: Record<string, Screen> = {
           { key: 'activate', label: '扫码激活实体卡' },
           { key: 'messages', label: '待处理消息（' + m.total + '）' },
         ],
-        rows: b.results
-          .map(benefitRow)
-          .concat(
-            m.results.map((message: Entity) => ({
-              id: message.id,
-              title: message.title,
-              lines: [message.appointment.clinic_name],
-              actions: [{ key: 'appointment', id: message.appointment_id, label: '处理预约结果' }],
-            })),
-          ),
+        rows: b.results.map(benefitRow).concat(
+          m.results.map((message: Entity) => ({
+            id: message.id,
+            title: message.title,
+            lines: [message.appointment.clinic_name],
+            actions: [{ key: 'appointment', id: message.appointment_id, label: '处理预约结果' }],
+          })),
+        ),
       };
     },
     action: claim,
