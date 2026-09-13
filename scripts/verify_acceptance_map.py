@@ -28,6 +28,7 @@ def main():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             for role in ['channel', 'resource']:
+                report['stage'] = role + '_login'
                 context = browser.new_context(http_credentials=creds, viewport={'width': 1440, 'height': 1000}, locale='zh-CN')
                 page = context.new_page()
                 urls, errors, previews, writes = [], [], [], []
@@ -51,19 +52,23 @@ def main():
                 page.get_by_role('button', name='登录', exact=True).click()
                 page.get_by_role('button', name='退出登录', exact=True).wait_for()
                 if role == 'channel':
+                    report['stage'] = 'address_lookup'
                     page.locator('.sidebar .arco-menu-item').filter(has_text=re.compile('^门诊管理$')).click()
                     page.get_by_role('button', name='新增门诊', exact=True).click()
                     for label, value in [('省 / 直辖市', '北京市'), ('城市', '北京市'), ('区 / 县', '海淀区'), ('经营地址', '中关村大街1号')]:
                         page.get_by_label(label, exact=True).fill(value)
                     with page.expect_response(lambda r: r.url.endswith('/clinics/geocode'), timeout=30000) as response:
                         page.get_by_role('button', name='按地址定位', exact=True).click()
+                    report['geocode_http_status'] = response.value.status
                     assert response.value.status == 200
                     assert key not in response.value.text()
+                    report['stage'] = 'map_load'
                     pic = page.get_by_alt_text('腾讯地图真实底图，点击选择门诊位置')
                     expect(pic).to_be_visible(timeout=30000)
                     confirm = page.get_by_role('button', name='确认中心标记为门诊位置', exact=True)
                     expect(confirm).to_be_enabled()
                     assert pic.evaluate('(img) => img.complete && img.naturalWidth === 600')
+                    report['stage'] = 'map_click'
                     initial = previews[-1].copy()
                     with page.expect_response(lambda r: r.url.endswith('/clinics/map-preview'), timeout=30000) as moved:
                         pic.click(position={'x': 380, 'y': 210})
@@ -71,6 +76,7 @@ def main():
                     expect(confirm).to_be_enabled()
                     assert previews[-1]['longitude'] != initial['longitude']
                     assert previews[-1]['latitude'] != initial['latitude']
+                    report['stage'] = 'map_confirm'
                     expect(pic).to_be_visible()
                     pic.screenshot(path=str(output / 'public-place-map.png'), animations='disabled')
                     confirm.click()
@@ -80,6 +86,7 @@ def main():
                     assert not writes
                     report['checks'].append({'channel_address_lookup': True, 'real_png': True, 'map_click_changes_coordinates': True, 'form_confirmation': True, 'cancel_without_saving': True})
                 else:
+                    report['stage'] = 'resource_permission'
                     denied = page.evaluate("""async () => {
                         const result = [];
                         for (const path of ['/api/v1/clinics/geocode', '/api/v1/clinics/map-preview']) {
@@ -91,6 +98,7 @@ def main():
                     assert denied == [403, 403]
                     report['checks'].append({'resource_map_access_denied': True})
                 assert not errors
+                report['stage'] = role + '_key_isolation'
                 assert all(key not in url and 'apis.map.qq.com' not in url for url in urls)
                 report['checks'].append({'role': role, 'browser_key_not_exposed': True, 'javascript_errors': 0})
                 page.get_by_role('button', name='退出登录', exact=True).click()
