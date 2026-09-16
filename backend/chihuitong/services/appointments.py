@@ -98,7 +98,11 @@ def locked_appointment(appointment_id, *, allow_payment=False):
     )
     appointment.clinic, appointment.benefit = clinic, benefit
     if not allow_payment:
-        require(not appointment.instant_orders.filter(status__in=["pending", "paid"]).exists(), "unresolved_payment", "此预约现付尚未完成核对，请先查单，不能变更预约或释放权益")
+        require(
+            not appointment.instant_orders.filter(status__in=["pending", "paid"]).exists(),
+            "unresolved_payment",
+            "此预约现付尚未完成核对，请先查单，不能变更预约或释放权益",
+        )
     return appointment, benefit
 
 
@@ -551,7 +555,11 @@ def redeem(actor, appointment_id, *, credential, confirmed, version, quote=None)
     can_redeem(appointment, benefit)
     product = Product.objects.select_for_update().get(pk=benefit.product_id)
     snapshot = resolve_fees(benefit.source.organization_id, appointment.clinic, product)
-    require(snapshot.get("payment_mode") != "instant", "instant_payment_required", "本门店采用核销现付，请创建现付订单并完成付款")
+    require(
+        snapshot.get("payment_mode") != "instant",
+        "instant_payment_required",
+        "本门店采用核销现付，请创建现付订单并完成付款",
+    )
     if quote is not None:
         try:
             quoted = signing.loads(quote, salt="redemption-quote", max_age=300)

@@ -204,12 +204,21 @@ def can_read_file(actor, asset):
     if actor.organization.kind == "clinic" and actor.membership.role != "admin":
         return False
     from chihuitong.models import ClinicAgreement
+
     from .cooperations import full_access
 
     # Signed multi-store documents must not inherit access merely from one managed store.
-    agreements = ClinicAgreement.objects.filter(pk__in=asset.links.filter(object_type="clinicagreement").values("object_id"))
+    agreements = ClinicAgreement.objects.filter(
+        pk__in=asset.links.filter(object_type="clinicagreement").values("object_id")
+    )
     if agreements.exists():
         return any(full_access(actor, agreement.cooperation, agreement) for agreement in agreements)
+    from chihuitong.models import ClinicBill
+    from .finance import full_bill_access
+
+    joint_bills = ClinicBill.objects.filter(cooperation__isnull=False, pk__in=asset.links.filter(object_type="clinicbill").values("object_id"))
+    if joint_bills.exists():
+        return any(full_bill_access(actor, bill) for bill in joint_bills)
     if asset.organization_id == actor.organization.id and (
         actor.membership.role == "admin" or asset.uploaded_by_id == actor.account.id
     ):

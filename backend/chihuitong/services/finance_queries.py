@@ -50,17 +50,25 @@ def clinic_bill_projection(bill, actor=None):
     from .finance import effective_bill_status, full_bill_access, scoped_bill_lines
 
     full = actor is None or full_bill_access(actor, bill)
-    total = bill.total_cents if full else sum(line.amount_cents for line in scoped_bill_lines(actor, bill).filter(active=True))
+    total = (
+        bill.total_cents
+        if full
+        else sum(line.amount_cents for line in scoped_bill_lines(actor, bill).filter(active=True))
+    )
     received = bill.received_cents if full else total if bill.status == "settled" else 0
 
     return {
         "id": str(bill.id),
         "clinic_id": str(bill.clinic_id),
-        "clinic_name": bill.cooperation.organization.name if bill.cooperation_id else bill.clinic.organization.name,
+        "clinic_name": bill.cooperation.organization.name
+        if bill.cooperation_id
+        else bill.clinic.organization.name,
         "cooperation_id": str(bill.cooperation_id) if bill.cooperation_id else None,
         "full_access": full,
         "can_pay": actor is not None and actor.organization.kind == "clinic" and full,
-        "scope_notice": "" if full else "仅显示本人负责门店的交易金额；整单由签约主体统一付款，整单结清后才标记已结算",
+        "scope_notice": ""
+        if full
+        else "仅显示本人负责门店的交易金额；整单由签约主体统一付款，整单结清后才标记已结算",
         "cycle": bill.cycle,
         "issued_on": iso(bill.issued_on),
         "period_end": iso(bill.period_end),
@@ -100,7 +108,11 @@ def transaction_projection(actor, record):
     product = appointment.benefit.product
     phone = customer.phone
     # Clinics need their appointment contact; other channels get a masked customer phone.
-    if not actor.platform and (actor.organization.kind not in RESOURCE_KINDS | {"clinic"} or actor.organization.kind == "clinic" and actor.organization.id != appointment.clinic.organization_id):
+    if not actor.platform and (
+        actor.organization.kind not in RESOURCE_KINDS | {"clinic"}
+        or actor.organization.kind == "clinic"
+        and actor.organization.id != appointment.clinic.organization_id
+    ):
         phone = phone[:3] + "****" + phone[-4:] if len(phone) == 11 else ""
     result = {
         "id": str(record.id),

@@ -228,7 +228,7 @@
             h(
               A.Space,
               { wrap: true, className: 'detail-actions' },
-              C.role === 'clinic' &&
+              C.role === 'clinic' && r.can_pay &&
                 ['pending_payment', 'overdue', 'disputed'].includes(r.status) &&
                 h(
                   A.Button,
@@ -243,7 +243,7 @@
                   },
                   '上传付款凭证',
                 ),
-              C.role === 'clinic' &&
+              C.role === 'clinic' && r.can_pay &&
                 !['settled', 'cancelled', 'no_payment'].includes(r.status) &&
                 h(A.Button, { onClick: () => C.open('payment', { bill: r }) }, '微信扫码支付'),
               ['clinic', 'channel'].includes(C.role) &&
@@ -268,7 +268,7 @@
                 h(BillLines, { path: base + 'clinic-bills/' + id + '/lines' }),
               ),
               h(A.Tabs.TabPane, { key: 'info', title: '账单信息' }, h(C.Facts, { data: r })),
-              h(
+              (!r.cooperation_id || r.full_access) && h(
                 A.Tabs.TabPane,
                 { key: 'receipts', title: '收款凭证' },
                 h(C.List, {
@@ -279,7 +279,7 @@
                   actions: (v) => C.button('凭证详情', () => C.open('clinicReceipt', { row: v })),
                 }),
               ),
-              h(
+              (!r.cooperation_id || r.full_access) && h(
                 A.Tabs.TabPane,
                 { key: 'payments', title: '微信支付记录' },
                 h(PaymentList, { bill: r }),
@@ -289,7 +289,7 @@
                 { key: 'feedback', title: '账单异议' },
                 h(FeedbackList, { rows: r.feedback }),
               ),
-              h(
+              (!r.cooperation_id || r.full_access) && h(
                 A.Tabs.TabPane,
                 { key: 'logs', title: '操作记录' },
                 h(C.Logs, { type: 'clinicbill', id }),

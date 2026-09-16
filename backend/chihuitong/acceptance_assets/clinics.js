@@ -223,6 +223,7 @@
     });
   }
   C.ClinicProducts = ClinicProducts;
+  C.ProfileView = ProfileView;
   C.pages.clinics = () =>
     h(
       C.Panel,
@@ -230,7 +231,7 @@
         title: C.role === 'clinic' ? '门诊资料' : '门诊管理',
         extra:
           ['platform', 'channel'].includes(C.role) &&
-          h(A.Button, { type: 'primary', onClick: () => profileForm() }, '新增门诊'),
+          h(A.Space, null, h(A.Button, { type: 'primary', onClick: () => C.open('clinicForm', {joint:true}) }, '单店入驻申请'), h(A.Button, {onClick: () => profileForm()}, '新增连锁门店')),
       },
       h(C.List, {
         path: base + 'clinics',
@@ -374,7 +375,7 @@
               ),
               h(
                 A.Tabs.TabPane,
-                { key: 'contracts', title: '合同与续签' },
+                { key: 'contracts', title: '签约主体与合同' },
                 r.cooperation_id && C.Agreements ? h(C.Agreements, { id: r.cooperation_id }) : h(C.Contracts, { orgId: r.organization_id, canManage: C.role !== 'clinic' }),
               ),
               h(
@@ -489,7 +490,7 @@
       ),
     );
   };
-  C.dialogs.clinicForm = function ({ row, draft, onClose }) {
+  C.dialogs.clinicForm = function ({ row, draft, joint=false, agreement, onClose }) {
     const [channel, setChannel] = React.useState(
       row?.channel_id || (C.role === 'channel' ? C.actor.organization_id : ''),
     );
@@ -502,11 +503,12 @@
         : null,
     );
     const profile = draft || row?.profile || {};
+    const jointProducts = C.useChoices(joint ? base + 'products?page_size=100' : null);
     const subjects = C.useChoices(!row ? base + 'clinic-cooperations?page_size=100' : null);
     const fields = [
       ...(!row
         ? [
-            { name: 'cooperation_id', label: '签约主体', optional: true, type: 'select', options: (subjects.data?.results || []).filter(x => x.can_manage).map(x => ({value: x.id, label: x.name + (x.kind === 'chain' ? ' · 连锁总部' : ' · 单店')})) },
+            ...(!joint ? [{ name: 'cooperation_id', label: '连锁签约主体（可稍后在合同关联）', optional: true, type: 'select', options: (subjects.data?.results || []).filter(x => x.can_manage && x.kind==='chain').map(x => ({value: x.id, label: x.name})) }] : []),
             {
               name: 'channel_id',
               label: '所属渠道',
@@ -525,6 +527,7 @@
           ]
         : []),
       ...keys.map((name) => ({ name, label: name === 'name' ? '门诊名称' : C.names[name] })),
+      ...(joint && C.jointFields ? C.jointFields(jointProducts.data?.results || [], !!row) : []),
       {
         name: 'responsible_id',
         label: '负责业务员',
@@ -560,19 +563,23 @@
         : []),
     ];
     return h(C.FormDialog, {
-      title: row ? '维护门诊资料' : '新增门诊',
+      title: joint ? '单店入驻 · 资料与合同统一提交' : row ? '维护门诊资料' : '新增连锁门店',
       onClose,
       fields,
       initial: {
+        ...(agreement ? {contract_number:agreement.number,contract_starts:agreement.starts_at,contract_ends:agreement.ends_at,contract_products:agreement.product_ids,contract_files:agreement.attachment_ids} : {}),
         ...profile,
         channel_id: channel,
         responsible_id: profile.responsible_id || C.actor.id,
         cover_ids: profile.cover_id ? [profile.cover_id] : [],
         location: profile.location || { status: 'unconfirmed' },
       },
-      submitText: row ? '提交变更审核' : '保存门诊资料',
+      submitText: joint ? '统一提交入驻审核' : row ? '提交变更审核' : '保存门诊资料',
       hint: '已审核门诊的所有修改均须再次审核。业务联系人及电话必填，不在客户小程序公开。地址变化后须重新核对地图。',
-      onSubmit: async (v) => {
+      onSubmit: async (v, key) => {
+        const jointData = joint ? C.jointData(v, row) : null;
+        v = {...v};
+        for (const field of Object.keys(v)) if (field.startsWith('contract_') || field.startsWith('subject_')) delete v[field];
         const { channel_id, cooperation_id, admin_name, admin_phone, cover_ids, ...next } = v;
         next.cover_id = cover_ids?.[0] || null;
         const address = keys
@@ -580,6 +587,7 @@
           .map((k) => next[k])
           .join('');
         if (next.location?.address_snapshot !== address) next.location = { status: 'unconfirmed' };
+        if (joint) return C.api(base+'clinic-onboarding','POST',{...jointData,clinic:{channel_id:channel_id || row.channel_id,...(!row?{admin_name,admin_phone}:{}),profile:next},...(row?{clinic_id:row.id,version:row.version}:{})},key);
         return row
           ? C.api(base + 'clinics/' + row.id + '/profile-changes', 'POST', {
               profile: next,

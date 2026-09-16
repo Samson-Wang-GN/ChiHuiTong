@@ -140,6 +140,7 @@ def asset(request, name):
         "workbench.js",
         "appointments.js",
         "finance.js",
+        "contract-center.js",
         "operations.js",
         "sales.js",
         "imports.js",

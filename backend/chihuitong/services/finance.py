@@ -38,28 +38,42 @@ def visible_clinic_bills(actor):
     if actor.platform:
         return qs
     stores = visible_clinics(actor)
-    return qs.filter(Q(clinic__in=stores) | Q(cooperation__organization=actor.organization) | Q(lines__redemption__appointment__clinic__in=stores)).distinct()
+    return qs.filter(
+        Q(clinic__in=stores)
+        | Q(cooperation__organization=actor.organization)
+        | Q(lines__redemption__appointment__clinic__in=stores)
+    ).distinct()
 
 
 def full_bill_access(actor, bill):
-    return actor.platform or (actor.organization.kind == "clinic" and actor.membership.role == "admin" and actor.organization.id == (bill.cooperation.organization_id if bill.cooperation_id else bill.clinic.organization_id))
+    return actor.platform or (
+        actor.organization.kind == "clinic"
+        and actor.membership.role == "admin"
+        and actor.organization.id
+        == (
+            bill.cooperation.organization_id if bill.cooperation_id else bill.clinic.organization_id
+        )
+    )
 
 
 def scoped_bill_lines(actor, bill):
-    return bill.lines.all() if full_bill_access(actor, bill) else bill.lines.filter(redemption__appointment__clinic__in=visible_clinics(actor))
+    return (
+        bill.lines.all()
+        if full_bill_access(actor, bill)
+        else bill.lines.filter(redemption__appointment__clinic__in=visible_clinics(actor))
+    )
 
 
 def get_bill(actor, bill_id, *, lock=False, pay=False):
     qs = visible_clinic_bills(actor)
     if lock:
-        qs = qs.select_for_update(of=("self",))
+        qs = ClinicBill.objects.select_related("clinic__organization", "cooperation__organization").filter(pk__in=qs.values("pk")).select_for_update(of=("self",))
     bill = qs.filter(pk=bill_id).first()
     require(bill, "not_found", "门诊账单不存在或无权访问", 404)
     if pay:
         actor.require_admin()
         require(
-            actor.organization.kind == "clinic"
-            and full_bill_access(actor, bill),
+            actor.organization.kind == "clinic" and full_bill_access(actor, bill),
             "forbidden",
             "仅本门诊管理员可提交付款",
             403,
@@ -152,23 +166,54 @@ def generate_clinic_bill(clinic_id, *, issued_on):
 @transaction.atomic
 def generate_cooperation_bill(cooperation_id, *, issued_on):
     from chihuitong.models import ClinicCooperation
+
     from .cooperations import current_agreement
 
     item = ClinicCooperation.objects.select_for_update().get(pk=cooperation_id)
     agreement = current_agreement(item, stock=True)
     require(agreement.payment_mode == "postpaid", "instant_clinic", "现付交易不生成后付账单")
     cycle = agreement.settlement_cycle
-    require((cycle == "weekly" and issued_on.weekday() == 0) or (cycle == "monthly" and issued_on.day == 1), "not_issue_day", "尚未到出账日")
+    require(
+        (cycle == "weekly" and issued_on.weekday() == 0)
+        or (cycle == "monthly" and issued_on.day == 1),
+        "not_issue_day",
+        "尚未到出账日",
+    )
     old = ClinicBill.objects.filter(cooperation=item, issued_on=issued_on).first()
     if old:
         return old
     cutoff = timezone.make_aware(datetime.combine(issued_on, time.min))
-    records = list(Redemption.objects.select_for_update().filter(cooperation=item, payment_mode="postpaid", status="active", settled_at__isnull=True, created_at__lt=cutoff).exclude(bill_lines__active=True).order_by("id"))
+    records = list(
+        Redemption.objects.select_for_update()
+        .filter(
+            cooperation=item,
+            payment_mode="postpaid",
+            status="active",
+            settled_at__isnull=True,
+            created_at__lt=cutoff,
+        )
+        .exclude(bill_lines__active=True)
+        .order_by("id")
+    )
     if not records:
         return None
     total = sum(record.fee_cents for record in records)
-    bill = ClinicBill.objects.create(cooperation=item, cycle=cycle, period_end=issued_on-timedelta(days=1), issued_on=issued_on, due_at=due_at(issued_on, cycle), total_cents=total, contract_version=agreement.id, status="open" if total else "no_payment")
-    ClinicBillLine.objects.bulk_create([ClinicBillLine(bill=bill, redemption=record, amount_cents=record.fee_cents) for record in records])
+    bill = ClinicBill.objects.create(
+        cooperation=item,
+        cycle=cycle,
+        period_end=issued_on - timedelta(days=1),
+        issued_on=issued_on,
+        due_at=due_at(issued_on, cycle),
+        total_cents=total,
+        contract_version=agreement.id,
+        status="open" if total else "no_payment",
+    )
+    ClinicBillLine.objects.bulk_create(
+        [
+            ClinicBillLine(bill=bill, redemption=record, amount_cents=record.fee_cents)
+            for record in records
+        ]
+    )
     if not total:
         Redemption.objects.filter(pk__in=[r.id for r in records]).update(settled_at=timezone.now())
     snapshot_bill(bill)

@@ -158,6 +158,9 @@ class CatalogTests(TestCase):
                 organization=self.clinic.organization
             )
         )
+        # This suite retains historical tri-party contract coverage. New onboarding is tested separately.
+        self.clinic.contract_policy = "legacy"
+        self.clinic.save(update_fields=["contract_policy"])
 
     def approve_clinic(self):
         self.clinic.refresh_from_db()

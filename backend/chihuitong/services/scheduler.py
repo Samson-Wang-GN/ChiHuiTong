@@ -11,9 +11,9 @@ from chihuitong.errors import BusinessError
 from chihuitong.models import (
     Appointment,
     Clinic,
+    ClinicAgreement,
     ClinicBill,
     ClinicCooperation,
-    ClinicAgreement,
     ContractVersion,
     Membership,
     Outbox,
@@ -86,13 +86,23 @@ def tick():
                 )
         from .cooperations import current_agreement
 
-        for subject in ClinicCooperation.objects.filter(redemptions__status="active", redemptions__payment_mode="postpaid", redemptions__settled_at__isnull=True).distinct():
+        for subject in ClinicCooperation.objects.filter(
+            redemptions__status="active",
+            redemptions__payment_mode="postpaid",
+            redemptions__settled_at__isnull=True,
+        ).distinct():
             try:
                 agreement = current_agreement(subject, stock=True)
             except BusinessError:
                 continue
-            if (agreement.settlement_cycle == "weekly" and day.weekday() == 0) or (agreement.settlement_cycle == "monthly" and day.day == 1):
-                created += enqueue("billing.cooperation", f"cooperation-bill:{subject.id}:{day}", {"cooperation_id": str(subject.id), "issued_on": day.isoformat()})
+            if (agreement.settlement_cycle == "weekly" and day.weekday() == 0) or (
+                agreement.settlement_cycle == "monthly" and day.day == 1
+            ):
+                created += enqueue(
+                    "billing.cooperation",
+                    f"cooperation-bill:{subject.id}:{day}",
+                    {"cooperation_id": str(subject.id), "issued_on": day.isoformat()},
+                )
     if day.day == 1:
         created += enqueue(
             "billing.partner", f"partner-bills:{day}", {"issued_on": day.isoformat()}
@@ -107,9 +117,31 @@ def tick():
         phase = "overdue" if overdue else day.isoformat()
         if bill.cooperation_id:
             agreement = ClinicAgreement.objects.get(pk=bill.contract_version)
-            created += enqueue("sms.business", f"bill-sms:{bill.id}:subject:{phase}", {"template": template, "bill_id": str(bill.id), "phone": agreement.contact["phone"], "parameters": {"bill_number": bill.id.hex[-8:].upper(), "amount": f"{Decimal(bill.total_cents-bill.received_cents)/100:.2f}", "due_date": timezone.localtime(bill.due_at).date().isoformat()}})
-            members = Membership.objects.filter(Q(organization_id=bill.cooperation.organization_id, role="admin") | Q(pk__in=bill.lines.values("redemption__appointment__clinic__responsible_id")))
-            notify_members(members, kind=template, obj=bill, title="签约主体账单已逾期，请核对" if overdue else "签约主体账单待付款", key=f"bill:{bill.id}:{day}")
+            created += enqueue(
+                "sms.business",
+                f"bill-sms:{bill.id}:subject:{phase}",
+                {
+                    "template": template,
+                    "bill_id": str(bill.id),
+                    "phone": agreement.contact["phone"],
+                    "parameters": {
+                        "bill_number": bill.id.hex[-8:].upper(),
+                        "amount": f"{Decimal(bill.total_cents - bill.received_cents) / 100:.2f}",
+                        "due_date": timezone.localtime(bill.due_at).date().isoformat(),
+                    },
+                },
+            )
+            members = Membership.objects.filter(
+                Q(organization_id=bill.cooperation.organization_id, role="admin")
+                | Q(pk__in=bill.lines.values("redemption__appointment__clinic__responsible_id"))
+            )
+            notify_members(
+                members,
+                kind=template,
+                obj=bill,
+                title="签约主体账单已逾期，请核对" if overdue else "签约主体账单待付款",
+                key=f"bill:{bill.id}:{day}",
+            )
             continue
         parameters = {
             "bill_number": bill.id.hex[-8:].upper(),

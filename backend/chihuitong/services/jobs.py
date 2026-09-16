@@ -63,9 +63,13 @@ def run_one():
             )
         elif job.kind == "billing.cooperation":
             from datetime import date
+
             from .finance import generate_cooperation_bill
 
-            generate_cooperation_bill(job.payload["cooperation_id"], issued_on=date.fromisoformat(job.payload["issued_on"]))
+            generate_cooperation_bill(
+                job.payload["cooperation_id"],
+                issued_on=date.fromisoformat(job.payload["issued_on"]),
+            )
         elif job.kind == "billing.partner":
             from datetime import date
 

@@ -59,10 +59,19 @@ def clinic_bill_detail(request, bill_id):
                     "snapshot": item.snapshot,
                     "created_at": queries.iso(item.created_at),
                 }
-                for item in (bill.revisions.order_by("revision") if finance.full_bill_access(actor, bill) else [])
+                for item in (
+                    bill.revisions.order_by("revision")
+                    if finance.full_bill_access(actor, bill)
+                    else []
+                )
             ],
             "feedback": [
-                queries.feedback_projection(item) for item in (bill.feedback.order_by("created_at") if finance.full_bill_access(actor, bill) else [])
+                queries.feedback_projection(item)
+                for item in (
+                    bill.feedback.order_by("created_at")
+                    if finance.full_bill_access(actor, bill)
+                    else []
+                )
             ],
         }
     )
@@ -158,7 +167,12 @@ def clinic_bill_export(request, bill_id):
 def clinic_receipts(request, bill_id):
     actor = request_actor(request)
     bill = finance.get_bill(actor, bill_id)
-    require(finance.full_bill_access(actor, bill) or not bill.cooperation_id, "forbidden", "整单付款凭证仅签约主体与平台可查看", 403)
+    require(
+        finance.full_bill_access(actor, bill) or not bill.cooperation_id,
+        "forbidden",
+        "整单付款凭证仅签约主体与平台可查看",
+        403,
+    )
     if request.method == "POST":
         data = validated(ReceiptInput, request)
         return Response(

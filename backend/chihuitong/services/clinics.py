@@ -52,7 +52,9 @@ def visible_clinics(actor):
         return qs
     if actor.organization.kind == "clinic":
         if actor.membership.role == "admin":
-            return qs.filter(Q(organization=actor.organization) | Q(cooperation__organization=actor.organization))
+            return qs.filter(
+                Q(organization=actor.organization) | Q(cooperation__organization=actor.organization)
+            )
         return qs.filter(organization=actor.organization)
     return qs.none()
 
@@ -237,16 +239,23 @@ def create_clinic(actor, *, channel_id, profile, admin_name, admin_phone, cooper
         )
     cooperation = None
     if cooperation_id:
-        from .cooperations import get_cooperation, assert_edit
+        from .cooperations import assert_edit, get_cooperation
 
         cooperation = get_cooperation(actor, cooperation_id, lock=True)
         assert_edit(actor, cooperation)
-        require(cooperation.kind == "chain" or not cooperation.clinics.exists(), "single_store_only", "单店主体只能开通一家门店")
+        require(
+            cooperation.kind == "chain" or not cooperation.clinics.exists(),
+            "single_store_only",
+            "单店主体只能开通一家门店",
+        )
     org = Organization.objects.create(name=normalized.get("name") or "待完善门诊", kind="clinic")
-    if not cooperation:
-        cooperation = ClinicCooperation.objects.create(organization=org, kind="single", created_by=actor.membership)
     clinic = Clinic.objects.create(
-        organization=org, channel=channel, responsible=responsible, profile=normalized, cooperation=cooperation
+        organization=org,
+        channel=channel,
+        responsible=responsible,
+        profile=normalized,
+        cooperation=cooperation,
+        contract_policy="bilateral",
     )
     from .organizations import account_for
 
@@ -317,7 +326,10 @@ def submit_profile(actor, clinic_id, *, profile, version):
 
 
 @transaction.atomic
-def review_profile(actor, change_id, *, approved, version, reason):
+def review_profile(actor, change_id, *, approved, version, reason, joint=False):
+    from chihuitong.models import ClinicAgreement
+
+    require(joint or not ClinicAgreement.objects.filter(onboarding_change_id=change_id).exists(), "joint_review_required", "此资料属于单店入驻申请，请统一审核")
     actor.require_platform()
     pending = ClinicProfileChange.objects.filter(pk=change_id).first()
     require(pending, "not_found", "资料申请不存在", 404)
@@ -400,7 +412,7 @@ def assert_new_business(clinic, product_id=None):
         "contact_required",
         "门诊业务联系人信息待补充",
     )
-    from .cooperations import clinic_agreement, assert_payment_ready
+    from .cooperations import assert_payment_ready, clinic_agreement
 
     agreement = clinic_agreement(clinic, product_id=product_id)
     if clinic.cooperation_id and agreement.payment_mode == "instant":
@@ -431,7 +443,11 @@ def set_service_status(actor, clinic_id, *, status, version, reason):
         )
         assert_new_business(clinic)
         if clinic.cooperation_id:
-            require(clinic.products.filter(status="online").exists(), "product_required", "请先上线至少一个合同授权推广产品")
+            require(
+                clinic.products.filter(status="online").exists(),
+                "product_required",
+                "请先上线至少一个合同授权推广产品",
+            )
     clinic.service_status = status
     advance(clinic, "service_status")
     audit(actor, clinic, "clinic.service_status", reason=reason, status=status)

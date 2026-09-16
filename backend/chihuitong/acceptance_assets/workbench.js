@@ -4,6 +4,7 @@
     { h, A } = C;
   const base = '/api/v1/';
   const titles = {
+    agreement_review: '门诊合同 / 单店入驻',
     organization_review: '合作机构审核',
     clinic_profile: '门诊资料审核',
     profile_resubmission: '门诊资料待重提',
@@ -32,6 +33,7 @@
       );
       const r = d.record;
       const routes = {
+        agreement_review: ['agreement', {id:r.id}],
         organization_review: ['institution', { id: r.id }],
         clinic_profile: ['clinic', { id: r.clinic_id, tab: 'review' }],
         profile_resubmission: ['clinic', { id: r.clinic_id, tab: 'review' }],

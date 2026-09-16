@@ -230,6 +230,7 @@
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
       ['institutions', '机构管理'],
+      ['contracts', '合同管理'],
       ['clinics', '门诊管理'],
       ['products', '推广产品'],
       ['sales', '推广产品销售'],
@@ -245,6 +246,7 @@
       ['accounts', '账号管理'],
     ],
     resource: [
+      ['contracts', '合同管理'],
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
       ['sales', '推广产品销售'],
@@ -256,6 +258,7 @@
       ['accounts', '账号管理'],
     ],
     channel: [
+      ['contracts', '合同管理'],
       ['instantOrders', '核销现付订单'],
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
@@ -268,6 +271,7 @@
       ['accounts', '账号管理'],
     ],
     clinic: [
+      ['contracts', '合同管理'],
       ['instantOrders', '核销现付订单'],
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
@@ -359,7 +363,7 @@
           member.role === 'admin' ||
           !(
             key === 'accounts' ||
-            (C.role === 'clinic' && ['clinicBills', 'clinics', 'cooperation'].includes(key))
+            (C.role === 'clinic' && ['clinicBills', 'clinics', 'cooperation', 'contracts'].includes(key))
           ),
       )
       .map(([key, title]) => [

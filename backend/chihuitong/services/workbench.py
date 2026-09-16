@@ -7,6 +7,7 @@ from django.utils import timezone
 from chihuitong.errors import require
 from chihuitong.models import (
     ClinicProfileChange,
+    ClinicAgreement,
     ClinicReceipt,
     ContractVersion,
     FinanceFeedback,
@@ -73,6 +74,11 @@ class TaskSource:
 def sources(actor):
     items = []
     clinics = visible_clinics(actor)
+    from .cooperations import visible_cooperations
+
+    if actor.platform or actor.organization.kind == "channel" or actor.organization.kind == "clinic" and actor.membership.role == "admin":
+        agreements = ClinicAgreement.objects.filter(cooperation__in=visible_cooperations(actor))
+        items.append(TaskSource("agreement_review", "门诊合同 / 单店入驻", agreements.exclude(status="draft") if actor.platform else agreements, Q(status="pending") if actor.platform else Q(status__in=["draft", "rejected"]), ("review",) if actor.platform else ("submit",), "due_at"))
     if actor.platform:
         items.extend(
             [
@@ -86,7 +92,7 @@ def sources(actor):
                 TaskSource(
                     "clinic_profile",
                     "门诊资料审核",
-                    ClinicProfileChange.objects.all(),
+                    ClinicProfileChange.objects.filter(onboarding_agreement__isnull=True),
                     Q(status="pending"),
                     ("review",),
                     "due_at",
@@ -188,7 +194,7 @@ def sources(actor):
             TaskSource(
                 "profile_resubmission",
                 "门诊资料退回修改",
-                ClinicProfileChange.objects.filter(clinic__in=clinics).exclude(status="pending"),
+                ClinicProfileChange.objects.filter(clinic__in=clinics, onboarding_agreement__isnull=True).exclude(status="pending"),
                 Q(status="rejected"),
                 ("resubmit",),
             )
@@ -330,6 +336,7 @@ def task_detail(actor, category, object_id):
     pending = source.queryset.filter(pk=object_id).filter(source.pending).exists()
     from chihuitong.api_appointments import appointment_projection, reschedule_projection
     from chihuitong.api_catalog import change_projection, contract_projection
+    from chihuitong.api_cooperations import agreement_projection
     from chihuitong.api_notifications import job_projection
     from chihuitong.api_sales import order_projection, receipt_projection
 
@@ -341,6 +348,7 @@ def task_detail(actor, category, object_id):
     from .finance_queries import receipt_projection as clinic_receipt_projection
 
     handlers = {
+        "agreement_review": lambda item: agreement_projection(actor, item),
         "organization_review": lambda item: {
             "id": str(item.id),
             "name": item.name,
@@ -360,8 +368,8 @@ def task_detail(actor, category, object_id):
         "clinic_receipt": clinic_receipt_projection,
         "partner_payment": partner_bill_projection,
         "partner_confirmation": partner_bill_projection,
-        "clinic_payment": clinic_bill_projection,
-        "clinic_collection": clinic_bill_projection,
+        "clinic_payment": lambda item: clinic_bill_projection(item, actor),
+        "clinic_collection": lambda item: clinic_bill_projection(item, actor),
         "finance_feedback": feedback_projection,
         "failed_job": job_projection,
         "appointment_confirmation": lambda item: appointment_projection(actor, item),

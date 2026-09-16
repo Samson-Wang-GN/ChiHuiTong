@@ -189,6 +189,7 @@ def contract_projection(item):
     return {
         "id": str(item.id),
         "contract_id": str(item.contract_id),
+        "subject_name": item.contract.organization.name,
         "organization_id": str(item.contract.organization_id),
         "number": item.contract.number,
         "kind": item.contract.kind,
@@ -409,8 +410,11 @@ def clinic_projection(clinic):
     return {
         "id": str(clinic.id),
         "organization_id": str(clinic.organization_id),
+        "contract_policy": clinic.contract_policy,
         "cooperation_id": str(clinic.cooperation_id) if clinic.cooperation_id else None,
-        "cooperation_name": clinic.cooperation.organization.name if clinic.cooperation_id else "历史独立门诊",
+        "cooperation_name": clinic.cooperation.organization.name
+        if clinic.cooperation_id
+        else "尚未关联合同" if clinic.contract_policy == "bilateral" else "历史独立门诊",
         "cooperation_kind": clinic.cooperation.kind if clinic.cooperation_id else "legacy",
         "channel_id": str(clinic.channel_id),
         "responsible_id": str(clinic.responsible_id),
@@ -449,7 +453,11 @@ def clinic_list(request):
         )
     qs = clinics.visible_clinics(actor)
     if request.query_params.get("cooperation_id"):
-        qs = qs.filter(cooperation_id=serializers.UUIDField().run_validation(request.query_params["cooperation_id"]))
+        qs = qs.filter(
+            cooperation_id=serializers.UUIDField().run_validation(
+                request.query_params["cooperation_id"]
+            )
+        )
     if request.query_params.get("search"):
         qs = qs.filter(organization__name__icontains=request.query_params["search"][:200])
     return paginated(

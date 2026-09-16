@@ -157,7 +157,11 @@ def create_version(actor, org_id, *, number, data):
 
         require(hasattr(org, "clinic"), "bilateral_contract_required", "签约主体请登记双方合同")
         clinic = get_clinic(actor, org.clinic.id)
-        require(not clinic.cooperation_id, "bilateral_contract_required", "请在门诊合作主体中登记双方合同，不能新建旧三方合同")
+        require(
+            not clinic.cooperation_id and clinic.contract_policy == "legacy",
+            "bilateral_contract_required",
+            "请在门诊合作主体中登记双方合同，不能新建旧三方合同",
+        )
         require(
             actor.platform or actor.organization.kind == "channel",
             "forbidden",
@@ -555,7 +559,9 @@ def resolve_fees(resource_id, clinic, product, *, at=None):
         "channel_term": term_snapshot(channel_term),
         "clinic_contract_id": str(clinic_contract.id),
         "cooperation_id": str(clinic.cooperation_id) if clinic.cooperation_id else None,
-        "debtor_id": str(clinic.cooperation.organization_id) if clinic.cooperation_id else str(clinic.organization_id),
+        "debtor_id": str(clinic.cooperation.organization_id)
+        if clinic.cooperation_id
+        else str(clinic.organization_id),
         "payment_mode": clinic_contract.payment_mode if clinic.cooperation_id else "postpaid",
         "product_version": product.version,
         "historical_fallback": {

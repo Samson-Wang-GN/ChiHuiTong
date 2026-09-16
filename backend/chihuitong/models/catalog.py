@@ -63,6 +63,7 @@ class FileAsset(Entity):
 
 
 class Clinic(Entity):
+    contract_policy = models.CharField(max_length=16, default="legacy")
     cooperation = models.ForeignKey(
         "ClinicCooperation", null=True, on_delete=models.PROTECT, related_name="clinics"
     )
@@ -223,6 +224,7 @@ class ClinicProduct(Entity):
 
 
 class ClinicCooperation(Entity):
+    credit_code = models.CharField(max_length=18, null=True, unique=True)
     organization = models.OneToOneField(
         Organization, on_delete=models.PROTECT, related_name="clinic_cooperation"
     )
@@ -232,12 +234,17 @@ class ClinicCooperation(Entity):
 
     class Meta:
         constraints = [
-            models.CheckConstraint(condition=Q(kind__in=["single", "chain"]), name="cooperation_kind")
+            models.CheckConstraint(
+                condition=Q(kind__in=["single", "chain"]), name="cooperation_kind"
+            )
         ]
 
 
 class ClinicAgreement(Entity):
-    cooperation = models.ForeignKey(ClinicCooperation, on_delete=models.PROTECT, related_name="agreements")
+    onboarding_change = models.OneToOneField("ClinicProfileChange", null=True, on_delete=models.PROTECT, related_name="onboarding_agreement")
+    cooperation = models.ForeignKey(
+        ClinicCooperation, on_delete=models.PROTECT, related_name="agreements"
+    )
     number = models.CharField(max_length=80)
     revision = models.PositiveIntegerField()
     status = models.CharField(max_length=16, default="draft")
@@ -254,22 +261,34 @@ class ClinicAgreement(Entity):
     submitted_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
     submitted_at = models.DateTimeField(null=True)
     due_at = models.DateTimeField(null=True)
-    reviewed_by = models.ForeignKey(Membership, null=True, on_delete=models.PROTECT, related_name="agreement_reviews")
+    reviewed_by = models.ForeignKey(
+        Membership, null=True, on_delete=models.PROTECT, related_name="agreement_reviews"
+    )
     reviewed_at = models.DateTimeField(null=True)
     reason = EncryptedTextField(default="")
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["cooperation", "revision"], name="agreement_revision"),
-            models.UniqueConstraint(fields=["cooperation"], condition=Q(status="pending"), name="one_pending_agreement"),
+            models.UniqueConstraint(
+                fields=["cooperation"], condition=Q(status="pending"), name="one_pending_agreement"
+            ),
             models.CheckConstraint(condition=Q(ends_at__gt=F("starts_at")), name="agreement_dates"),
-            models.CheckConstraint(condition=Q(payment_mode="instant", settlement_cycle="") | Q(payment_mode="postpaid", settlement_cycle__in=["weekly", "monthly"]), name="agreement_payment_cycle"),
+            models.CheckConstraint(
+                condition=Q(payment_mode="instant", settlement_cycle="")
+                | Q(payment_mode="postpaid", settlement_cycle__in=["weekly", "monthly"]),
+                name="agreement_payment_cycle",
+            ),
         ]
 
 
 class AgreementClinic(Entity):
-    agreement = models.ForeignKey(ClinicAgreement, on_delete=models.PROTECT, related_name="coverage")
+    agreement = models.ForeignKey(
+        ClinicAgreement, on_delete=models.PROTECT, related_name="coverage"
+    )
     clinic = models.ForeignKey(Clinic, on_delete=models.PROTECT, related_name="agreement_coverage")
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["agreement", "clinic"], name="agreement_clinic_once")]
+        constraints = [
+            models.UniqueConstraint(fields=["agreement", "clinic"], name="agreement_clinic_once")
+        ]

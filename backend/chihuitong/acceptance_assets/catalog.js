@@ -197,7 +197,8 @@
               h(
                 A.Tabs.TabPane,
                 { key: 'contracts', title: '合作合同' },
-                h(Contracts, { orgId: id, canManage: true }),
+                h(Contracts, { orgId: id, canManage: false }),
+                C.button('前往合同管理', () => C.navigate('contracts')),
               ),
               h(
                 A.Tabs.TabPane,
@@ -365,6 +366,7 @@
     });
   }
   C.Contracts = Contracts;
+  C.contractForm = contractForm;
   C.dialogs.contract = function ({ id, canManage = false, onClose }) {
     const q = C.useChoices(base + 'contract-versions/' + id),
       r = q.data;
@@ -415,7 +417,7 @@
                     '确认合同资料与全部附件完整后提交。',
                   ),
                 ),
-              C.role === 'platform' &&
+              canManage && C.role === 'platform' &&
                 r.status === 'pending' &&
                 C.button('审核合同', () =>
                   C.action(
@@ -426,7 +428,7 @@
                     C.reviewFields,
                   ),
                 ),
-              C.role === 'platform' &&
+              canManage && C.role === 'platform' &&
                 r.status === 'approved' &&
                 C.button('终止合同', () =>
                   C.action(
@@ -473,7 +475,7 @@
                 h(
                   A.Tabs.TabPane,
                   { key: 'products', title: '推广产品配置' },
-                  h(Terms, { contract: r }),
+                  h(Terms, { contract: r, canManage }),
                 ),
               h(
                 A.Tabs.TabPane,
@@ -485,9 +487,9 @@
       ),
     );
   };
-  function Terms({ contract }) {
+  function Terms({ contract, canManage = false }) {
     const edit = (row) => C.open('termForm', { contract, row });
-    const editable = C.role === 'platform' && ['draft', 'approved'].includes(contract.status);
+    const editable = canManage && C.role === 'platform' && ['draft', 'approved'].includes(contract.status);
     return h(C.List, {
       path: base + 'contract-versions/' + contract.id + '/products',
       toolbar: editable && h(A.Button, { type: 'primary', onClick: () => edit() }, '添加推广产品'),
@@ -624,7 +626,7 @@
                     extra: C.button('查看合同', () =>
                       C.open('contract', {
                         id: r.current_contract.id,
-                        canManage: C.role === 'platform',
+                        canManage: false,
                       }),
                     ),
                   },
@@ -657,7 +659,7 @@
                   extra: C.button('详情', () =>
                     C.open('contract', {
                       id: r.pending_contract.id,
-                      canManage: C.role === 'platform',
+                      canManage: false,
                     }),
                   ),
                 },
