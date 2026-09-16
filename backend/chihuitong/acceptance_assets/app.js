@@ -361,7 +361,8 @@
           member.role === 'admin' ||
           !(
             key === 'accounts' ||
-            (C.role === 'clinic' && ['clinicBills', 'clinics', 'contracts'].includes(key))
+            (C.role === 'clinic' &&
+              ['clinicBills', 'clinics', 'contracts'].includes(key))
           ),
       )
       .map(([key, title]) => [

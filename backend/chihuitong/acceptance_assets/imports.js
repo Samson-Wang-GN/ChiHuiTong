@@ -158,9 +158,7 @@
     );
     React.useEffect(() => {
       if (!q.data || q.data.id !== id) return;
-      setCurrent((previous) =>
-        previous?.id === q.data.id && previous.version > q.data.version ? previous : q.data,
-      );
+      setCurrent((previous) => previous?.id === q.data.id && previous.version > q.data.version ? previous : q.data);
       if (initial.current !== id && q.data.sheets.length) {
         const config = q.data.configuration?.sheet ? q.data.configuration : q.data.recommendation;
         setSheet(config?.sheet || q.data.sheets[0].name);
@@ -430,8 +428,7 @@
       current?.status === 'failed' &&
         h(A.Alert, {
           type: 'error',
-          content:
-            '文件读取或校验未完成。请检查文件内容，删除当前文件后重新上传；不会沿用之前的名单。',
+          content: '文件读取或校验未完成。请检查文件内容，删除当前文件后重新上传；不会沿用之前的名单。',
         }),
       (matching || current?.status === 'queued') &&
         h(A.Spin, {
