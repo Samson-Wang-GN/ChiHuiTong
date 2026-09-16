@@ -5,6 +5,7 @@ from . import api_appointments as appointments
 from . import api_audit as audit
 from . import api_catalog as catalog
 from . import api_cooperations as cooperations
+from . import api_contract_preparation as preparation
 from . import api_finance as finance
 from . import api_location as location
 from . import api_metrics as metrics
@@ -15,6 +16,10 @@ from . import api_sales as sales
 from . import api_workbench as workbench
 
 urlpatterns = [
+    path("contract-preparations", preparation.drafts),
+    path("contract-preparations/<uuid:preparation_id>", preparation.detail),
+    path("contract-preparations/<uuid:preparation_id>/<str:action>", preparation.action),
+    path("contract-templates", preparation.templates),
     path("health", api.health),
     path("auth/code", api.send_code),
     path("auth/login", api.login),

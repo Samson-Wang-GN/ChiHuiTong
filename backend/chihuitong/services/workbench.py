@@ -193,7 +193,7 @@ def sources(actor):
         items.append(
             TaskSource(
                 "contract_submission",
-                "门诊三方合同签订与续签",
+                "门诊合同签订与续签",
                 ContractVersion.objects.filter(
                     contract__in=accessible_contracts(actor), contract__kind="clinic"
                 ).exclude(status="pending"),

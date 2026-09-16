@@ -160,7 +160,7 @@ def create_version(actor, org_id, *, number, data):
         require(
             not clinic.cooperation_id and clinic.contract_policy == "legacy",
             "bilateral_contract_required",
-            "请在门诊合作主体中登记双方合同，不能新建旧三方合同",
+            "请通过门诊待签合同草稿办理双方合同",
         )
         require(
             actor.platform or actor.organization.kind == "channel",
@@ -291,7 +291,7 @@ def review_version(actor, version_id, *, approved, version, reason):
             require(
                 item.channel_id == clinic.channel_id,
                 "channel_changed",
-                "门诊渠道已变更，请重新签订当前三方合同",
+                "门诊渠道已变更，请联系平台核对适用合同",
             )
         latest = (
             item.contract.versions.filter(status="approved")

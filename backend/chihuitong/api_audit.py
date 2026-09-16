@@ -38,6 +38,9 @@ def visible_metadata(actor, value):
 
 
 def scoped_object(actor, object_type, object_id):
+    if object_type == "contractpreparation":
+        from .services.contract_preparation import get
+        return get(actor, object_id)
     if object_type in {"cliniccooperation", "clinicagreement"}:
         from .services import cooperations
 

@@ -331,7 +331,7 @@
             settlement_cycle: renewFrom?.settlement_cycle || 'monthly',
             number: renewFrom?.number || '',
           },
-      hint: '三方门诊合同由渠道提交、平台审核。月结付款期限为出账次日起5个自然日，周结为3个自然日；新周期适用于尚未出账交易。',
+      hint: '合同由平台统一管理。月结付款期限为出账次日起5个自然日，周结为3个自然日；新周期适用于尚未出账交易。',
       onSubmit: (v) => {
         const { number, reason, contact_name, contact_phone, ...values } = v;
         const data = {

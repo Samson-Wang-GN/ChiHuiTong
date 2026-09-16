@@ -44,23 +44,21 @@
   });
   C.jointFields = (products, existing) => [
     ...(!existing ? subjectFields : []),
-    { name: 'contract_number', label: '合同编号' },
     { name: 'contract_starts', label: '合同生效时间', type: 'date', time: true },
     { name: 'contract_ends', label: '合同到期时间', type: 'date', time: true },
     multi('contract_products', '申请上线的推广产品', productOptions(products)),
-    { name: 'contract_files', label: '门诊已签署的完整合同', type: 'files', purpose: 'contract' },
   ];
   C.jointData = (v, row) => ({
     ...(!row ? { subject: subjectData(v, 'single') } : {}),
     agreement: {
-      number: v.contract_number,
-      starts_at: C.iso(v.contract_starts),
-      ends_at: C.iso(v.contract_ends),
+      number: v.contract_number || '',
+      starts_at: v.contract_starts ? C.iso(v.contract_starts) : '',
+      ends_at: v.contract_ends ? C.iso(v.contract_ends) : '',
       payment_mode: 'instant',
       settlement_cycle: '',
       clinic_ids: [],
       product_ids: v.contract_products,
-      attachment_ids: v.contract_files,
+      attachment_ids: [],
       contact: { name: v.business_contact, phone: v.business_phone },
     },
   });
@@ -73,21 +71,20 @@
       C.role === 'resource'
         ? { resource: '客户资源方合同' }
         : C.role === 'channel'
-          ? { clinic: '门诊双方合同', channel: '本机构与平台合同', legacy: '历史三方合同' }
+          ? { clinic: '门诊合同', channel: '本机构与平台合同' }
           : C.role === 'clinic'
-            ? { clinic: '门诊双方合同', legacy: '历史三方合同' }
+            ? { clinic: '门诊合同' }
             : {
-                clinic: '门诊双方合同',
+                clinic: '门诊合同',
                 resource: '客户资源方合同',
                 channel: '门诊渠道合同',
-                legacy: '历史三方合同',
               };
     return h(
       C.Panel,
       {
         title: '合同管理',
         extra:
-          ((C.role === 'platform' && kind !== 'legacy') ||
+          ((C.role === 'platform') ||
             (C.role === 'channel' && kind === 'clinic')) &&
           h(
             A.Button,
@@ -102,6 +99,8 @@
       h(
         A.Space,
         { className: 'detail-actions' },
+        ['platform', 'channel'].includes(C.role) && C.button('待签合同草稿', () => C.open('preparations', {})),
+        C.role === 'platform' && C.button('合同模板配置', () => C.open('contractTemplates', {})),
         h('span', null, '合同类型'),
         h(A.Select, {
           value: kind,
@@ -132,7 +131,7 @@
           C.button('详情', () =>
             C.open(kind === 'clinic' ? 'agreement' : 'contract', {
               id: r.id,
-              canManage: C.role === 'platform' || (kind === 'legacy' && C.role === 'channel'),
+              canManage: C.role === 'platform',
             }),
           ),
       }),
@@ -176,12 +175,12 @@
       }),
     );
   };
-  C.dialogs.agreementForm = function ({ subject, row, onClose }) {
+  C.dialogs.agreementForm = function ({ subject, row, preparation, onClose }) {
     const subjects = C.useChoices(base + 'clinic-cooperations?page_size=100'),
       stores = C.useChoices(base + 'clinics?page_size=100'),
       products = C.useChoices(base + 'contracts/products?page_size=100');
-    const [selected, setSelected] = React.useState(subject?.id || 'new'),
-      [kind, setKind] = React.useState(subject?.kind || 'chain');
+    const [selected, setSelected] = React.useState(subject?.id || preparation?.payload.cooperation_id || 'new'),
+      [kind, setKind] = React.useState(subject?.kind || preparation?.kind || 'chain');
     const chosen = (subjects.data?.results || []).find((x) => x.id === selected),
       actualKind = chosen?.kind || kind;
     const fields = [
@@ -210,14 +209,14 @@
               label: '合作类型',
               render: () =>
                 h(A.Select, {
-                  options: C.options({ chain: '连锁总部', single: '独立单店（合同单独登记）' }),
+                  options: C.options({ chain: '连锁总部' }),
                   onChange: setKind,
                 }),
             },
             ...subjectFields,
           ]
         : []),
-      { name: 'number', label: '合同编号' },
+      ...(row ? [{ name: 'number', label: '合同编号' }] : []),
       ...dates,
       { name: 'contact_name', label: '业务联系人' },
       { name: 'contact_phone', label: '业务联系人电话' },
@@ -244,16 +243,26 @@
         true,
       ),
       multi('product_ids', '推广产品', productOptions(products.data?.results || [])),
-      { name: 'attachment_ids', label: '门诊签署完整合同', type: 'files', purpose: 'contract' },
+      ...(row ? [{ name: 'attachment_ids', label: '门诊签署完整合同', type: 'files', purpose: 'contract' }] : []),
     ];
     return h(C.FormDialog, {
       title: row ? '修改合同草稿' : '新增合同 / 续签',
       onClose,
-      fields,
+      fields: row ? fields : fields.map((f) => ({ ...f, optional: true })),
+      submitText: row ? '保存' : '保存待签草稿',
       initial: {
         subject_choice: selected,
         subject_kind: kind,
         settlement_cycle: 'monthly',
+        ...(preparation ? {
+          ...preparation.payload.agreement,
+          subject_name: preparation.payload.subject?.name,
+          subject_credit: preparation.payload.subject?.credit_code,
+          subject_admin: preparation.payload.subject?.admin_name,
+          subject_phone: preparation.payload.subject?.admin_phone,
+          contact_name: preparation.payload.agreement?.contact?.name,
+          contact_phone: preparation.payload.agreement?.contact?.phone,
+        } : {}),
         ...(row
           ? {
               ...row,
@@ -263,32 +272,26 @@
             }
           : {}),
       },
-      hint: '新主体随合同一起保存，无需单独建档。连锁可先保存草稿再补覆盖门店；最终审核前须补齐。单店首次入驻建议使用门店管理的联合申请。',
-      onSubmit: (v, key) => {
+      hint: '先保存待签草稿，再生成下载、打印签署、上传照片并提交。合同编号由系统生成。单店请从门诊管理开通。',
+      onSubmit: async (v, key) => {
         const data = {
           number: v.number,
-          starts_at: C.iso(v.starts_at),
-          ends_at: C.iso(v.ends_at),
+          starts_at: v.starts_at ? C.iso(v.starts_at) : '',
+          ends_at: v.ends_at ? C.iso(v.ends_at) : '',
           contact: { name: v.contact_name, phone: v.contact_phone },
           clinic_ids: v.clinic_ids || [],
           product_ids: v.product_ids,
-          attachment_ids: v.attachment_ids,
+          attachment_ids: v.attachment_ids || [],
           payment_mode: actualKind === 'chain' ? 'postpaid' : 'instant',
           settlement_cycle: actualKind === 'chain' ? v.settlement_cycle : '',
         };
-        return row
-          ? C.api(base + 'clinic-agreements/' + row.id, 'POST', { version: row.version, data }, key)
-          : C.api(
-              base + 'contracts',
-              'POST',
-              {
-                data,
-                ...(selected === 'new'
-                  ? { subject: subjectData(v, actualKind) }
-                  : { cooperation_id: selected }),
-              },
-              key,
-            );
+        if (row) return C.api(base + 'clinic-agreements/' + row.id, 'POST', { version: row.version, data }, key);
+        const saved = await C.api(base + 'contract-preparations' + (preparation ? '/' + preparation.id : ''), 'POST', {
+          kind: actualKind, payload: { agreement: data, ...(selected === 'new' ? { subject: subjectData(v, actualKind) } : { cooperation_id: selected }) },
+          ...(preparation ? { version: preparation.version } : {}),
+        }, key);
+        C.open('preparation', { id: saved.id });
+        return saved;
       },
     });
   };
@@ -525,6 +528,7 @@
             ),
           ),
           h(C.Panel, { title: '门诊签署件' }, h(C.Attachments, { ids: r.attachment_ids })),
+          r.generated_attachment_ids?.length > 0 && h(C.Panel, { title: '系统生成的待签合同（核对用）' }, h(C.Attachments, { ids: r.generated_attachment_ids })),
           h(
             C.Panel,
             { title: '双方最终签署件' },

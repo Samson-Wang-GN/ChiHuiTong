@@ -906,9 +906,9 @@
     clinic: {
       channel_changed: '变更所属渠道',
       confirmation_hours: '调整待确认时限',
-      contract_created: '登记三方合同',
-      contract_reviewed: '审核三方合同',
-      contract_terminated: '终止三方合同',
+      contract_created: '登记合同',
+      contract_reviewed: '审核合同',
+      contract_terminated: '终止合同',
       created: '建立门诊档案',
       product_status: '调整门诊推广产品',
       profile_reviewed: '审核门诊资料',

@@ -203,18 +203,19 @@ class OnboardingTests(TestCase):
             format="json",
             HTTP_IDEMPOTENCY_KEY="joint-synthetic-idempotency",
         )
-        self.assertEqual(first.status_code, 201, first.data)
+        self.assertEqual(first.status_code, 409, first.data)
         again = client.post(
             "/api/v1/clinic-onboarding",
             body,
             format="json",
             HTTP_IDEMPOTENCY_KEY="joint-synthetic-idempotency",
         )
-        self.assertEqual(first.data["id"], again.data["id"])
+        self.assertEqual(again.status_code, 409)
+        record = self.apply()
         self.assertEqual(ClinicCooperation.objects.count(), 1)
         other = api_client(self.other).get("/api/v1/contracts?kind=clinic")
         self.assertEqual(other.data["total"], 0)
         self.assertEqual(
-            api_client(self.other).get("/api/v1/clinic-agreements/" + first.data["id"]).status_code,
+            api_client(self.other).get("/api/v1/clinic-agreements/" + str(record.id)).status_code,
             404,
         )

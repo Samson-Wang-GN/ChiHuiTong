@@ -293,7 +293,8 @@ def validate_data(actor, item, data):
     for store in stores:
         for product_id in products:
             current_contract(store.channel_id, product_id=product_id)
-    validate_attachment_ids(actor, data["attachment_ids"], purposes={"contract"})
+    if data["attachment_ids"]:
+        validate_attachment_ids(actor, data["attachment_ids"], purposes={"contract"})
     assert_no_payment(ids)
     require(
         item.kind == "chain" or not item.clinics.exclude(pk__in=ids).exists(),
@@ -402,6 +403,7 @@ def submit_agreement(actor, agreement_id, *, version):
     assert_edit(actor, item.cooperation)
     check_version(item, version)
     require(item.status == "draft", "invalid_state", "仅草稿可提交审核")
+    require(item.attachment_ids, "signature_required", "请上传完整门诊签署件后再提交审核", 409)
     require(
         not item.cooperation.agreements.filter(status="pending").exists(),
         "pending_agreement",

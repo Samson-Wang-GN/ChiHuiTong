@@ -35,7 +35,7 @@ class AgreementInput(StrictSerializer):
         child=serializers.UUIDField(), min_length=1, max_length=1000
     )
     attachment_ids = serializers.ListField(
-        child=serializers.CharField(max_length=36), min_length=1, max_length=30
+        child=serializers.CharField(max_length=36), allow_empty=True, max_length=30
     )
 
 
@@ -99,21 +99,9 @@ class OnboardingInput(StrictSerializer):
 
 @api_view(["POST"])
 def onboarding_submit(request):
-    from .api_sales import command
-    from .services import onboarding
-
-    actor = request_actor(request)
-    data = validated(OnboardingInput, request)
-    return Response(
-        command(
-            request,
-            actor,
-            "onboarding.submit",
-            data,
-            lambda: agreement_projection(actor, onboarding.submit(actor, **data)),
-        ),
-        status=201,
-    )
+    request_actor(request)
+    from .errors import require
+    require(False, "preparation_required", "请先保存待签草稿、生成合同并上传签署件，再提交审核", 409)
 
 
 @api_view(["GET", "POST"])
@@ -141,7 +129,7 @@ def unified_contracts(request):
         )
     kind = request.query_params.get("kind", "clinic")
     require(
-        kind in {"clinic", "resource", "channel", "legacy"}, "invalid_kind", "合同类型不合法", 400
+        kind in {"clinic", "resource", "channel"}, "invalid_kind", "合同类型不合法", 400
     )
     word = request.query_params.get("search", "")[:160]
     if kind == "clinic":
@@ -161,7 +149,7 @@ def unified_contracts(request):
     qs = contracts.display_versions(
         ContractVersion.objects.select_related("contract__organization").filter(
             contract__in=contracts.accessible_contracts(actor),
-            contract__kind="clinic" if kind == "legacy" else kind,
+            contract__kind=kind,
         )
     )
     if word:
@@ -250,7 +238,11 @@ def agreement_projection(actor, item):
     stores = item.coverage.select_related("clinic__organization").filter(
         clinic__in=visible_clinics(actor)
     )
+    from .models import ContractPreparation
+    preparation = ContractPreparation.objects.filter(agreement=item).first()
+    generated = preparation.prints.filter(revision=preparation.generation).first() if preparation else None
     return {
+        "generated_attachment_ids": [str(generated.asset_id)] if generated and full else [],
         "id": str(item.id),
         "cooperation_id": str(item.cooperation_id),
         "subject_name": item.cooperation.organization.name,
