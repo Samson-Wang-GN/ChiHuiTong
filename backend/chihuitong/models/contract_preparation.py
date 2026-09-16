@@ -1,6 +1,7 @@
 from django.db import models
 
 from chihuitong.crypto import EncryptedJSONField, EncryptedTextField
+
 from .core import Entity, Membership
 
 
@@ -27,7 +28,9 @@ class ContractPreparation(Entity):
 
 
 class ContractPrint(Entity):
-    preparation = models.ForeignKey(ContractPreparation, on_delete=models.PROTECT, related_name="prints")
+    preparation = models.ForeignKey(
+        ContractPreparation, on_delete=models.PROTECT, related_name="prints"
+    )
     template = models.ForeignKey(ContractTemplate, on_delete=models.PROTECT)
     revision = models.PositiveIntegerField()
     snapshot = EncryptedJSONField()
@@ -35,4 +38,8 @@ class ContractPrint(Entity):
     asset = models.OneToOneField("FileAsset", on_delete=models.PROTECT)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["preparation", "revision"], name="contract_print_revision")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["preparation", "revision"], name="contract_print_revision"
+            )
+        ]

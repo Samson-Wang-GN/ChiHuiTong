@@ -4,8 +4,8 @@ from . import api
 from . import api_appointments as appointments
 from . import api_audit as audit
 from . import api_catalog as catalog
-from . import api_cooperations as cooperations
 from . import api_contract_preparation as preparation
+from . import api_cooperations as cooperations
 from . import api_finance as finance
 from . import api_location as location
 from . import api_metrics as metrics

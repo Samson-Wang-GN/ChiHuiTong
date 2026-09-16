@@ -204,7 +204,10 @@ def can_read_file(actor, asset):
     if actor.organization.kind == "clinic" and actor.membership.role != "admin":
         return False
     from chihuitong.models import ContractPreparation
-    drafts = ContractPreparation.objects.filter(pk__in=asset.links.filter(object_type="contractpreparation").values("object_id"))
+
+    drafts = ContractPreparation.objects.filter(
+        pk__in=asset.links.filter(object_type="contractpreparation").values("object_id")
+    )
     if drafts.exists() and actor.organization.kind == "channel":
         allowed = drafts.filter(owner__organization=actor.organization)
         if actor.membership.role != "admin":

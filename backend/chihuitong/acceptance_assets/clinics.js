@@ -504,7 +504,9 @@
   };
   C.dialogs.clinicForm = function ({ row, draft, joint = false, agreement, preparation, onClose }) {
     const [channel, setChannel] = React.useState(
-      row?.channel_id || preparation?.payload.clinic?.channel_id || (C.role === 'channel' ? C.actor.organization_id : ''),
+      row?.channel_id ||
+        preparation?.payload.clinic?.channel_id ||
+        (C.role === 'channel' ? C.actor.organization_id : ''),
     );
     const channels = C.useChoices(
       C.role === 'platform' ? base + 'organizations?status=active&page_size=100' : null,
@@ -591,17 +593,19 @@
       onClose,
       fields: joint ? fields.map((f) => ({ ...f, optional: true })) : fields,
       initial: {
-        ...(preparation ? {
-          contract_starts: preparation.payload.agreement?.starts_at,
-          contract_ends: preparation.payload.agreement?.ends_at,
-          contract_products: preparation.payload.agreement?.product_ids,
-          subject_name: preparation.payload.subject?.name,
-          subject_credit: preparation.payload.subject?.credit_code,
-          subject_admin: preparation.payload.subject?.admin_name,
-          subject_phone: preparation.payload.subject?.admin_phone,
-          admin_name: preparation.payload.clinic?.admin_name,
-          admin_phone: preparation.payload.clinic?.admin_phone,
-        } : {}),
+        ...(preparation
+          ? {
+              contract_starts: preparation.payload.agreement?.starts_at,
+              contract_ends: preparation.payload.agreement?.ends_at,
+              contract_products: preparation.payload.agreement?.product_ids,
+              subject_name: preparation.payload.subject?.name,
+              subject_credit: preparation.payload.subject?.credit_code,
+              subject_admin: preparation.payload.subject?.admin_name,
+              subject_phone: preparation.payload.subject?.admin_phone,
+              admin_name: preparation.payload.clinic?.admin_name,
+              admin_phone: preparation.payload.clinic?.admin_phone,
+            }
+          : {}),
         ...(agreement
           ? {
               contract_number: agreement.number,
@@ -618,7 +622,9 @@
         location: profile.location || { status: 'unconfirmed' },
       },
       submitText: joint ? '保存待签草稿' : row ? '提交变更审核' : '保存门诊资料',
-      hint: joint ? '可先保存不完整资料。补齐合同项后生成下载，门诊签署并上传照片后再统一提交审核；保存草稿不会开通营业。' : '已审核门诊的所有修改均须再次审核。业务联系人及电话必填，不在客户小程序公开。地址变化后须重新核对地图。',
+      hint: joint
+        ? '可先保存不完整资料。补齐合同项后生成下载，门诊签署并上传照片后再统一提交审核；保存草稿不会开通营业。'
+        : '已审核门诊的所有修改均须再次审核。业务联系人及电话必填，不在客户小程序公开。地址变化后须重新核对地图。',
       onSubmit: async (v, key) => {
         const jointData = joint ? C.jointData(v, row) : null;
         v = { ...v };
@@ -639,13 +645,13 @@
               kind: 'single',
               ...(preparation ? { version: preparation.version } : {}),
               payload: {
-              ...jointData,
-              clinic: {
-                channel_id: channel_id || row?.channel_id,
-                ...(!row ? { admin_name, admin_phone } : {}),
-                profile: next,
-              },
-              ...(row ? { clinic_id: row.id, version: row.version } : {}),
+                ...jointData,
+                clinic: {
+                  channel_id: channel_id || row?.channel_id,
+                  ...(!row ? { admin_name, admin_phone } : {}),
+                  profile: next,
+                },
+                ...(row ? { clinic_id: row.id, version: row.version } : {}),
               },
             },
             key,

@@ -84,8 +84,7 @@
       {
         title: '合同管理',
         extra:
-          ((C.role === 'platform') ||
-            (C.role === 'channel' && kind === 'clinic')) &&
+          (C.role === 'platform' || (C.role === 'channel' && kind === 'clinic')) &&
           h(
             A.Button,
             {
@@ -99,7 +98,8 @@
       h(
         A.Space,
         { className: 'detail-actions' },
-        ['platform', 'channel'].includes(C.role) && C.button('待签合同草稿', () => C.open('preparations', {})),
+        ['platform', 'channel'].includes(C.role) &&
+          C.button('待签合同草稿', () => C.open('preparations', {})),
         C.role === 'platform' && C.button('合同模板配置', () => C.open('contractTemplates', {})),
         h('span', null, '合同类型'),
         h(A.Select, {
@@ -179,7 +179,9 @@
     const subjects = C.useChoices(base + 'clinic-cooperations?page_size=100'),
       stores = C.useChoices(base + 'clinics?page_size=100'),
       products = C.useChoices(base + 'contracts/products?page_size=100');
-    const [selected, setSelected] = React.useState(subject?.id || preparation?.payload.cooperation_id || 'new'),
+    const [selected, setSelected] = React.useState(
+        subject?.id || preparation?.payload.cooperation_id || 'new',
+      ),
       [kind, setKind] = React.useState(subject?.kind || preparation?.kind || 'chain');
     const chosen = (subjects.data?.results || []).find((x) => x.id === selected),
       actualKind = chosen?.kind || kind;
@@ -243,7 +245,16 @@
         true,
       ),
       multi('product_ids', '推广产品', productOptions(products.data?.results || [])),
-      ...(row ? [{ name: 'attachment_ids', label: '门诊签署完整合同', type: 'files', purpose: 'contract' }] : []),
+      ...(row
+        ? [
+            {
+              name: 'attachment_ids',
+              label: '门诊签署完整合同',
+              type: 'files',
+              purpose: 'contract',
+            },
+          ]
+        : []),
     ];
     return h(C.FormDialog, {
       title: row ? '修改合同草稿' : '新增合同 / 续签',
@@ -254,15 +265,17 @@
         subject_choice: selected,
         subject_kind: kind,
         settlement_cycle: 'monthly',
-        ...(preparation ? {
-          ...preparation.payload.agreement,
-          subject_name: preparation.payload.subject?.name,
-          subject_credit: preparation.payload.subject?.credit_code,
-          subject_admin: preparation.payload.subject?.admin_name,
-          subject_phone: preparation.payload.subject?.admin_phone,
-          contact_name: preparation.payload.agreement?.contact?.name,
-          contact_phone: preparation.payload.agreement?.contact?.phone,
-        } : {}),
+        ...(preparation
+          ? {
+              ...preparation.payload.agreement,
+              subject_name: preparation.payload.subject?.name,
+              subject_credit: preparation.payload.subject?.credit_code,
+              subject_admin: preparation.payload.subject?.admin_name,
+              subject_phone: preparation.payload.subject?.admin_phone,
+              contact_name: preparation.payload.agreement?.contact?.name,
+              contact_phone: preparation.payload.agreement?.contact?.phone,
+            }
+          : {}),
         ...(row
           ? {
               ...row,
@@ -285,11 +298,28 @@
           payment_mode: actualKind === 'chain' ? 'postpaid' : 'instant',
           settlement_cycle: actualKind === 'chain' ? v.settlement_cycle : '',
         };
-        if (row) return C.api(base + 'clinic-agreements/' + row.id, 'POST', { version: row.version, data }, key);
-        const saved = await C.api(base + 'contract-preparations' + (preparation ? '/' + preparation.id : ''), 'POST', {
-          kind: actualKind, payload: { agreement: data, ...(selected === 'new' ? { subject: subjectData(v, actualKind) } : { cooperation_id: selected }) },
-          ...(preparation ? { version: preparation.version } : {}),
-        }, key);
+        if (row)
+          return C.api(
+            base + 'clinic-agreements/' + row.id,
+            'POST',
+            { version: row.version, data },
+            key,
+          );
+        const saved = await C.api(
+          base + 'contract-preparations' + (preparation ? '/' + preparation.id : ''),
+          'POST',
+          {
+            kind: actualKind,
+            payload: {
+              agreement: data,
+              ...(selected === 'new'
+                ? { subject: subjectData(v, actualKind) }
+                : { cooperation_id: selected }),
+            },
+            ...(preparation ? { version: preparation.version } : {}),
+          },
+          key,
+        );
         C.open('preparation', { id: saved.id });
         return saved;
       },
@@ -528,7 +558,12 @@
             ),
           ),
           h(C.Panel, { title: '门诊签署件' }, h(C.Attachments, { ids: r.attachment_ids })),
-          r.generated_attachment_ids?.length > 0 && h(C.Panel, { title: '系统生成的待签合同（核对用）' }, h(C.Attachments, { ids: r.generated_attachment_ids })),
+          r.generated_attachment_ids?.length > 0 &&
+            h(
+              C.Panel,
+              { title: '系统生成的待签合同（核对用）' },
+              h(C.Attachments, { ids: r.generated_attachment_ids }),
+            ),
           h(
             C.Panel,
             { title: '双方最终签署件' },

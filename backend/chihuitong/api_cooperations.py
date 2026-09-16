@@ -101,7 +101,10 @@ class OnboardingInput(StrictSerializer):
 def onboarding_submit(request):
     request_actor(request)
     from .errors import require
-    require(False, "preparation_required", "请先保存待签草稿、生成合同并上传签署件，再提交审核", 409)
+
+    require(
+        False, "preparation_required", "请先保存待签草稿、生成合同并上传签署件，再提交审核", 409
+    )
 
 
 @api_view(["GET", "POST"])
@@ -109,28 +112,15 @@ def unified_contracts(request):
     from django.db.models import Q
 
     from .api_catalog import contract_projection
-    from .api_sales import command
     from .errors import require
     from .models import ClinicAgreement, ContractVersion
     from .services import contracts
 
     actor = request_actor(request)
     if request.method == "POST":
-        data = validated(StartInput, request)
-        return Response(
-            command(
-                request,
-                actor,
-                "agreement.start",
-                data,
-                lambda: agreement_projection(actor, cooperations.start_agreement(actor, **data)),
-            ),
-            status=201,
-        )
+        require(False, "preparation_required", "请通过待签合同草稿生成合同并上传签署件", 409)
     kind = request.query_params.get("kind", "clinic")
-    require(
-        kind in {"clinic", "resource", "channel"}, "invalid_kind", "合同类型不合法", 400
-    )
+    require(kind in {"clinic", "resource", "channel"}, "invalid_kind", "合同类型不合法", 400)
     word = request.query_params.get("search", "")[:160]
     if kind == "clinic":
         qs = ClinicAgreement.objects.select_related("cooperation__organization").filter(
@@ -239,8 +229,11 @@ def agreement_projection(actor, item):
         clinic__in=visible_clinics(actor)
     )
     from .models import ContractPreparation
+
     preparation = ContractPreparation.objects.filter(agreement=item).first()
-    generated = preparation.prints.filter(revision=preparation.generation).first() if preparation else None
+    generated = (
+        preparation.prints.filter(revision=preparation.generation).first() if preparation else None
+    )
     return {
         "generated_attachment_ids": [str(generated.asset_id)] if generated and full else [],
         "id": str(item.id),
@@ -319,10 +312,9 @@ def agreements(request, cooperation_id):
     actor = request_actor(request)
     item = cooperations.get_cooperation(actor, cooperation_id)
     if request.method == "POST":
-        value = cooperations.save_agreement(
-            actor, cooperation_id, data=validated(AgreementInput, request)
-        )
-        return Response(agreement_projection(actor, value), status=201)
+        from .errors import require
+
+        require(False, "preparation_required", "请通过待签合同草稿办理新签或续签", 409)
     return paginated(
         request,
         item.agreements.select_related("cooperation__organization"),

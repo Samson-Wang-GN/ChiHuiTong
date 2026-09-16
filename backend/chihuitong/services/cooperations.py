@@ -506,7 +506,8 @@ def review_agreement(actor, agreement_id, *, version, approved, reason, final=Fa
                 "请先登记原件收件及平台签署时间",
             )
             validate_attachment_ids(actor, item.signed_attachment_ids, purposes={"contract"})
-            require(item.coverage.exists(), "coverage_required", "合同缺少覆盖门店")
+            require(item.cooperation.kind == "chain" or item.coverage.exists(),
+                    "coverage_required", "单店合同缺少覆盖门店")
             # Lock the covered clinics before checking any in-flight payment.
             clinic_ids = list(item.coverage.values_list("clinic_id", flat=True))
             stores = list(

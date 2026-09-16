@@ -1,6 +1,6 @@
 from .catalog import *  # noqa: F403
-from .core import *  # noqa: F403
 from .contract_preparation import *  # noqa: F403
+from .core import *  # noqa: F403
 from .finance import *  # noqa: F403
 from .fulfillment import *  # noqa: F403
 from .mini import *  # noqa: F403
