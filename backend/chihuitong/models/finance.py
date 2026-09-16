@@ -182,7 +182,7 @@ class InstantRedemptionOrder(Entity):
         constraints = [
             models.UniqueConstraint(
                 fields=["appointment"],
-                condition=Q(status__in=["pending", "paid", "completed"]),
+                condition=Q(status__in=["pending", "completed"]),
                 name="one_active_instant_order",
             ),
             models.CheckConstraint(

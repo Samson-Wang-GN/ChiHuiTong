@@ -218,3 +218,36 @@ class CooperationTests(TestCase):
             self.assertRaises(BusinessError),
         ):
             cooperations.assert_payment_ready()
+
+    def test_zero_fee_completes_without_inventing_receipt(self):
+        appointment = self.instant_setup()
+        self.product.fee_cents = 0
+        self.product.save(update_fields=["fee_cents"])
+        with patch("django.utils.timezone.now", return_value=self.scheduled + timedelta(hours=1)):
+            quote = appointments.redemption_quote(self.clinic_actor, appointment.id, credential=self.card.credential)
+            item = instant.create(self.clinic_actor, appointment.id, credential=self.card.credential, confirmed=True, version=quote["version"], quote=quote["quote"], key="zero-fee-synthetic")
+        self.assertEqual(item.status, "completed")
+        self.assertEqual(item.receipts.count(), 0)
+        self.assertEqual(item.payment_attempts.count(), 0)
+
+    def test_late_success_retains_funds_when_replacement_order_exists(self):
+        appointment = self.instant_setup()
+        with patch("django.utils.timezone.now", return_value=self.scheduled + timedelta(hours=1)), patch("chihuitong.services.instant.prepare"):
+            def create(key):
+                quote = appointments.redemption_quote(self.clinic_actor, appointment.id, credential=self.card.credential)
+                return instant.create(self.clinic_actor, appointment.id, credential=self.card.credential, confirmed=True, version=quote["version"], quote=quote["quote"], key=key)
+            first = create("late-first-synthetic")
+            attempt = first.payment_attempts.get()
+            data = {"appid":attempt.appid,"mchid":attempt.mchid,"out_trade_no":attempt.number,"amount":{"total":attempt.amount_cents,"currency":"CNY"},"trade_state":"CLOSED"}
+            instant.observe(attempt.id, data)
+            appointment.refresh_from_db()
+            self.assertGreater(appointment.version, first.appointment_version)
+            second = create("late-second-synthetic")
+            instant.observe(attempt.id, {**data,"trade_state":"SUCCESS","trade_type":"NATIVE","transaction_id":"late-synthetic-reference","success_time":timezone.now().isoformat()})
+            first.refresh_from_db()
+            self.assertEqual(first.status,"paid")
+            self.assertEqual(first.receipts.count(),1)
+            with self.assertRaises(BusinessError):
+                instant.complete(first.id)
+            self.assertEqual(second.status,"pending")
+            self.assertEqual(Redemption.objects.filter(appointment=appointment).count(),0)

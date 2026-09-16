@@ -49,6 +49,30 @@ class StartInput(StrictSerializer):
     data = AgreementInput()
 
 
+@api_view(["GET"])
+def product_choices(request):
+    from .errors import BusinessError, require
+    from .models import Product
+    from .services import catalog, clinics, contracts
+
+    actor = request_actor(request)
+    require(actor.platform or actor.organization.kind in {"channel", "clinic"}, "forbidden", "无权查看门诊合同产品", 403)
+    if actor.organization.kind == "clinic":
+        actor.require_admin()
+    qs = Product.objects.filter(status="active")
+    if not actor.platform:
+        channels = [actor.organization.id] if actor.organization.kind == "channel" else clinics.visible_clinics(actor).values_list("channel_id", flat=True).distinct()
+        ids = set()
+        for channel_id in channels:
+            try:
+                contract = contracts.current_contract(channel_id)
+            except BusinessError:
+                continue
+            ids.update(contract.products.filter(status="active").values_list("product_id", flat=True))
+        qs = qs.filter(pk__in=ids)
+    return paginated(request, qs, catalog.product_snapshot, states=["active"])
+
+
 class OnboardingClinicInput(ClinicInput):
     admin_name = serializers.CharField(max_length=100, required=False)
     admin_phone = serializers.CharField(max_length=40, required=False)

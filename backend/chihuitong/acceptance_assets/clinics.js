@@ -514,7 +514,7 @@
         : null,
     );
     const profile = draft || row?.profile || {};
-    const jointProducts = C.useChoices(joint ? base + 'products?page_size=100' : null);
+    const jointProducts = C.useChoices(joint ? base + 'contracts/products?page_size=100' : null);
     const subjects = C.useChoices(!row ? base + 'clinic-cooperations?page_size=100' : null);
     const fields = [
       ...(!row

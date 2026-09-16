@@ -179,7 +179,7 @@
   C.dialogs.agreementForm = function ({ subject, row, onClose }) {
     const subjects = C.useChoices(base + 'clinic-cooperations?page_size=100'),
       stores = C.useChoices(base + 'clinics?page_size=100'),
-      products = C.useChoices(base + 'products?page_size=100');
+      products = C.useChoices(base + 'contracts/products?page_size=100');
     const [selected, setSelected] = React.useState(subject?.id || 'new'),
       [kind, setKind] = React.useState(subject?.kind || 'chain');
     const chosen = (subjects.data?.results || []).find((x) => x.id === selected),

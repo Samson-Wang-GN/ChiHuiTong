@@ -186,7 +186,7 @@ def prepare(attempt_id):
 @transaction.atomic
 def observe(attempt_id, data):
     ref = PaymentAttempt.objects.select_related("instant_order").get(pk=attempt_id)
-    appointments.locked_appointment(ref.instant_order.appointment_id, allow_payment=True)
+    appointment, _ = appointments.locked_appointment(ref.instant_order.appointment_id, allow_payment=True)
     order = InstantRedemptionOrder.objects.select_for_update().get(pk=ref.instant_order_id)
     attempt = PaymentAttempt.objects.select_for_update().get(pk=attempt_id)
     state = payments.validate_observation(attempt, data)
@@ -242,10 +242,15 @@ def observe(attempt_id, data):
             attempt.error_code = "external_refund_review"
             advance(attempt, "error_code")
     elif state == "CLOSED":
+        if attempt.status == "closed":
+            return attempt
         attempt.status, attempt.gateway_payload = "closed", {}
         order.status = "closed"
         advance(attempt, "status", "gateway_payload")
         advance(order, "status")
+        # A deadline job skipped during payment must become eligible again after trusted closure.
+        advance(appointment)
+        appointments.appointment_event(appointment)
         audit(None, order, "instant.closed")
     else:
         attempt.status = "pending" if state == "NOTPAY" else "unknown"
@@ -264,6 +269,7 @@ def complete(order_id):
     )
     if item.status == "completed":
         return item
+    require(not appointment.instant_orders.exclude(pk=item.id).filter(status__in=["pending", "paid", "completed"]).exists(), "payment_conflict", "存在其他待核对付款，请平台核对收款事实；不要重复支付")
     require(
         item.status == "paid" and item.paid_at and (item.amount_cents == 0 or item.receipts.exists()),
         "payment_pending",

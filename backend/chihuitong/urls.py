@@ -43,6 +43,7 @@ urlpatterns = [
     path("clinics", catalog.clinic_list),
     path("clinic-cooperations", cooperations.cooperation_list),
     path("contracts", cooperations.unified_contracts),
+    path("contracts/products", cooperations.product_choices),
     path("clinic-onboarding", cooperations.onboarding_submit),
     path("clinic-cooperations/<uuid:cooperation_id>", cooperations.cooperation_detail),
     path("clinic-cooperations/<uuid:cooperation_id>/attach", cooperations.attach),
