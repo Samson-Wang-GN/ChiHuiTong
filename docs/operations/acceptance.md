@@ -10,7 +10,9 @@ REQ-045 / TASK-090 / ADR-0028（沿用REQ-044独立部署保护）。仅在开�
 
 ## 本次范围
 
-2026-09-16最新应用：`9b737ec5fd7b7d1267bd3dc280e6e79c48718143`，REQ-048～050统一合同、单店联合入驻、连锁主体后付与单店现付后台。0017～0019迁移通过；发布前后1098条核心业务ID摘要相同。数据库备份`runtime/acceptance/before-20260916T050637Z.dump`；旧部署/应用和worker服务文件、私有配置/附件备份位于`runtime/acceptance/release-backups/9b737ec5fd7b7d1267bd3dc280e6e79c48718143/`，仅服务器私有权限保存。
+2026-09-16最新应用：`675696e545d57918ef0e70c61caec16c588de46c`，REQ-051支持待签草稿、平台模板配置、生成PDF/下载打印、签署照片回传与版本校验；门诊合同仅平台与门诊签约主体双方。迁移0020只增表。204项后端及四角色业务/合同回归、真实HTTPS`20260916T061312Z-acceptance-browser`通过。发布前后1098条核心ID、私有环境配置及共享站点不变；模板表为0条，需平台配置认可的正式正文。数据库备份`runtime/acceptance/before-20260916T061237Z.dump`，其他私有回退资料位于`runtime/acceptance/release-backups/675696e545d57918ef0e70c61caec16c588de46c/`。操作与限制见[合同生成交付](../contract-generation-review.md)。
+
+上一轮应用：`9b737ec5fd7b7d1267bd3dc280e6e79c48718143`，REQ-048～050统一合同、单店联合入驻、连锁主体后付与单店现付后台。0017～0019迁移通过；发布前后1098条核心业务ID摘要相同。数据库备份`runtime/acceptance/before-20260916T050637Z.dump`；旧部署/应用和worker服务文件、私有配置/附件备份位于`runtime/acceptance/release-backups/9b737ec5fd7b7d1267bd3dc280e6e79c48718143/`，仅服务器私有权限保存。
 
 真实HTTPS回归`20260916T050727Z-acceptance-browser/summary.json`通过：四角色登录/菜单/详情/窄屏/退出、入口401/绕过403、应用重启及原站点检查。197项后端、四角色完整业务回归均在发布前通过。支付/短信仍为显式模拟，既有地图私有Key及用户资料保留。旧程序不识别新收款/主体模型，有新写入时禁止直接还原旧库；详细回退边界、测试及操作路径见[本轮交付](../contract-onboarding-review.md)。以下为历史版本，不能将df52809视作当前应用。
 
