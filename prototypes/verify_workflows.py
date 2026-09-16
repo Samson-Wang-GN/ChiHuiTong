@@ -91,7 +91,7 @@ def verify():
         button('补齐演示资质与照片').click()
         button('保存门诊资料').click()
         button('提交资料审核').click()
-        tab('合同与续签');button('签订三方合同').click()
+        tab('合同与续签');button('签订门诊合同').click()
         page.get_by_label('合同编号',exact=True).fill('TEST-FIRST-001')
         button('使用演示附件').click();button('提交平台审核').click()
         c=next(r for r in next(p for p in data('channel') if p['id']=='clinics')['rows'] if r['name']=='首签测试门诊（演示）')
@@ -99,7 +99,7 @@ def verify():
         assert c['contractVersions'][0]['status']=='待审核'
         tab('推广产品')
         button('上线').first.click()
-        page.get_by_text('授权、门诊资质、有效三方合同或服务状态不满足，不能上线。',exact=True).wait_for()
+        page.get_by_text('授权、门诊资质、有效门诊合同或服务状态不满足，不能上线。',exact=True).wait_for()
         print('clinic creation / required fields / materials / first signing / pending blocks launch passed',flush=True)
 
         go('platform','clinics')

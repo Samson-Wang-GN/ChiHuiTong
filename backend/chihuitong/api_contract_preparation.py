@@ -48,7 +48,9 @@ def projection(item):
         "signed_ids": item.signed_ids,
         "signed_generation": item.signed_generation,
         "generated_file_id": str(printed.asset_id) if printed else None,
-        "print_changed": bool(printed and printed.snapshot.get("input") != service.contract_input(item.payload)),
+        "print_changed": bool(
+            printed and printed.snapshot.get("input") != service.contract_input(item.payload)
+        ),
         "agreement_id": str(item.agreement_id) if item.agreement_id else None,
         "created_at": item.created_at.isoformat(),
     }

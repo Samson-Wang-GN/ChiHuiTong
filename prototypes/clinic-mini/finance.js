@@ -62,6 +62,6 @@ window.ClinicFinance=(()=>{
       ...b.submissions.map((s,i)=>card('付款凭证 '+(i+1),s.status,h(React.Fragment,null,row('金额',s.amount.toFixed(2)+'元'),row('付款时间',s.date.replace('T',' ')),...s.files.map((f,n)=>h(arco.Image,{key:n,src:f.url,alt:'已提交付款凭证',width:100})),note('由平台管理员审核，门诊没有审核确认收款入口。')))),
       card('操作记录',null,h(Mini.StateList,{states:['已记录'],items:b.logs.map(l=>({...l,status:'已记录'})),render:l=>h('div',{key:l.id},row('操作时间',new Date(l.time).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'})),h('p',null,l.actor+' · '+l.label))})),btn('返回账单与收款',()=>go('bills'),{type:'secondary'}));
   }
-  function Contract(){return h(React.Fragment,null,heading('门诊三方合同'),card('平台 / 启明渠道 / 明禾口腔','生效中',h(React.Fragment,null,row('合同编号','HT-MH-DEMO'),row('生效日期','2026-01-01'),row('到期日期','2026-09-30'),row('结算周期','周结'),row('付款期限','出账次日起3个自然日'),note('合同即将到期，请联系渠道业务员签订续签，由平台审核。门诊不可自行修改或审核。'),note('原型合同摘要为虚构样例，未接入真实合同附件。'))));}
+  function Contract(){return h(React.Fragment,null,heading('门诊合同'),card('平台 / 明禾口腔签约主体','生效中',h(React.Fragment,null,row('合同编号','HT-MH-DEMO'),row('生效日期','2026-01-01'),row('到期日期','2026-09-30'),row('结算周期','周结'),row('付款期限','出账次日起3个自然日'),note('合同即将到期，请联系渠道业务员签订续签，由平台审核。门诊不可自行修改或审核。'),note('原型合同摘要为虚构样例，未接入真实合同附件。'))));}
   return {reverse,admin,migrate,act,Bill,Contract};
 })();

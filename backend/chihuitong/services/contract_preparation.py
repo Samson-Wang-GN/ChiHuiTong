@@ -13,7 +13,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from chihuitong.errors import require
-from chihuitong.models import ContractPreparation, ContractPrint, ContractTemplate, FileAsset, Product
+from chihuitong.models import (
+    ContractPreparation,
+    ContractPrint,
+    ContractTemplate,
+    FileAsset,
+    Product,
+)
 
 from . import cooperations, files
 from .common import advance, advisory_lock, audit, check_version
@@ -144,8 +150,12 @@ def save(actor, *, kind, payload, pk=None, version=None):
 
             payload[key] = str(serializers.UUIDField().run_validation(payload[key]))
     subject = payload.get("subject", {})
-    require(all(isinstance(subject.get(k, ""), str) for k in ("name", "credit_code")),
-            "invalid_payload", "主体名称及信用代码必须为文本", 400)
+    require(
+        all(isinstance(subject.get(k, ""), str) for k in ("name", "credit_code")),
+        "invalid_payload",
+        "主体名称及信用代码必须为文本",
+        400,
+    )
     if not actor.platform:
         from .contracts import current_contract
 
@@ -159,9 +169,15 @@ def save(actor, *, kind, payload, pk=None, version=None):
         )
     ids = payload_files(payload)
     profile = payload.get("clinic", {}).get("profile", {})
-    require(all(isinstance(profile.get(k, ""), str) for k in
-                ("name", "legal_entity", "province", "city", "district", "address")),
-            "invalid_payload", "门诊名称和地址必须为文本", 400)
+    require(
+        all(
+            isinstance(profile.get(k, ""), str)
+            for k in ("name", "legal_entity", "province", "city", "district", "address")
+        ),
+        "invalid_payload",
+        "门诊名称和地址必须为文本",
+        400,
+    )
     if ids:
         files.validate_attachment_ids(actor, ids, purposes={"cover", "license"})
     payload = json.loads(json.dumps(payload, default=str))
@@ -273,10 +289,13 @@ def snapshot(actor, item, tpl):
         require(
             clinics.count() == len(set(data["clinic_ids"])), "forbidden", "包含无权签约的门店", 403
         )
-        require(item.kind == "chain" or clinics.exists(), "coverage_required", "请选择覆盖门店", 400)
-        stores = "；".join(
-            c.organization.name + " " + c.profile.get("address", "") for c in clinics
-        ) or "尚未绑定门店（待门店审核后逐步接入）"
+        require(
+            item.kind == "chain" or clinics.exists(), "coverage_required", "请选择覆盖门店", 400
+        )
+        stores = (
+            "；".join(c.organization.name + " " + c.profile.get("address", "") for c in clinics)
+            or "尚未绑定门店（待门店审核后逐步接入）"
+        )
     values = {
         "number": item.number,
         "platform_name": tpl.platform_name,
@@ -335,12 +354,21 @@ def pdf_bytes(data, revision):
         "title", parent=normal, fontSize=17, leading=25, alignment=1, spaceAfter=20
     )
     story = [Paragraph(escape(data["title"]), title)]
-    labels = [("合同编号", "number"), ("平台签约主体", "platform_name"),
-              ("平台信用代码", "platform_credit_code"), ("门诊签约主体", "subject_name"),
-              ("门诊主体信用代码", "subject_credit_code"), ("生效时间", "starts_at"),
-              ("到期时间", "ends_at"), ("付款方式", "payment_mode"), ("结算周期", "settlement_cycle"),
-              ("推广产品及费用", "products"), ("覆盖门店", "stores"),
-              ("业务联系人", "contact_name"), ("联系电话", "contact_phone")]
+    labels = [
+        ("合同编号", "number"),
+        ("平台签约主体", "platform_name"),
+        ("平台信用代码", "platform_credit_code"),
+        ("门诊签约主体", "subject_name"),
+        ("门诊主体信用代码", "subject_credit_code"),
+        ("生效时间", "starts_at"),
+        ("到期时间", "ends_at"),
+        ("付款方式", "payment_mode"),
+        ("结算周期", "settlement_cycle"),
+        ("推广产品及费用", "products"),
+        ("覆盖门店", "stores"),
+        ("业务联系人", "contact_name"),
+        ("联系电话", "contact_phone"),
+    ]
     for label, key in labels:
         story.append(Paragraph(escape(f"{label}：{data['values'][key]}"), normal))
     story.append(Spacer(1, 12))
@@ -421,12 +449,22 @@ def sign(actor, pk, *, version, generation, attachment_ids):
         400,
     )
     files.validate_attachment_ids(actor, attachment_ids, purposes={"contract"})
-    require(not FileAsset.objects.filter(id__in=attachment_ids, sha256=printed.asset.sha256).exists(),
-            "unsigned_file", "上传文件与系统未签署版本相同，请上传签署照片或扫描件", 400)
+    require(
+        not FileAsset.objects.filter(id__in=attachment_ids, sha256=printed.asset.sha256).exists(),
+        "unsigned_file",
+        "上传文件与系统未签署版本相同，请上传签署照片或扫描件",
+        400,
+    )
     item.signed_ids, item.signed_generation = attachment_ids, generation
     files.link_files(attachment_ids, item)
     advance(item, "signed_ids", "signed_generation")
-    audit(actor, item, "contract_draft.signed_uploaded", generation=generation, attachment_ids=attachment_ids)
+    audit(
+        actor,
+        item,
+        "contract_draft.signed_uploaded",
+        generation=generation,
+        attachment_ids=attachment_ids,
+    )
     return item
 
 

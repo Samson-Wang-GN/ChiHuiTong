@@ -23,11 +23,11 @@ window.PrototypeTasks = (() => {
           if(r.cycleRequest?.status==='待审核')add(page,r,'审核结算周期变更','账期-'+r.cycleRequest.id,{focusTab:'合同与续签',businessStatus:'账期待审核'});
           for(const change of r.profileChanges||[])if(change.status==='待审核')add(page,r,'审核门诊资料变更','资料变更-'+change.id,{focusTab:'资料与资质',businessStatus:'资料变更待审核'});
           if(r.qualification==='待审核')add(page,r,'审核门诊资质','资质审核',{focusTab:'资料与资质'});
-          for(const c of r.contractVersions||[])if(c.status==='待审核')add(page,r,'审核三方合同 '+c.number,'合同-'+c.id,{focusTab:'合同与续签'});
+          for(const c of r.contractVersions||[])if(c.status==='待审核')add(page,r,'审核门诊合同 '+c.number,'合同-'+c.id,{focusTab:'合同与续签'});
         }else{
           if(['草稿','审核不通过'].includes(r.qualification))add(page,r,'补充并提交门诊资料','资料-'+r.qualification,{focusTab:'资料与资质'});
           const versions=r.contractVersions||[],c=versions.find(c=>['已生效','即将到期'].includes(c.status));
-          if(!versions.some(c=>['待审核','已审核待生效'].includes(c.status))&&(!c||c.end<='2026-10-07'))add(page,r,c?'续签即将到期合同':'提交门诊三方合同','续签-'+(c?.id||'首签'),{focusTab:'合同与续签'});
+          if(!versions.some(c=>['待审核','已审核待生效'].includes(c.status))&&(!c||c.end<='2026-10-07'))add(page,r,c?'续签即将到期合同':'提交门诊合同','续签-'+(c?.id||'首签'),{focusTab:'合同与续签'});
         }
       }else if(page==='bills'){
         const status=W.billStatus(r);

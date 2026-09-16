@@ -63,7 +63,11 @@
             data: r,
             fields: ['number', 'kind', 'status', 'generation', 'signed_generation'],
           }),
-          r.print_changed && h(A.Alert, { type: 'warning', content: '资料中的合同内容已修改，原待签版仅供留档。请重新生成、打印并签署后再提交。' }),
+          r.print_changed &&
+            h(A.Alert, {
+              type: 'warning',
+              content: '资料中的合同内容已修改，原待签版仅供留档。请重新生成、打印并签署后再提交。',
+            }),
           h(
             A.Space,
             { wrap: true, className: 'detail-actions' },
@@ -78,7 +82,8 @@
                   [],
                 ),
               ),
-            r.generated_file_id && !r.print_changed &&
+            r.generated_file_id &&
+              !r.print_changed &&
               C.button('下载打印合同', () =>
                 C.download(
                   base + 'files/' + r.generated_file_id,

@@ -83,6 +83,7 @@ def exercise(pages, report):
         clinic_id=item['onboarding_clinic_id']
         assert read(channel,'/api/v1/clinics/'+clinic_id)['service_status']!='online'
         menu(platform,'合同管理')
+        platform.locator('.workspace').get_by_role('button',name='刷新',exact=True).click()
         platform.locator('.workspace .arco-table-tr').filter(has_text=draft['number']).get_by_role('button',name='详情',exact=True).click()
         dialog(platform).get_by_text('门诊资料与资质',exact=True).wait_for()
         dialog(platform).get_by_text('合同推广产品',exact=True).wait_for()

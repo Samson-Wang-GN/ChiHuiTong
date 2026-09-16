@@ -303,6 +303,8 @@ def contract_terminate(request, version_id):
 def contract_list(request, org_id):
     actor = request_actor(request)
     if request.method == "POST":
+        require(not Organization.objects.filter(pk=org_id, kind="clinic").exists(),
+                "preparation_required", "门诊新签和续签请通过待签合同草稿办理", 409)
         return Response(
             contract_projection(
                 contracts.create_version(actor, org_id, **validated(ContractInput, request))

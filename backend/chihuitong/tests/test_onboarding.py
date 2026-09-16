@@ -173,8 +173,12 @@ class OnboardingTests(TestCase):
         item = cooperations.submit_agreement(self.channel, item.id, version=item.version)
         item = self.signed(item)
         item = cooperations.review_agreement(
-            self.platform, item.id, version=item.version, approved=True,
-            reason="连锁总部先签约，尚无覆盖门店不得使门店上线", final=True,
+            self.platform,
+            item.id,
+            version=item.version,
+            approved=True,
+            reason="连锁总部先签约，尚无覆盖门店不得使门店上线",
+            final=True,
         )
         self.assertEqual(item.status, "approved")
         self.assertEqual(item.coverage.count(), 0)

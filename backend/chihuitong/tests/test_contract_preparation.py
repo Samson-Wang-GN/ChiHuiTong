@@ -80,11 +80,21 @@ class PreparationTests(TestCase):
         self.assertIn(self.subject["name"], content)
         self.assertNotIn("{{", content)
         self.assertTrue(files.can_read_file(self.channel, first.asset))
-        colleague = actor_fixture("channel", "13900000802", role="staff", org=self.channel.organization)
+        colleague = actor_fixture(
+            "channel", "13900000802", role="staff", org=self.channel.organization
+        )
         self.assertFalse(files.can_read_file(colleague, first.asset))
-        duplicate = files.upload_file(self.channel, data=raw, filename="unsigned.pdf", purpose="contract")
+        duplicate = files.upload_file(
+            self.channel, data=raw, filename="unsigned.pdf", purpose="contract"
+        )
         with self.assertRaises(BusinessError):
-            service.sign(self.channel, item.id, version=item.version, generation=1, attachment_ids=[str(duplicate.id)])
+            service.sign(
+                self.channel,
+                item.id,
+                version=item.version,
+                generation=1,
+                attachment_ids=[str(duplicate.id)],
+            )
         Path("contract-test-sample.pdf").write_bytes(raw)
         again = service.generate(self.channel, item.id, version=item.version)
         self.assertEqual(again.generation, 1)
@@ -169,47 +179,77 @@ class PreparationTests(TestCase):
 
     def finish_draft(self, item):
         item = service.generate(self.channel, item.id, version=item.version)
-        item = service.sign(self.channel, item.id, version=item.version, generation=item.generation,
-                            attachment_ids=[str(self.asset.id)])
+        item = service.sign(
+            self.channel,
+            item.id,
+            version=item.version,
+            generation=item.generation,
+            attachment_ids=[str(self.asset.id)],
+        )
         return service.submit(self.channel, item.id, version=item.version).agreement
 
     def test_chain_contract_before_store_and_no_old_api_bypass(self):
         from chihuitong.services import cooperations
 
         self.template("chain")
-        payload = {"subject": {**self.payload["subject"], "kind": "chain"},
-                   "agreement": {**self.payload["agreement"], "payment_mode": "postpaid", "settlement_cycle": "monthly"}}
+        payload = {
+            "subject": {**self.payload["subject"], "kind": "chain"},
+            "agreement": {
+                **self.payload["agreement"],
+                "payment_mode": "postpaid",
+                "settlement_cycle": "monthly",
+            },
+        }
         item = service.save(self.channel, kind="chain", payload=payload)
         contract = self.finish_draft(item)
         self.assertEqual(contract.status, "pending")
         self.assertEqual(contract.coverage.count(), 0)
         contract = OnboardingTests.signed(self, contract)
-        contract = cooperations.review_agreement(self.platform, contract.id, version=contract.version,
-                                                approved=True, final=True, reason="合成总部合同审核")
+        contract = cooperations.review_agreement(
+            self.platform,
+            contract.id,
+            version=contract.version,
+            approved=True,
+            final=True,
+            reason="合成总部合同审核",
+        )
         self.assertEqual(contract.status, "approved")
         client = api_client(self.channel)
         for path in ("contracts", f"clinic-cooperations/{contract.cooperation_id}/agreements"):
             self.assertEqual(client.post("/api/v1/" + path, {}, format="json").status_code, 409)
 
     def test_single_renewal_reuses_subject_and_rejected_onboarding_can_correct(self):
-        from chihuitong.services import cooperations, onboarding
+        from chihuitong.services import onboarding
 
         self.template()
         original = OnboardingTests.apply(self)
-        original = onboarding.review(self.platform, original.id, version=original.version,
-                                     approved=False, reason="合成退回")
+        original = onboarding.review(
+            self.platform, original.id, version=original.version, approved=False, reason="合成退回"
+        )
         clinic = original.onboarding_change.clinic
         clinic.refresh_from_db()
-        payload = {"clinic": self.payload["clinic"], "clinic_id": str(clinic.id), "version": clinic.version,
-                   "agreement": self.payload["agreement"]}
+        payload = {
+            "clinic": self.payload["clinic"],
+            "clinic_id": str(clinic.id),
+            "version": clinic.version,
+            "agreement": self.payload["agreement"],
+        }
         corrected = self.finish_draft(service.save(self.channel, kind="single", payload=payload))
         self.assertEqual(corrected.cooperation_id, original.cooperation_id)
         self.assertEqual(corrected.onboarding_change.clinic_id, clinic.id)
         corrected = OnboardingTests.signed(self, corrected)
-        corrected = onboarding.review(self.platform, corrected.id, version=corrected.version,
-                                      approved=True, final=True, reason="合成审核")
-        payload = {"cooperation_id": str(corrected.cooperation_id),
-                   "agreement": {**self.payload["agreement"], "clinic_ids": [str(clinic.id)]}}
+        corrected = onboarding.review(
+            self.platform,
+            corrected.id,
+            version=corrected.version,
+            approved=True,
+            final=True,
+            reason="合成审核",
+        )
+        payload = {
+            "cooperation_id": str(corrected.cooperation_id),
+            "agreement": {**self.payload["agreement"], "clinic_ids": [str(clinic.id)]},
+        }
         renewal = self.finish_draft(service.save(self.channel, kind="single", payload=payload))
         self.assertEqual(renewal.cooperation_id, original.cooperation_id)
         self.assertIsNone(renewal.onboarding_change_id)
@@ -217,9 +257,18 @@ class PreparationTests(TestCase):
 
     def test_invalid_partial_shapes_are_user_errors(self):
         client = api_client(self.channel)
-        for index, payload in enumerate([{"subject": {"credit_code": 123}}, {"clinic_id": "bad"},
-                                        {"clinic": {"profile": {"name": []}}},
-                                        {"clinic": {"profile": {"business_license_ids": [{}]}}}]):
-            response = client.post("/api/v1/contract-preparations", {"kind": "single", "payload": payload},
-                                   format="json", HTTP_IDEMPOTENCY_KEY=f"invalid-draft-{index}")
+        for index, payload in enumerate(
+            [
+                {"subject": {"credit_code": 123}},
+                {"clinic_id": "bad"},
+                {"clinic": {"profile": {"name": []}}},
+                {"clinic": {"profile": {"business_license_ids": [{}]}}},
+            ]
+        ):
+            response = client.post(
+                "/api/v1/contract-preparations",
+                {"kind": "single", "payload": payload},
+                format="json",
+                HTTP_IDEMPOTENCY_KEY=f"invalid-draft-{index}",
+            )
             self.assertEqual(response.status_code, 400, response.data)

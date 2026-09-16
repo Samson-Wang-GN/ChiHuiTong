@@ -916,6 +916,13 @@
       service_status: '调整门诊上线状态',
       location_candidate_requested: '请求地址定位',
     },
+    contract_draft: {
+      saved: '保存待签合同草稿',
+      generated: '生成待签合同',
+      signed_uploaded: '上传门诊签署件',
+      submitted: '提交合同审核',
+    },
+    contract_template: { published: '发布合同模板版本' },
     contract: {
       draft_updated: '修改合同草稿',
       product_configured: '配置合同推广产品',
