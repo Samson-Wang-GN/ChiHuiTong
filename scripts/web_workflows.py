@@ -345,7 +345,11 @@ def exercise(pages, report, worker, fixture):
             appointment = read(clinic, '/api/v1/appointments/'+event['appointment_id'])
             menu(clinic, '预约管理')
             clinic.locator('.arco-table-tr').filter(has_text=appointment['customer_name']).get_by_role('button', name='详情', exact=True).click()
+            # The nested drawer must open after its parent finishes entering, not during
+            # the parent's CSS transition (the first pointer action can otherwise be lost).
+            clinic.wait_for_function("() => document.getAnimations().filter(a => a.effect?.target?.closest?.('.arco-drawer-wrapper')).every(a => a.playState !== 'running')")
             dialog(clinic).get_by_role('button', name='补充核销' if kind=='supplement' else '扫码核销', exact=True).click()
+            clinic.get_by_text('扫码核销 · 核对服务与费用', exact=True).wait_for()
             clinic.get_by_label('权益二维码内容', exact=True).fill(event['credential'])
             clinic.get_by_role('button', name='读取预约', exact=True).click()
             clinic.get_by_role('button', name='核对核销费用', exact=True).click()
