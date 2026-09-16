@@ -49,14 +49,24 @@ def upload(page, report, filename='synthetic-proof.png'):
 
 
 def date_field(page, label, value):
-    page.wait_for_timeout(400)
+    page.locator('.arco-form-label-item').filter(has_text=label).last.wait_for()
+    page.wait_for_function("() => document.getAnimations().filter(a => a.effect?.target?.closest?.('.arco-modal, .arco-drawer-wrapper')).every(a => a.playState !== 'running')")
     element = field(page, label).locator('input').first
     element.click()
-    element.fill(value)
-    page.wait_for_timeout(150)
-    element.press('Enter')
-    page.wait_for_timeout(150)
-    element.press('Tab')
+    picker = page.locator('.arco-picker-container:visible').last
+    picker.wait_for()
+    from datetime import datetime
+    if value == datetime.now().strftime('%Y-%m-%d'):
+        # Choose the calendar's actual date action; do not rely on blur committing
+        # an uncommitted text buffer in the date-only picker.
+        picker.get_by_text('今天', exact=True).click()
+    else:
+        element.fill(value)
+        element.press('Enter')
+        confirm = picker.get_by_role('button', name='确定', exact=True)
+        if confirm.is_visible():
+            confirm.click()
+        element.press('Tab')
     from playwright.sync_api import expect
     expect(element).to_have_value(value)
 
