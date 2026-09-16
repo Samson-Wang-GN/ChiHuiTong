@@ -53,8 +53,12 @@ def date_field(page, label, value):
     element = field(page, label).locator('input').first
     element.click()
     element.fill(value)
+    page.wait_for_timeout(150)
     element.press('Enter')
+    page.wait_for_timeout(150)
     element.press('Tab')
+    from playwright.sync_api import expect
+    expect(element).to_have_value(value)
 
 
 def exercise(pages, report, worker, fixture):
@@ -232,8 +236,9 @@ def exercise(pages, report, worker, fixture):
             partner.get_by_role('button', name='详情', exact=True).first.click()
             partner.get_by_role('button', name='确认收款', exact=True).click()
             date_field(partner, '实际收款日期', today)
-            dialog(partner).get_by_role('button', name='确认收款', exact=True).click()
-            partner.wait_for_timeout(300)
+            with partner.expect_response(lambda r: r.url.endswith('/partner-bills/'+bill['id']+'/receive') and r.request.method == 'POST') as receipt:
+                dialog(partner).get_by_role('button', name='确认收款', exact=True).click()
+            assert receipt.value.status == 200, receipt.value.text()
             assert read(partner, '/api/v1/partner-bills/'+bill['id'])['status'] == 'completed'
             close(partner)
             completed.append(role+' monthly statement confirm platform proof and receipt')

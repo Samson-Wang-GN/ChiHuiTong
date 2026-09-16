@@ -687,14 +687,4 @@
     );
   }
   C.Cooperation = Cooperation;
-  C.pages.cooperation = () =>
-    h(
-      C.Panel,
-      { title: '合作合同与推广产品' },
-      h(A.Alert, {
-        type: 'info',
-        content: '本页仅查看本机构合同及授权推广产品；配置由平台统一管理。',
-      }),
-      h(Cooperation, { orgId: C.actor.organization_id }),
-    );
 })();

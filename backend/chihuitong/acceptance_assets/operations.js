@@ -47,6 +47,7 @@
       return;
     }
     const type = {
+      clinicagreement: 'agreement',
       appointment: 'appointment',
       clinicbill: 'clinicBill',
       partnerbill: 'partnerBill',

@@ -246,39 +246,37 @@
       ['accounts', '账号管理'],
     ],
     resource: [
-      ['contracts', '合同管理'],
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
+      ['contracts', '合同管理'],
       ['sales', '推广产品销售'],
       ['overview', '客户与权益概览'],
       ['appointments', '预约与核销明细'],
       ['partnerBills', '合作方结算单'],
-      ['cooperation', '合作合同与推广产品'],
       ['notifications', '站内消息'],
       ['accounts', '账号管理'],
     ],
     channel: [
-      ['contracts', '合同管理'],
-      ['instantOrders', '核销现付订单'],
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
+      ['contracts', '合同管理'],
       ['clinics', '门诊管理'],
       ['appointments', '预约与核销明细'],
       ['clinicBills', '门诊账单'],
+      ['instantOrders', '核销现付订单'],
       ['partnerBills', '合作方结算单'],
-      ['cooperation', '合作合同与推广产品'],
       ['notifications', '站内消息'],
       ['accounts', '账号管理'],
     ],
     clinic: [
-      ['contracts', '合同管理'],
-      ['instantOrders', '核销现付订单'],
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
+      ['contracts', '合同管理'],
       ['appointments', '预约管理'],
       ['overdue', '过期预约待办'],
       ['clinics', '门诊资料'],
       ['clinicBills', '门诊账单'],
+      ['instantOrders', '核销现付订单'],
       ['notifications', '站内消息'],
       ['accounts', '账号管理'],
     ],
@@ -364,7 +362,7 @@
           !(
             key === 'accounts' ||
             (C.role === 'clinic' &&
-              ['clinicBills', 'clinics', 'cooperation', 'contracts'].includes(key))
+              ['clinicBills', 'clinics', 'contracts'].includes(key))
           ),
       )
       .map(([key, title]) => [

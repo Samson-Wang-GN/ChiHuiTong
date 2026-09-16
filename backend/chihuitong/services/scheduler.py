@@ -221,7 +221,9 @@ def tick():
             key=f"contract-expiry:{version.id}:{day}",
         )
     for agreement in ClinicAgreement.objects.filter(
-        status="approved", starts_at__lte=now, ends_at__gte=now,
+        status="approved",
+        starts_at__lte=now,
+        ends_at__gte=now,
         ends_at__lte=now + timedelta(days=30),
     ).select_related("cooperation"):
         try:
@@ -237,7 +239,9 @@ def tick():
             | Q(pk__in=stores.values("responsible_id"))
         )
         notify_members(
-            members, kind="contract.expiring", obj=agreement,
+            members,
+            kind="contract.expiring",
+            obj=agreement,
             title="门诊合同将于30天内到期，请办理续签",
             key=f"agreement-expiry:{agreement.id}:{day}",
         )
