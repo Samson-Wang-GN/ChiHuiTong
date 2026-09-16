@@ -1,5 +1,20 @@
 # 后端接口与角色接入约定
 
+## REQ-048～050 合同与联合入驻补充
+
+以下路径统一前缀`/api/v1`，服务端仍逐次检查身份、机构范围、记录版本及幂等键。
+
+- `GET /contracts?kind=clinic|resource|channel|legacy`：统一台账；状态Tab及详情按合同类型投影。`POST /contracts`原子登记门诊合同及可选新主体，主体已有时传`cooperation_id`；无覆盖门店可存草稿但不得最终审核。
+- `GET /contracts/products`：只返回本角色可选的有效产品，渠道仅当前合同授权产品，不开放其他机构配置。
+- `POST /clinic-onboarding`：单店资料、主体、合同一次提交；补正传原`clinic_id`和`version`复用主体/门店。只适用初次联合入驻，不代替已上线资料改版或独立续签。
+- `GET /clinic-cooperations`及`/{id}`：权限内主体只读选择，不设独立主体维护菜单。`POST /clinic-cooperations/{id}/agreements`登记续签草稿。
+- `GET/POST /clinic-agreements/{id}`：详情/编辑草稿；`/submit`、`/paper`、`/review`、`/terminate`及`/onboarding-review`执行相应动作。联合申请只允许`onboarding-review`最终审批，独立审核拒绝绕过；`approved`和`final`区分预审/最终审核。
+- `POST /clinics/batch-online`：平台批量上线，逐店返回`online/blocked`及原因；每店单独事务，不绕过资质、合同、产品或付款能力校验。
+- `GET /instant-orders`及`/{id}`：现付核销订单；`POST /appointments/{id}/instant-payment`创建现付核销订单，`POST /instant-orders/{id}`确认重试完成核销；付款恢复、查单/关闭等确切输入见`api_payments.py`。`GET /payments/{id}/qr`仅为授权、未过期的真实Native支付返回PNG；模拟不提供虚假可付款码。
+- 原门诊账单接口兼容`clinic_id`或`cooperation_id`二选一；总部管理员处理整单，门店/渠道投影只有权限内逐笔明细、Excel和小计，不暴露总部收付款凭证或其他门店患者信息。
+
+验证、入口及限制见[本轮交付](contract-onboarding-review.md)。小程序新模式接入另行实施，不因Web接口已完成而视为小程序验收完成。
+
 TASK-096只读地图：`POST /api/v1/clinics/{clinic_id}/profile-map`返回PNG。请求可含`change_id`（必须属于该门诊）、`snapshot`（before/after，默认after）、`zoom`（4～18，默认17）；不指定申请时读当前生效版，前端携带`profile_version`核对版本。继承门诊资料读取权限；未知/越权门诊或申请404，未确认位置/过期版本409，非法参数400，地图服务不可用503。接口拒绝自由经纬度输入，图片响应no-store，不变更坐标或审核状态；原`/clinics/map-preview`仍只用于有编辑权限的选点流程。
 
 适用：需求0.32、REQ-043；2026-09-12。本文描述已实现后端，不表示旧原型已经接入。完整路由以`backend/chihuitong/urls.py`为准；严格输入字段定义在对应`api*.py`的Serializer中，业务最终校验在`services/`。真实第三方配置和用户验收单独跟踪。

@@ -10,6 +10,10 @@ REQ-045 / TASK-090 / ADR-0028（沿用REQ-044独立部署保护）。仅在开�
 
 ## 本次范围
 
+2026-09-16最新应用：`9b737ec5fd7b7d1267bd3dc280e6e79c48718143`，REQ-048～050统一合同、单店联合入驻、连锁主体后付与单店现付后台。0017～0019迁移通过；发布前后1098条核心业务ID摘要相同。数据库备份`runtime/acceptance/before-20260916T050637Z.dump`；旧部署/应用和worker服务文件、私有配置/附件备份位于`runtime/acceptance/release-backups/9b737ec5fd7b7d1267bd3dc280e6e79c48718143/`，仅服务器私有权限保存。
+
+真实HTTPS回归`20260916T050727Z-acceptance-browser/summary.json`通过：四角色登录/菜单/详情/窄屏/退出、入口401/绕过403、应用重启及原站点检查。197项后端、四角色完整业务回归均在发布前通过。支付/短信仍为显式模拟，既有地图私有Key及用户资料保留。旧程序不识别新收款/主体模型，有新写入时禁止直接还原旧库；详细回退边界、测试及操作路径见[本轮交付](../contract-onboarding-review.md)。以下为历史版本，不能将df52809视作当前应用。
+
 TASK-096最新应用：`df52809dcdbff107832f7d74efa48ae0746e858e`。门诊生效/待审定位提示、资料与审核对照真实地图已部署；无迁移，备份`runtime/acceptance/before-20260913T035317Z.dump`。门诊资料与全部申请内容摘要发布前后相同。三角色真实HTTPS报告`20260913T035506Z-live-profile-maps`通过，回退应用为d4f39e7（保留数据库及源码外地图Key）。后续文档/验证脚本提交不切换应用。完整证据见[地图页面交付](../clinic-map-review.md)。
 
 TASK-095配置更新（2026-09-13）：腾讯地图Key已安全写入`runtime/acceptance/environment.json`及`service.env`，配置备份后缀`.before-map-20260913T030246Z`；仅重启本项目应用，代码版本仍为d4f39e7，无迁移。真实地址解析与底图预检成功；用户分配额度后，`20260913T031651Z-map-browser`聚焦页面验证通过。详见[地图配置、回退及验收证据](../tencent-map-acceptance.md)。
