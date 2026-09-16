@@ -203,6 +203,13 @@ def can_read_file(actor, asset):
         return True
     if actor.organization.kind == "clinic" and actor.membership.role != "admin":
         return False
+    from chihuitong.models import ClinicAgreement
+    from .cooperations import full_access
+
+    # Signed multi-store documents must not inherit access merely from one managed store.
+    agreements = ClinicAgreement.objects.filter(pk__in=asset.links.filter(object_type="clinicagreement").values("object_id"))
+    if agreements.exists():
+        return any(full_access(actor, agreement.cooperation, agreement) for agreement in agreements)
     if asset.organization_id == actor.organization.id and (
         actor.membership.role == "admin" or asset.uploaded_by_id == actor.account.id
     ):

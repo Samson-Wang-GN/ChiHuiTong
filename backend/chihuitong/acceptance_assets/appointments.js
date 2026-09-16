@@ -421,6 +421,13 @@
     }
     function redeem() {
       act(async () => {
+        if (quote.payment_mode === 'instant') {
+          const order = await C.api(base + 'appointments/' + selected.id + '/instant-payment', 'POST', {credential, version: quote.version, confirmed, quote: quote.quote}, key.current);
+          C.refresh();
+          onClose();
+          C.open('instant', {id: order.id});
+          return;
+        }
         await C.api(
           base + 'redemptions',
           'POST',
@@ -511,7 +518,8 @@
         h(
           C.Panel,
           { title: '本次核销确认' },
-          h(C.Facts, { data: quote, fields: ['units', 'fee_cents'] }),
+          h(C.Facts, { data: quote, fields: ['units', 'fee_cents', 'payment_mode'] }),
+          quote.payment_mode === 'instant' && h(A.Alert, {type: 'warning', content: '此门店核销现付。确认后创建付款订单，付款成功才完成核销；前台可使用工作手机付款，无需负责人审批。'}),
           h(A.Alert, {
             type: 'warning',
             content:

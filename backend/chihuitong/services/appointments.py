@@ -35,7 +35,9 @@ def visible_appointments(actor):
     qs = Appointment.objects.select_related("clinic", "benefit__card__order", "customer")
     if actor.platform:
         return qs
-    if actor.organization.kind in {"clinic", "channel"}:
+    if actor.organization.kind == "clinic":
+        return qs.filter(clinic__organization=actor.organization)
+    if actor.organization.kind == "channel":
         return qs.filter(clinic__in=visible_clinics(actor))
     return qs.filter(benefit__card__order__in=visible_orders(actor))
 
@@ -74,7 +76,7 @@ def validate_date(when, benefit, *, future=False):
         require(when > timezone.now(), "past_appointment", "请选择未来的预约时间", 400)
 
 
-def locked_appointment(appointment_id):
+def locked_appointment(appointment_id, *, allow_payment=False):
     reference = (
         Appointment.objects.filter(pk=appointment_id)
         .values("benefit_id", "benefit__card_id", "benefit__card__order_id", "clinic_id")
@@ -95,6 +97,8 @@ def locked_appointment(appointment_id):
         .get(pk=reference["benefit_id"])
     )
     appointment.clinic, appointment.benefit = clinic, benefit
+    if not allow_payment:
+        require(not appointment.instant_orders.filter(status__in=["pending", "paid"]).exists(), "unresolved_payment", "此预约现付尚未完成核对，请先查单，不能变更预约或释放权益")
     return appointment, benefit
 
 
@@ -524,6 +528,7 @@ def redemption_quote(actor, appointment_id, *, credential):
         "fee_cents": fees["fee_cents"],
         "units": appointment.units,
         "version": appointment.version,
+        "payment_mode": fees.get("payment_mode", "postpaid"),
     }
 
 
@@ -546,6 +551,7 @@ def redeem(actor, appointment_id, *, credential, confirmed, version, quote=None)
     can_redeem(appointment, benefit)
     product = Product.objects.select_for_update().get(pk=benefit.product_id)
     snapshot = resolve_fees(benefit.source.organization_id, appointment.clinic, product)
+    require(snapshot.get("payment_mode") != "instant", "instant_payment_required", "本门店采用核销现付，请创建现付订单并完成付款")
     if quote is not None:
         try:
             quoted = signing.loads(quote, salt="redemption-quote", max_age=300)
@@ -569,6 +575,11 @@ def redeem(actor, appointment_id, *, credential, confirmed, version, quote=None)
             "scheduled_at": appointment.scheduled_at.isoformat(),
         }
     )
+    return finish_redemption(actor, appointment, benefit, snapshot)
+
+
+def finish_redemption(actor, appointment, benefit, snapshot, *, settled_at=None):
+    """Caller holds appointment/benefit locks and has validated service and payment."""
     record = Redemption.objects.create(
         appointment=appointment,
         actor=actor.membership,
@@ -577,6 +588,9 @@ def redeem(actor, appointment_id, *, credential, confirmed, version, quote=None)
         units=appointment.units,
         previous_completion_source=appointment.completion_source,
         snapshot=snapshot,
+        cooperation_id=snapshot.get("cooperation_id"),
+        payment_mode=snapshot.get("payment_mode", "postpaid"),
+        settled_at=settled_at,
         **{
             key: snapshot[key]
             for key in ["fee_cents", "resource_cents", "channel_cents", "platform_cents"]
@@ -751,7 +765,9 @@ def restore_reversal(customer_id, appointment_id, *, version, confirmed):
 @transaction.atomic
 def process_deadline(appointment_id, *, now=None):
     now = now or timezone.now()
-    appointment, benefit = locked_appointment(appointment_id)
+    appointment, benefit = locked_appointment(appointment_id, allow_payment=True)
+    if appointment.instant_orders.filter(status__in=["pending", "paid"]).exists():
+        return appointment
     appointment.reschedules.filter(status="pending", expires_at__lte=now).update(
         status="expired", reviewed_at=now
     )

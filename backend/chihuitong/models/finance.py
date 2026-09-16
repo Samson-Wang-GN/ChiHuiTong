@@ -9,7 +9,8 @@ from .fulfillment import Redemption
 
 
 class ClinicBill(Entity):
-    clinic = models.ForeignKey(Clinic, on_delete=models.PROTECT, related_name="bills")
+    clinic = models.ForeignKey(Clinic, null=True, on_delete=models.PROTECT, related_name="bills")
+    cooperation = models.ForeignKey("ClinicCooperation", null=True, on_delete=models.PROTECT, related_name="bills")
     cycle = models.CharField(max_length=16)
     period_end = models.DateField()
     issued_on = models.DateField()
@@ -23,7 +24,9 @@ class ClinicBill(Entity):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["clinic", "issued_on"], name="clinic_bill_issue_date")
+            models.UniqueConstraint(fields=["clinic", "issued_on"], name="clinic_bill_issue_date"),
+            models.UniqueConstraint(fields=["cooperation", "issued_on"], name="cooperation_bill_issue_date"),
+            models.CheckConstraint(condition=Q(clinic__isnull=False, cooperation__isnull=True) | Q(clinic__isnull=True, cooperation__isnull=False), name="bill_one_debtor"),
         ]
 
 
@@ -77,7 +80,8 @@ class ClinicReceipt(Entity):
 
 
 class PaymentAttempt(Entity):
-    bill = models.ForeignKey(ClinicBill, on_delete=models.PROTECT, related_name="payment_attempts")
+    bill = models.ForeignKey(ClinicBill, null=True, on_delete=models.PROTECT, related_name="payment_attempts")
+    instant_order = models.ForeignKey("InstantRedemptionOrder", null=True, on_delete=models.PROTECT, related_name="payment_attempts")
     bill_version = models.PositiveIntegerField()
     number = models.CharField(max_length=32, unique=True)
     amount_cents = models.PositiveBigIntegerField()
@@ -97,6 +101,8 @@ class PaymentAttempt(Entity):
 
     class Meta:
         constraints = [
+            models.CheckConstraint(condition=Q(bill__isnull=False, instant_order__isnull=True) | Q(bill__isnull=True, instant_order__isnull=False), name="payment_one_target"),
+            models.UniqueConstraint(fields=["instant_order"], condition=Q(status__in=["creating", "pending", "unknown"]), name="one_unresolved_instant_payment"),
             models.UniqueConstraint(
                 fields=["created_by", "request_key"],
                 condition=~Q(request_key=""),
@@ -124,9 +130,30 @@ class ReceiptLedger(Entity):
     kind = models.CharField(max_length=16)
     source_id = models.UUIDField()
     bill = models.ForeignKey(ClinicBill, null=True, on_delete=models.PROTECT)
+    instant_order = models.ForeignKey("InstantRedemptionOrder", null=True, on_delete=models.PROTECT, related_name="receipts")
     amount_cents = models.PositiveBigIntegerField()
     received_at = models.DateTimeField()
     anomaly = models.CharField(max_length=80, blank=True)
+
+
+class InstantRedemptionOrder(Entity):
+    appointment = models.ForeignKey("Appointment", on_delete=models.PROTECT, related_name="instant_orders")
+    cooperation = models.ForeignKey("ClinicCooperation", on_delete=models.PROTECT)
+    agreement = models.ForeignKey("ClinicAgreement", on_delete=models.PROTECT)
+    created_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
+    status = models.CharField(max_length=16, default="pending")
+    amount_cents = models.PositiveBigIntegerField()
+    snapshot = models.JSONField()
+    appointment_version = models.PositiveIntegerField()
+    redemption = models.OneToOneField(Redemption, null=True, on_delete=models.PROTECT, related_name="instant_order")
+    paid_at = models.DateTimeField(null=True)
+    error_code = models.CharField(max_length=80, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["appointment"], condition=Q(status__in=["pending", "paid", "completed"]), name="one_active_instant_order"),
+            models.CheckConstraint(condition=Q(status__in=["pending", "paid", "completed", "closed"]), name="instant_order_state"),
+        ]
 
 
 class PartnerBill(Entity):

@@ -27,6 +27,11 @@ def payment_gateway():
 def get_attempt(actor, attempt_id, *, operate=False):
     ref = PaymentAttempt.objects.filter(pk=attempt_id).first()
     require(ref, "not_found", "支付记录不存在", 404)
+    if ref.instant_order_id:
+        from .instant import get_order
+
+        get_order(actor, ref.instant_order_id, operate=operate and not actor.platform)
+        return ref
     get_bill(actor, ref.bill_id, pay=operate and not actor.platform)
     return ref
 
@@ -35,6 +40,7 @@ def projection(attempt):
     data = {
         "id": str(attempt.id),
         "bill_id": str(attempt.bill_id),
+        "instant_order_id": str(attempt.instant_order_id) if attempt.instant_order_id else None,
         "number": attempt.number,
         "status": attempt.status,
         "amount_cents": attempt.amount_cents,
@@ -156,6 +162,10 @@ def create_payment(
 def retry_preparation(actor, attempt_id):
     """Retry the same merchant order after a lost creation response, never invent a receipt."""
     ref = get_attempt(actor, attempt_id, operate=True)
+    if ref.instant_order_id:
+        from .instant import prepare
+
+        return prepare(ref.id)
     gateway = payment_gateway()
     with transaction.atomic():
         bill = get_bill(actor, ref.bill_id, lock=True, pay=True)
@@ -304,6 +314,10 @@ def payment_fields(data):
 @transaction.atomic
 def observe(attempt_id, data):
     ref = PaymentAttempt.objects.get(pk=attempt_id)
+    if ref.instant_order_id:
+        from .instant import observe as observe_instant
+
+        return observe_instant(attempt_id, data)
     bill = ClinicBill.objects.select_for_update().get(pk=ref.bill_id)
     attempt = PaymentAttempt.objects.select_for_update().get(pk=attempt_id)
     state = validate_observation(attempt, data)

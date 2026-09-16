@@ -372,6 +372,7 @@ def contract_products(request, version_id):
 
 
 class ClinicInput(StrictSerializer):
+    cooperation_id = serializers.UUIDField(required=False)
     channel_id = serializers.UUIDField()
     profile = serializers.JSONField()
     admin_name = serializers.CharField(max_length=100)
@@ -408,6 +409,9 @@ def clinic_projection(clinic):
     return {
         "id": str(clinic.id),
         "organization_id": str(clinic.organization_id),
+        "cooperation_id": str(clinic.cooperation_id) if clinic.cooperation_id else None,
+        "cooperation_name": clinic.cooperation.organization.name if clinic.cooperation_id else "历史独立门诊",
+        "cooperation_kind": clinic.cooperation.kind if clinic.cooperation_id else "legacy",
         "channel_id": str(clinic.channel_id),
         "responsible_id": str(clinic.responsible_id),
         "profile": clinic.profile,
@@ -444,6 +448,8 @@ def clinic_list(request):
             status=201,
         )
     qs = clinics.visible_clinics(actor)
+    if request.query_params.get("cooperation_id"):
+        qs = qs.filter(cooperation_id=serializers.UUIDField().run_validation(request.query_params["cooperation_id"]))
     if request.query_params.get("search"):
         qs = qs.filter(organization__name__icontains=request.query_params["search"][:200])
     return paginated(

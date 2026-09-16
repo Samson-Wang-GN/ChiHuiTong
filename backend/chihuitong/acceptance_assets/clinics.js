@@ -375,7 +375,7 @@
               h(
                 A.Tabs.TabPane,
                 { key: 'contracts', title: '合同与续签' },
-                h(C.Contracts, { orgId: r.organization_id, canManage: C.role !== 'clinic' }),
+                r.cooperation_id && C.Agreements ? h(C.Agreements, { id: r.cooperation_id }) : h(C.Contracts, { orgId: r.organization_id, canManage: C.role !== 'clinic' }),
               ),
               h(
                 A.Tabs.TabPane,
@@ -502,9 +502,11 @@
         : null,
     );
     const profile = draft || row?.profile || {};
+    const subjects = C.useChoices(!row ? base + 'clinic-cooperations?page_size=100' : null);
     const fields = [
       ...(!row
         ? [
+            { name: 'cooperation_id', label: '签约主体', optional: true, type: 'select', options: (subjects.data?.results || []).filter(x => x.can_manage).map(x => ({value: x.id, label: x.name + (x.kind === 'chain' ? ' · 连锁总部' : ' · 单店')})) },
             {
               name: 'channel_id',
               label: '所属渠道',
@@ -571,7 +573,7 @@
       submitText: row ? '提交变更审核' : '保存门诊资料',
       hint: '已审核门诊的所有修改均须再次审核。业务联系人及电话必填，不在客户小程序公开。地址变化后须重新核对地图。',
       onSubmit: async (v) => {
-        const { channel_id, admin_name, admin_phone, cover_ids, ...next } = v;
+        const { channel_id, cooperation_id, admin_name, admin_phone, cover_ids, ...next } = v;
         next.cover_id = cover_ids?.[0] || null;
         const address = keys
           .filter((k) => ['province', 'city', 'district', 'address'].includes(k))
@@ -583,7 +585,7 @@
               profile: next,
               version: row.version,
             })
-          : C.api(base + 'clinics', 'POST', { channel_id, admin_name, admin_phone, profile: next });
+          : C.api(base + 'clinics', 'POST', { channel_id, ...(cooperation_id ? {cooperation_id} : {}), admin_name, admin_phone, profile: next });
       },
     });
   };

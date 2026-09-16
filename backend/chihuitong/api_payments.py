@@ -17,10 +17,52 @@ class PaymentInput(VersionInput):
     method = serializers.ChoiceField(choices=["native"])
 
 
+class InstantInput(VersionInput):
+    credential = serializers.CharField(max_length=512)
+    quote = serializers.CharField(max_length=2048)
+    confirmed = serializers.BooleanField()
+
+
+@api_view(["GET"])
+def instant_orders(request):
+    from .services import instant
+
+    actor = request_actor(request)
+    return paginated(request, instant.visible_orders(actor), instant.projection, states=["pending", "paid", "completed", "closed"])
+
+
+@api_view(["POST"])
+def instant_create(request, appointment_id):
+    from .services import instant
+
+    actor = request_actor(request)
+    item = instant.create(actor, appointment_id, **validated(InstantInput, request), key=request.headers.get("Idempotency-Key", ""))
+    return Response(instant.projection(item), status=201)
+
+
+@api_view(["GET", "POST"])
+def instant_detail(request, order_id):
+    from .services import instant
+
+    actor = request_actor(request)
+    item = instant.get_order(actor, order_id, operate=request.method == "POST" and not actor.platform)
+    if request.method == "POST":
+        data = validated(PaymentActionInput, request)
+        require(data["confirmed"], "confirmation_required", "请确认重新处理", 400)
+        item = instant.complete(item.id)
+    result = instant.projection(item)
+    result["payments"] = [payments.projection(p) for p in item.payment_attempts.order_by("created_at")]
+    if actor.organization.kind != "clinic":
+        for p in result["payments"]:
+            p.pop("payment_parameters", None)
+    return Response(result)
+
+
 @api_view(["GET", "POST"])
 def bill_payments(request, bill_id):
     actor = request_actor(request)
     bill = finance.get_bill(actor, bill_id)
+    require(finance.full_bill_access(actor, bill) or not bill.cooperation_id, "forbidden", "整单付款信息仅签约主体与平台可查看", 403)
     if request.method == "POST":
         data = validated(PaymentInput, request)
         rate_limit(f"payment:{actor.membership.id}", seconds=60, maximum=10)

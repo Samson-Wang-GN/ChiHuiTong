@@ -61,12 +61,21 @@ def run_one():
             generate_clinic_bill(
                 job.payload["clinic_id"], issued_on=date.fromisoformat(job.payload["issued_on"])
             )
+        elif job.kind == "billing.cooperation":
+            from datetime import date
+            from .finance import generate_cooperation_bill
+
+            generate_cooperation_bill(job.payload["cooperation_id"], issued_on=date.fromisoformat(job.payload["issued_on"]))
         elif job.kind == "billing.partner":
             from datetime import date
 
             from .finance import generate_partner_bills
 
             generate_partner_bills(issued_on=date.fromisoformat(job.payload["issued_on"]))
+        elif job.kind == "instant.complete":
+            from .instant import complete
+
+            complete(job.payload["order_id"])
         elif job.kind == "payment.reconcile":
             from .payments import reconcile
 

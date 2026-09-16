@@ -96,6 +96,7 @@ OTP_COOLDOWN_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 SESSION_SECONDS = 8 * 60 * 60
 WECHAT_PAY_ENABLED = os.environ.get("CHT_WECHAT_PAY_ENABLED", "false").lower() == "true"
+INSTANT_PAYMENT_ACCEPTED = os.environ.get("CHT_INSTANT_PAYMENT_ACCEPTED", "false").lower() == "true"
 ACCEPTANCE_SIMULATED_EXTERNALS = (
     os.environ.get("CHT_ACCEPTANCE_SIMULATED_EXTERNALS", "false").lower() == "true"
 )

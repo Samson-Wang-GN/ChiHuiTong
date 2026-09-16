@@ -66,6 +66,8 @@ class Reschedule(Entity):
 
 
 class Redemption(Entity):
+    cooperation = models.ForeignKey("ClinicCooperation", null=True, on_delete=models.PROTECT, related_name="redemptions")
+    payment_mode = models.CharField(max_length=16, default="postpaid")
     appointment = models.ForeignKey(
         Appointment, on_delete=models.PROTECT, related_name="redemptions"
     )

@@ -63,6 +63,9 @@ class FileAsset(Entity):
 
 
 class Clinic(Entity):
+    cooperation = models.ForeignKey(
+        "ClinicCooperation", null=True, on_delete=models.PROTECT, related_name="clinics"
+    )
     organization = models.OneToOneField(
         Organization, on_delete=models.PROTECT, related_name="clinic"
     )
@@ -217,3 +220,56 @@ class ClinicProduct(Entity):
         constraints = [
             models.UniqueConstraint(fields=["clinic", "product"], name="one_clinic_product")
         ]
+
+
+class ClinicCooperation(Entity):
+    organization = models.OneToOneField(
+        Organization, on_delete=models.PROTECT, related_name="clinic_cooperation"
+    )
+    kind = models.CharField(max_length=16, choices=[("single", "单店"), ("chain", "连锁")])
+    created_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
+    status = models.CharField(max_length=16, default="active")
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(kind__in=["single", "chain"]), name="cooperation_kind")
+        ]
+
+
+class ClinicAgreement(Entity):
+    cooperation = models.ForeignKey(ClinicCooperation, on_delete=models.PROTECT, related_name="agreements")
+    number = models.CharField(max_length=80)
+    revision = models.PositiveIntegerField()
+    status = models.CharField(max_length=16, default="draft")
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    payment_mode = models.CharField(max_length=16)
+    settlement_cycle = models.CharField(max_length=16, default="")
+    contact = EncryptedJSONField(default=dict)
+    product_ids = models.JSONField(default=list)
+    attachment_ids = models.JSONField(default=list)
+    signed_attachment_ids = models.JSONField(default=list)
+    paper = EncryptedJSONField(default=dict)
+    content_status = models.CharField(max_length=16, default="pending")
+    submitted_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
+    submitted_at = models.DateTimeField(null=True)
+    due_at = models.DateTimeField(null=True)
+    reviewed_by = models.ForeignKey(Membership, null=True, on_delete=models.PROTECT, related_name="agreement_reviews")
+    reviewed_at = models.DateTimeField(null=True)
+    reason = EncryptedTextField(default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["cooperation", "revision"], name="agreement_revision"),
+            models.UniqueConstraint(fields=["cooperation"], condition=Q(status="pending"), name="one_pending_agreement"),
+            models.CheckConstraint(condition=Q(ends_at__gt=F("starts_at")), name="agreement_dates"),
+            models.CheckConstraint(condition=Q(payment_mode="instant", settlement_cycle="") | Q(payment_mode="postpaid", settlement_cycle__in=["weekly", "monthly"]), name="agreement_payment_cycle"),
+        ]
+
+
+class AgreementClinic(Entity):
+    agreement = models.ForeignKey(ClinicAgreement, on_delete=models.PROTECT, related_name="coverage")
+    clinic = models.ForeignKey(Clinic, on_delete=models.PROTECT, related_name="agreement_coverage")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["agreement", "clinic"], name="agreement_clinic_once")]

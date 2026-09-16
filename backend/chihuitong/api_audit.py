@@ -38,6 +38,13 @@ def visible_metadata(actor, value):
 
 
 def scoped_object(actor, object_type, object_id):
+    if object_type in {"cliniccooperation", "clinicagreement"}:
+        from .services import cooperations
+
+        item = cooperations.get_cooperation(actor, object_id) if object_type == "cliniccooperation" else cooperations.get_agreement(actor, object_id)
+        subject = item if object_type == "cliniccooperation" else item.cooperation
+        require(cooperations.full_access(actor, subject, None if object_type == "cliniccooperation" else item), "not_found", "无权查看完整合同操作记录", 404)
+        return item
     if object_type == "clinic":
         if actor.organization.kind == "clinic":
             actor.require_admin()
@@ -55,7 +62,13 @@ def scoped_object(actor, object_type, object_id):
         require(item, "not_found", "合同版本不存在", 404)
         return item.contract
     elif object_type == "clinicbill":
-        return finance.get_bill(actor, object_id)
+        item = finance.get_bill(actor, object_id)
+        require(not item.cooperation_id or finance.full_bill_access(actor, item), "not_found", "无权查看整单操作记录", 404)
+        return item
+    elif object_type == "instantredemptionorder":
+        from .services.instant import get_order
+
+        return get_order(actor, object_id)
     elif object_type == "partnerbill":
         return finance.get_partner_bill(actor, object_id)
     elif object_type == "salesorder":

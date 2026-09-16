@@ -4,6 +4,7 @@ from . import api
 from . import api_appointments as appointments
 from . import api_audit as audit
 from . import api_catalog as catalog
+from . import api_cooperations as cooperations
 from . import api_finance as finance
 from . import api_location as location
 from . import api_metrics as metrics
@@ -40,6 +41,13 @@ urlpatterns = [
     path("contract-versions/<uuid:version_id>/review", catalog.contract_review),
     path("contract-versions/<uuid:version_id>/products", catalog.contract_products),
     path("clinics", catalog.clinic_list),
+    path("clinic-cooperations", cooperations.cooperation_list),
+    path("clinic-cooperations/<uuid:cooperation_id>", cooperations.cooperation_detail),
+    path("clinic-cooperations/<uuid:cooperation_id>/attach", cooperations.attach),
+    path("clinic-cooperations/<uuid:cooperation_id>/agreements", cooperations.agreements),
+    path("clinic-agreements/<uuid:agreement_id>", cooperations.agreement_detail),
+    path("clinic-agreements/<uuid:agreement_id>/<str:action>", cooperations.agreement_action),
+    path("clinics/batch-online", cooperations.batch_online),
     path("clinics/geocode", location.locate),
     path("clinics/map-preview", location.map_preview),
     path("clinics/<uuid:clinic_id>", catalog.clinic_detail),
@@ -98,6 +106,9 @@ urlpatterns = [
     path("fulfillment-tasks", appointments.fulfillment_tasks),
     path("clinic-bills/<uuid:bill_id>/payments", payments.bill_payments),
     path("payments/configuration", payments.payment_configuration),
+    path("instant-orders", payments.instant_orders),
+    path("instant-orders/<uuid:order_id>", payments.instant_detail),
+    path("appointments/<uuid:appointment_id>/instant-payment", payments.instant_create),
     path("payments/<uuid:attempt_id>/<str:action>", payments.payment_action),
     path("payments/wechat/notify", payments.notification),
     path("notifications", notifications.notification_list),

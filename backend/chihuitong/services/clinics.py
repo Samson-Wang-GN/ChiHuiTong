@@ -4,12 +4,14 @@ import uuid
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from chihuitong.crypto import normalize_phone
 from chihuitong.errors import BusinessError, require
 from chihuitong.models import (
     Clinic,
+    ClinicCooperation,
     ClinicProduct,
     ClinicProfileChange,
     Membership,
@@ -49,6 +51,8 @@ def visible_clinics(actor):
             qs = qs.filter(responsible=actor.membership)
         return qs
     if actor.organization.kind == "clinic":
+        if actor.membership.role == "admin":
+            return qs.filter(Q(organization=actor.organization) | Q(cooperation__organization=actor.organization))
         return qs.filter(organization=actor.organization)
     return qs.none()
 
@@ -211,7 +215,7 @@ def profile_attachment_ids(profile):
 
 
 @transaction.atomic
-def create_clinic(actor, *, channel_id, profile, admin_name, admin_phone):
+def create_clinic(actor, *, channel_id, profile, admin_name, admin_phone, cooperation_id=None):
     require(
         actor.platform or actor.organization.kind == "channel",
         "forbidden",
@@ -231,9 +235,18 @@ def create_clinic(actor, *, channel_id, profile, admin_name, admin_phone):
         require(
             responsible.id == actor.membership.id, "forbidden", "业务员只能录入本人负责的门诊", 403
         )
+    cooperation = None
+    if cooperation_id:
+        from .cooperations import get_cooperation, assert_edit
+
+        cooperation = get_cooperation(actor, cooperation_id, lock=True)
+        assert_edit(actor, cooperation)
+        require(cooperation.kind == "chain" or not cooperation.clinics.exists(), "single_store_only", "单店主体只能开通一家门店")
     org = Organization.objects.create(name=normalized.get("name") or "待完善门诊", kind="clinic")
+    if not cooperation:
+        cooperation = ClinicCooperation.objects.create(organization=org, kind="single", created_by=actor.membership)
     clinic = Clinic.objects.create(
-        organization=org, channel=channel, responsible=responsible, profile=normalized
+        organization=org, channel=channel, responsible=responsible, profile=normalized, cooperation=cooperation
     )
     from .organizations import account_for
 
@@ -387,7 +400,11 @@ def assert_new_business(clinic, product_id=None):
         "contact_required",
         "门诊业务联系人信息待补充",
     )
-    current_contract(clinic.organization_id, channel_id=clinic.channel_id)
+    from .cooperations import clinic_agreement, assert_payment_ready
+
+    agreement = clinic_agreement(clinic, product_id=product_id)
+    if clinic.cooperation_id and agreement.payment_mode == "instant":
+        assert_payment_ready()
     current_contract(clinic.channel_id, product_id=product_id)
     if product_id:
         require(
@@ -413,6 +430,8 @@ def set_service_status(actor, clinic_id, *, status, version, reason):
             clinic.service_status != "exited", "clinic_exited", "已退出门诊需重新建立合作后处理"
         )
         assert_new_business(clinic)
+        if clinic.cooperation_id:
+            require(clinic.products.filter(status="online").exists(), "product_required", "请先上线至少一个合同授权推广产品")
     clinic.service_status = status
     advance(clinic, "service_status")
     audit(actor, clinic, "clinic.service_status", reason=reason, status=status)
@@ -468,6 +487,9 @@ def change_channel(actor, clinic_id, *, channel_id, responsible_id, version, rea
     actor.require_platform()
     clinic = get_clinic(actor, clinic_id, lock=True)
     check_version(clinic, version)
+    from .cooperations import assert_no_payment
+
+    assert_no_payment([clinic.id])
     require(clinic.service_status == "offline", "offline_required", "请先将门诊下线再变更渠道")
     require(
         not clinic.profile_changes.filter(status="pending").exists(),

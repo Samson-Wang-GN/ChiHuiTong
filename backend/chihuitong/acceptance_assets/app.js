@@ -235,6 +235,7 @@
       ['sales', '推广产品销售'],
       ['appointments', '预约管理'],
       ['clinicBills', '门诊账单'],
+      ['instantOrders', '核销现付订单'],
       ['partnerBills', '合作方结算单'],
       ['overview', '客户与权益概览'],
       ['notifications', '站内消息'],
@@ -255,6 +256,7 @@
       ['accounts', '账号管理'],
     ],
     channel: [
+      ['instantOrders', '核销现付订单'],
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
       ['clinics', '门诊管理'],
@@ -266,6 +268,7 @@
       ['accounts', '账号管理'],
     ],
     clinic: [
+      ['instantOrders', '核销现付订单'],
       ['workbench', '工作台'],
       ['tasks', '待处理任务'],
       ['appointments', '预约管理'],

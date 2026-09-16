@@ -155,7 +155,9 @@ def create_version(actor, org_id, *, number, data):
     if org.kind == "clinic":
         from .clinics import get_clinic
 
+        require(hasattr(org, "clinic"), "bilateral_contract_required", "签约主体请登记双方合同")
         clinic = get_clinic(actor, org.clinic.id)
+        require(not clinic.cooperation_id, "bilateral_contract_required", "请在门诊合作主体中登记双方合同，不能新建旧三方合同")
         require(
             actor.platform or actor.organization.kind == "channel",
             "forbidden",
@@ -530,9 +532,9 @@ def resolve_fees(resource_id, clinic, product, *, at=None):
     at = at or timezone.now()
     resource_contract = current_contract(resource_id, at=at, product_id=product.id, stock=True)
     channel_contract = current_contract(clinic.channel_id, at=at, product_id=product.id, stock=True)
-    clinic_contract = current_contract(
-        clinic.organization_id, at=at, stock=True, channel_id=clinic.channel_id
-    )
+    from .cooperations import clinic_agreement
+
+    clinic_contract = clinic_agreement(clinic, at=at, stock=True, product_id=product.id)
     resource_term = resource_contract.products.get(product=product)
     channel_term = channel_contract.products.get(product=product)
     resource_amount = split_cents(product.fee_cents, resource_term.mode, resource_term.value)
@@ -552,6 +554,9 @@ def resolve_fees(resource_id, clinic, product, *, at=None):
         "resource_term": term_snapshot(resource_term),
         "channel_term": term_snapshot(channel_term),
         "clinic_contract_id": str(clinic_contract.id),
+        "cooperation_id": str(clinic.cooperation_id) if clinic.cooperation_id else None,
+        "debtor_id": str(clinic.cooperation.organization_id) if clinic.cooperation_id else str(clinic.organization_id),
+        "payment_mode": clinic_contract.payment_mode if clinic.cooperation_id else "postpaid",
         "product_version": product.version,
         "historical_fallback": {
             "resource": resource_contract.ends_at < at,

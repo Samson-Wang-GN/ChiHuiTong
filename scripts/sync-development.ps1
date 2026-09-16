@@ -1,5 +1,6 @@
 param(
-    [string]$SshKey = 'C:\Users\Admin1\.ssh\genius_server.pem'
+    [string]$SshKey = 'C:\Users\Admin1\.ssh\genius_server.pem',
+    [switch]$AllowUntracked
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -10,7 +11,7 @@ function Assert-Exit([string]$Step) {
 $revision = (git -c "safe.directory=$projectRoot" rev-parse HEAD).Trim()
 Assert-Exit 'Read local revision'
 if ($revision -notmatch '^[0-9a-f]{40}$') { throw 'Invalid revision' }
-$dirty = git -c "safe.directory=$projectRoot" status --porcelain
+$dirty = if ($AllowUntracked) { git -c "safe.directory=$projectRoot" status --porcelain --untracked-files=no } else { git -c "safe.directory=$projectRoot" status --porcelain }
 Assert-Exit 'Inspect local worktree'
 if ($dirty) { throw 'Commit the reviewed project files before syncing; uncommitted files are not deployed' }
 $packageDir = Join-Path $projectRoot '.tmp'
