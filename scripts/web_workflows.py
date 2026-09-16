@@ -63,9 +63,7 @@ def date_field(page, label, value):
     else:
         element.fill(value)
         element.press('Enter')
-        confirm = picker.get_by_role('button', name='确定', exact=True)
-        if confirm.is_visible():
-            confirm.click()
+        picker.wait_for(state='hidden')
         element.press('Tab')
     from playwright.sync_api import expect
     expect(element).to_have_value(value)
