@@ -11,7 +11,6 @@ from chihuitong.crypto import normalize_phone
 from chihuitong.errors import BusinessError, require
 from chihuitong.models import (
     Clinic,
-    ClinicCooperation,
     ClinicProduct,
     ClinicProfileChange,
     Membership,
@@ -329,7 +328,11 @@ def submit_profile(actor, clinic_id, *, profile, version):
 def review_profile(actor, change_id, *, approved, version, reason, joint=False):
     from chihuitong.models import ClinicAgreement
 
-    require(joint or not ClinicAgreement.objects.filter(onboarding_change_id=change_id).exists(), "joint_review_required", "此资料属于单店入驻申请，请统一审核")
+    require(
+        joint or not ClinicAgreement.objects.filter(onboarding_change_id=change_id).exists(),
+        "joint_review_required",
+        "此资料属于单店入驻申请，请统一审核",
+    )
     actor.require_platform()
     pending = ClinicProfileChange.objects.filter(pk=change_id).first()
     require(pending, "not_found", "资料申请不存在", 404)

@@ -414,7 +414,9 @@ def clinic_projection(clinic):
         "cooperation_id": str(clinic.cooperation_id) if clinic.cooperation_id else None,
         "cooperation_name": clinic.cooperation.organization.name
         if clinic.cooperation_id
-        else "尚未关联合同" if clinic.contract_policy == "bilateral" else "历史独立门诊",
+        else "尚未关联合同"
+        if clinic.contract_policy == "bilateral"
+        else "历史独立门诊",
         "cooperation_kind": clinic.cooperation.kind if clinic.cooperation_id else "legacy",
         "channel_id": str(clinic.channel_id),
         "responsible_id": str(clinic.responsible_id),

@@ -241,7 +241,12 @@ class ClinicCooperation(Entity):
 
 
 class ClinicAgreement(Entity):
-    onboarding_change = models.OneToOneField("ClinicProfileChange", null=True, on_delete=models.PROTECT, related_name="onboarding_agreement")
+    onboarding_change = models.OneToOneField(
+        "ClinicProfileChange",
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="onboarding_agreement",
+    )
     cooperation = models.ForeignKey(
         ClinicCooperation, on_delete=models.PROTECT, related_name="agreements"
     )

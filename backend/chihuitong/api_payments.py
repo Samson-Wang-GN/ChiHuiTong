@@ -20,13 +20,24 @@ class PaymentInput(VersionInput):
 @api_view(["GET"])
 def payment_qr(request, attempt_id):
     import io
+
     import qrcode
     from django.utils import timezone
 
     actor = request_actor(request)
     attempt = payments.get_attempt(actor, attempt_id, operate=True)
     code = attempt.gateway_payload.get("code_url", "")
-    require(attempt.status == "pending" and attempt.expires_at > timezone.now() and attempt.method == "native" and code.startswith("weixin://") and len(code) < 2048 and attempt.mchid != "SIMULATED-NO-MONEY", "payment_not_available", "当前没有有效微信付款码，请查单核对", 409)
+    require(
+        attempt.status == "pending"
+        and attempt.expires_at > timezone.now()
+        and attempt.method == "native"
+        and code.startswith("weixin://")
+        and len(code) < 2048
+        and attempt.mchid != "SIMULATED-NO-MONEY",
+        "payment_not_available",
+        "当前没有有效微信付款码，请查单核对",
+        409,
+    )
     output = io.BytesIO()
     qrcode.make(code).save(output, format="PNG")
     response = HttpResponse(output.getvalue(), content_type="image/png")

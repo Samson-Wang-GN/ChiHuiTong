@@ -53,7 +53,11 @@ def get_cooperation(actor, cooperation_id, *, lock=False):
 def full_access(actor, item, agreement=None):
     if actor.platform or actor.organization.id == item.organization_id:
         return actor.platform or actor.membership.role == "admin"
-    if item.kind == "single" and actor.organization.kind == "clinic" and actor.membership.role == "admin":
+    if (
+        item.kind == "single"
+        and actor.organization.kind == "clinic"
+        and actor.membership.role == "admin"
+    ):
         return item.clinics.filter(organization=actor.organization).exists()
     if actor.organization.kind != "channel":
         return False
@@ -98,14 +102,24 @@ def create_cooperation(actor, *, name, kind, admin_name, admin_phone, credit_cod
     )
     if not actor.platform:
         current_contract(actor.organization.id)
-    from .organizations import account_for
-
     import re
 
+    from .organizations import account_for
+
     credit_code = credit_code.strip().upper()
-    require(re.fullmatch(r"[0-9A-HJ-NPQRTUWXY]{18}", credit_code), "invalid_credit_code", "请填写18位统一社会信用代码", 400)
+    require(
+        re.fullmatch(r"[0-9A-HJ-NPQRTUWXY]{18}", credit_code),
+        "invalid_credit_code",
+        "请填写18位统一社会信用代码",
+        400,
+    )
     advisory_lock("clinic_signatory", credit_code)
-    require(not ClinicCooperation.objects.filter(credit_code=credit_code).exists(), "subject_exists", "此签约主体已登记，请选择已有主体；无权限时请联系平台", 409)
+    require(
+        not ClinicCooperation.objects.filter(credit_code=credit_code).exists(),
+        "subject_exists",
+        "此签约主体已登记，请选择已有主体；无权限时请联系平台",
+        409,
+    )
     org = Organization.objects.create(name=name.strip(), kind="clinic")
     item = ClinicCooperation.objects.create(
         organization=org, kind=kind, created_by=actor.membership, credit_code=credit_code
@@ -174,7 +188,11 @@ def current_agreement(item, *, at=None, stock=False):
 
 def clinic_agreement(clinic, *, stock=False, at=None, product_id=None):
     if not clinic.cooperation_id:
-        require(clinic.contract_policy == "legacy", "contract_unavailable", "请先在合同管理关联门店并完成合同签署")
+        require(
+            clinic.contract_policy == "legacy",
+            "contract_unavailable",
+            "请先在合同管理关联门店并完成合同签署",
+        )
         return current_contract(
             clinic.organization_id, at=at, stock=stock, channel_id=clinic.channel_id
         )
@@ -247,7 +265,14 @@ def validate_data(actor, item, data):
     )
     stores = Clinic.objects.select_for_update().filter(pk__in=ids).order_by("id")
     require(stores.count() == len(ids), "coverage_invalid", "覆盖门店不存在", 400)
-    require(not stores.exclude(Q(cooperation=item) | Q(cooperation__isnull=True, contract_policy="bilateral")).exists(), "coverage_invalid", "不能在草稿中转移其他主体或历史门店，请联系平台", 400)
+    require(
+        not stores.exclude(
+            Q(cooperation=item) | Q(cooperation__isnull=True, contract_policy="bilateral")
+        ).exists(),
+        "coverage_invalid",
+        "不能在草稿中转移其他主体或历史门店，请联系平台",
+        400,
+    )
     require(
         not stores.exclude(pk__in=visible_clinics(actor).values("id")).exists(),
         "forbidden",
@@ -270,19 +295,31 @@ def validate_data(actor, item, data):
             current_contract(store.channel_id, product_id=product_id)
     validate_attachment_ids(actor, data["attachment_ids"], purposes={"contract"})
     assert_no_payment(ids)
-    require(item.kind == "chain" or not item.clinics.exclude(pk__in=ids).exists(), "single_store_only", "单店主体已关联其他门店")
+    require(
+        item.kind == "chain" or not item.clinics.exclude(pk__in=ids).exists(),
+        "single_store_only",
+        "单店主体已关联其他门店",
+    )
     for store in stores:
         if not store.cooperation_id:
             require(store.service_status != "online", "clinic_online", "关联签约主体前须下线")
             store.cooperation = item
             advance(store, "cooperation")
-            audit(actor, store, "clinic.cooperation_attached", cooperation_id=str(item.id), reason="合同关联门店")
+            audit(
+                actor,
+                store,
+                "clinic.cooperation_attached",
+                cooperation_id=str(item.id),
+                reason="合同关联门店",
+            )
     return sorted(ids), sorted(products)
 
 
 @transaction.atomic
 def start_agreement(actor, *, data, cooperation_id=None, subject=None):
-    require(bool(cooperation_id) != bool(subject), "subject_required", "请选择已有主体或填写新主体", 400)
+    require(
+        bool(cooperation_id) != bool(subject), "subject_required", "请选择已有主体或填写新主体", 400
+    )
     if subject:
         cooperation_id = create_cooperation(actor, **subject).id
     return save_agreement(actor, cooperation_id, data=data)
@@ -440,7 +477,11 @@ def review_agreement(actor, agreement_id, *, version, approved, reason, final=Fa
     item = get_agreement(actor, agreement_id, lock=True)
     ClinicCooperation.objects.select_for_update().get(pk=item.cooperation_id)
     check_version(item, version)
-    require(not item.onboarding_change_id or joint, "joint_review_required", "此合同属于单店入驻申请，请统一审核")
+    require(
+        not item.onboarding_change_id or joint,
+        "joint_review_required",
+        "此合同属于单店入驻申请，请统一审核",
+    )
     require(
         item.status == "pending" and reason.strip(),
         "invalid_state",

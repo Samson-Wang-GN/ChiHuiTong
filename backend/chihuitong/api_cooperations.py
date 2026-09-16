@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .api import StrictSerializer, paginated, validated
-from .api_catalog import VersionInput
+from .api_catalog import ClinicInput, VersionInput
 from .identity import request_actor
 from .services import cooperations
 
@@ -28,7 +28,9 @@ class AgreementInput(StrictSerializer):
     payment_mode = serializers.ChoiceField(choices=["instant", "postpaid"])
     settlement_cycle = serializers.ChoiceField(choices=["", "weekly", "monthly"])
     contact = ContactInput()
-    clinic_ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=True, max_length=1000)
+    clinic_ids = serializers.ListField(
+        child=serializers.UUIDField(), allow_empty=True, max_length=1000
+    )
     product_ids = serializers.ListField(
         child=serializers.UUIDField(), min_length=1, max_length=1000
     )
@@ -47,16 +49,12 @@ class StartInput(StrictSerializer):
     data = AgreementInput()
 
 
-from .api_catalog import ClinicInput
-
-
 class OnboardingClinicInput(ClinicInput):
     admin_name = serializers.CharField(max_length=100, required=False)
     admin_phone = serializers.CharField(max_length=40, required=False)
 
 
 class OnboardingInput(StrictSerializer):
-
     clinic = OnboardingClinicInput()
     agreement = AgreementInput()
     subject = CooperationInput(required=False)
@@ -66,19 +64,29 @@ class OnboardingInput(StrictSerializer):
 
 @api_view(["POST"])
 def onboarding_submit(request):
-    from .services import onboarding
     from .api_sales import command
+    from .services import onboarding
 
     actor = request_actor(request)
     data = validated(OnboardingInput, request)
-    return Response(command(request, actor, "onboarding.submit", data, lambda: agreement_projection(actor, onboarding.submit(actor, **data))), status=201)
+    return Response(
+        command(
+            request,
+            actor,
+            "onboarding.submit",
+            data,
+            lambda: agreement_projection(actor, onboarding.submit(actor, **data)),
+        ),
+        status=201,
+    )
 
 
 @api_view(["GET", "POST"])
 def unified_contracts(request):
     from django.db.models import Q
-    from .api_sales import command
+
     from .api_catalog import contract_projection
+    from .api_sales import command
     from .errors import require
     from .models import ClinicAgreement, ContractVersion
     from .services import contracts
@@ -86,19 +94,61 @@ def unified_contracts(request):
     actor = request_actor(request)
     if request.method == "POST":
         data = validated(StartInput, request)
-        return Response(command(request, actor, "agreement.start", data, lambda: agreement_projection(actor, cooperations.start_agreement(actor, **data))), status=201)
+        return Response(
+            command(
+                request,
+                actor,
+                "agreement.start",
+                data,
+                lambda: agreement_projection(actor, cooperations.start_agreement(actor, **data)),
+            ),
+            status=201,
+        )
     kind = request.query_params.get("kind", "clinic")
-    require(kind in {"clinic", "resource", "channel", "legacy"}, "invalid_kind", "合同类型不合法", 400)
+    require(
+        kind in {"clinic", "resource", "channel", "legacy"}, "invalid_kind", "合同类型不合法", 400
+    )
     word = request.query_params.get("search", "")[:160]
     if kind == "clinic":
-        qs = ClinicAgreement.objects.select_related("cooperation__organization").filter(cooperation__in=cooperations.visible_cooperations(actor))
+        qs = ClinicAgreement.objects.select_related("cooperation__organization").filter(
+            cooperation__in=cooperations.visible_cooperations(actor)
+        )
         if word:
-            qs = qs.filter(Q(number__icontains=word) | Q(cooperation__organization__name__icontains=word))
-        return paginated(request, qs, lambda item: agreement_projection(actor, item), states=["draft", "pending", "approved", "rejected", "terminated"])
-    qs = contracts.display_versions(ContractVersion.objects.select_related("contract__organization").filter(contract__in=contracts.accessible_contracts(actor), contract__kind="clinic" if kind == "legacy" else kind))
+            qs = qs.filter(
+                Q(number__icontains=word) | Q(cooperation__organization__name__icontains=word)
+            )
+        return paginated(
+            request,
+            qs,
+            lambda item: agreement_projection(actor, item),
+            states=["draft", "pending", "approved", "rejected", "terminated"],
+        )
+    qs = contracts.display_versions(
+        ContractVersion.objects.select_related("contract__organization").filter(
+            contract__in=contracts.accessible_contracts(actor),
+            contract__kind="clinic" if kind == "legacy" else kind,
+        )
+    )
     if word:
-        qs = qs.filter(Q(contract__number__icontains=word) | Q(contract__organization__name__icontains=word))
-    return paginated(request, qs, contract_projection, status_field="display_status", states=["draft", "pending", "effective", "not_started", "expired", "superseded", "rejected", "terminated"])
+        qs = qs.filter(
+            Q(contract__number__icontains=word) | Q(contract__organization__name__icontains=word)
+        )
+    return paginated(
+        request,
+        qs,
+        contract_projection,
+        status_field="display_status",
+        states=[
+            "draft",
+            "pending",
+            "effective",
+            "not_started",
+            "expired",
+            "superseded",
+            "rejected",
+            "terminated",
+        ],
+    )
 
 
 class PaperInput(StrictSerializer):
@@ -169,9 +219,15 @@ def agreement_projection(actor, item):
         "cooperation_id": str(item.cooperation_id),
         "subject_name": item.cooperation.organization.name,
         "onboarding": bool(item.onboarding_change_id),
-        "onboarding_change_id": str(item.onboarding_change_id) if item.onboarding_change_id else None,
-        "onboarding_clinic_id": str(item.onboarding_change.clinic_id) if item.onboarding_change_id else None,
-        "onboarding_profile": item.onboarding_change.after if item.onboarding_change_id and full else None,
+        "onboarding_change_id": str(item.onboarding_change_id)
+        if item.onboarding_change_id
+        else None,
+        "onboarding_clinic_id": str(item.onboarding_change.clinic_id)
+        if item.onboarding_change_id
+        else None,
+        "onboarding_profile": item.onboarding_change.after
+        if item.onboarding_change_id and full
+        else None,
         "number": item.number,
         "revision": item.revision,
         "version": item.version,

@@ -6,8 +6,8 @@ from django.utils import timezone
 
 from chihuitong.errors import require
 from chihuitong.models import (
-    ClinicProfileChange,
     ClinicAgreement,
+    ClinicProfileChange,
     ClinicReceipt,
     ContractVersion,
     FinanceFeedback,
@@ -76,9 +76,23 @@ def sources(actor):
     clinics = visible_clinics(actor)
     from .cooperations import visible_cooperations
 
-    if actor.platform or actor.organization.kind == "channel" or actor.organization.kind == "clinic" and actor.membership.role == "admin":
+    if (
+        actor.platform
+        or actor.organization.kind == "channel"
+        or actor.organization.kind == "clinic"
+        and actor.membership.role == "admin"
+    ):
         agreements = ClinicAgreement.objects.filter(cooperation__in=visible_cooperations(actor))
-        items.append(TaskSource("agreement_review", "门诊合同 / 单店入驻", agreements.exclude(status="draft") if actor.platform else agreements, Q(status="pending") if actor.platform else Q(status__in=["draft", "rejected"]), ("review",) if actor.platform else ("submit",), "due_at"))
+        items.append(
+            TaskSource(
+                "agreement_review",
+                "门诊合同 / 单店入驻",
+                agreements.exclude(status="draft") if actor.platform else agreements,
+                Q(status="pending") if actor.platform else Q(status__in=["draft", "rejected"]),
+                ("review",) if actor.platform else ("submit",),
+                "due_at",
+            )
+        )
     if actor.platform:
         items.extend(
             [
@@ -194,7 +208,9 @@ def sources(actor):
             TaskSource(
                 "profile_resubmission",
                 "门诊资料退回修改",
-                ClinicProfileChange.objects.filter(clinic__in=clinics, onboarding_agreement__isnull=True).exclude(status="pending"),
+                ClinicProfileChange.objects.filter(
+                    clinic__in=clinics, onboarding_agreement__isnull=True
+                ).exclude(status="pending"),
                 Q(status="rejected"),
                 ("resubmit",),
             )

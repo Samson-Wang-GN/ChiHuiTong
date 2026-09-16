@@ -67,7 +67,11 @@ def scoped_bill_lines(actor, bill):
 def get_bill(actor, bill_id, *, lock=False, pay=False):
     qs = visible_clinic_bills(actor)
     if lock:
-        qs = ClinicBill.objects.select_related("clinic__organization", "cooperation__organization").filter(pk__in=qs.values("pk")).select_for_update(of=("self",))
+        qs = (
+            ClinicBill.objects.select_related("clinic__organization", "cooperation__organization")
+            .filter(pk__in=qs.values("pk"))
+            .select_for_update(of=("self",))
+        )
     bill = qs.filter(pk=bill_id).first()
     require(bill, "not_found", "门诊账单不存在或无权访问", 404)
     if pay:
