@@ -396,8 +396,9 @@ def get_agreement(actor, agreement_id, *, lock=False):
 
 @transaction.atomic
 def submit_agreement(actor, agreement_id, *, version):
+    ref = get_agreement(actor, agreement_id)
+    ClinicCooperation.objects.select_for_update().get(pk=ref.cooperation_id)
     item = get_agreement(actor, agreement_id, lock=True)
-    ClinicCooperation.objects.select_for_update().get(pk=item.cooperation_id)
     assert_edit(actor, item.cooperation)
     check_version(item, version)
     require(item.status == "draft", "invalid_state", "仅草稿可提交审核")
@@ -474,8 +475,10 @@ def record_paper(actor, agreement_id, *, version, data):
 @transaction.atomic
 def review_agreement(actor, agreement_id, *, version, approved, reason, final=False, joint=False):
     actor.require_platform()
+    ref = get_agreement(actor, agreement_id)
+    ClinicCooperation.objects.select_for_update().get(pk=ref.cooperation_id)
+    list(Clinic.objects.select_for_update().filter(cooperation_id=ref.cooperation_id).order_by("id"))
     item = get_agreement(actor, agreement_id, lock=True)
-    ClinicCooperation.objects.select_for_update().get(pk=item.cooperation_id)
     check_version(item, version)
     require(
         not item.onboarding_change_id or joint,
@@ -541,6 +544,9 @@ def review_agreement(actor, agreement_id, *, version, approved, reason, final=Fa
 @transaction.atomic
 def terminate_agreement(actor, agreement_id, *, version, reason):
     actor.require_platform()
+    ref = get_agreement(actor, agreement_id)
+    ClinicCooperation.objects.select_for_update().get(pk=ref.cooperation_id)
+    list(Clinic.objects.select_for_update().filter(cooperation_id=ref.cooperation_id).order_by("id"))
     item = get_agreement(actor, agreement_id, lock=True)
     check_version(item, version)
     require(

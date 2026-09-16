@@ -231,7 +231,16 @@
         title: C.role === 'clinic' ? '门诊资料' : '门诊管理',
         extra:
           ['platform', 'channel'].includes(C.role) &&
-          h(A.Space, null, h(A.Button, { type: 'primary', onClick: () => C.open('clinicForm', {joint:true}) }, '单店入驻申请'), h(A.Button, {onClick: () => profileForm()}, '新增连锁门店')),
+          h(
+            A.Space,
+            null,
+            h(
+              A.Button,
+              { type: 'primary', onClick: () => C.open('clinicForm', { joint: true }) },
+              '单店入驻申请',
+            ),
+            h(A.Button, { onClick: () => profileForm() }, '新增连锁门店'),
+          ),
       },
       h(C.List, {
         path: base + 'clinics',
@@ -376,7 +385,9 @@
               h(
                 A.Tabs.TabPane,
                 { key: 'contracts', title: '签约主体与合同' },
-                r.cooperation_id && C.Agreements ? h(C.Agreements, { id: r.cooperation_id }) : h(C.Contracts, { orgId: r.organization_id, canManage: C.role !== 'clinic' }),
+                r.cooperation_id && C.Agreements
+                  ? h(C.Agreements, { id: r.cooperation_id })
+                  : h(C.Contracts, { orgId: r.organization_id, canManage: C.role !== 'clinic' }),
               ),
               h(
                 A.Tabs.TabPane,
@@ -490,7 +501,7 @@
       ),
     );
   };
-  C.dialogs.clinicForm = function ({ row, draft, joint=false, agreement, onClose }) {
+  C.dialogs.clinicForm = function ({ row, draft, joint = false, agreement, onClose }) {
     const [channel, setChannel] = React.useState(
       row?.channel_id || (C.role === 'channel' ? C.actor.organization_id : ''),
     );
@@ -508,7 +519,19 @@
     const fields = [
       ...(!row
         ? [
-            ...(!joint ? [{ name: 'cooperation_id', label: '连锁签约主体（可稍后在合同关联）', optional: true, type: 'select', options: (subjects.data?.results || []).filter(x => x.can_manage && x.kind==='chain').map(x => ({value: x.id, label: x.name})) }] : []),
+            ...(!joint
+              ? [
+                  {
+                    name: 'cooperation_id',
+                    label: '连锁签约主体（可稍后在合同关联）',
+                    optional: true,
+                    type: 'select',
+                    options: (subjects.data?.results || [])
+                      .filter((x) => x.can_manage && x.kind === 'chain')
+                      .map((x) => ({ value: x.id, label: x.name })),
+                  },
+                ]
+              : []),
             {
               name: 'channel_id',
               label: '所属渠道',
@@ -567,7 +590,15 @@
       onClose,
       fields,
       initial: {
-        ...(agreement ? {contract_number:agreement.number,contract_starts:agreement.starts_at,contract_ends:agreement.ends_at,contract_products:agreement.product_ids,contract_files:agreement.attachment_ids} : {}),
+        ...(agreement
+          ? {
+              contract_number: agreement.number,
+              contract_starts: agreement.starts_at,
+              contract_ends: agreement.ends_at,
+              contract_products: agreement.product_ids,
+              contract_files: agreement.attachment_ids,
+            }
+          : {}),
         ...profile,
         channel_id: channel,
         responsible_id: profile.responsible_id || C.actor.id,
@@ -578,8 +609,9 @@
       hint: '已审核门诊的所有修改均须再次审核。业务联系人及电话必填，不在客户小程序公开。地址变化后须重新核对地图。',
       onSubmit: async (v, key) => {
         const jointData = joint ? C.jointData(v, row) : null;
-        v = {...v};
-        for (const field of Object.keys(v)) if (field.startsWith('contract_') || field.startsWith('subject_')) delete v[field];
+        v = { ...v };
+        for (const field of Object.keys(v))
+          if (field.startsWith('contract_') || field.startsWith('subject_')) delete v[field];
         const { channel_id, cooperation_id, admin_name, admin_phone, cover_ids, ...next } = v;
         next.cover_id = cover_ids?.[0] || null;
         const address = keys
@@ -587,13 +619,33 @@
           .map((k) => next[k])
           .join('');
         if (next.location?.address_snapshot !== address) next.location = { status: 'unconfirmed' };
-        if (joint) return C.api(base+'clinic-onboarding','POST',{...jointData,clinic:{channel_id:channel_id || row.channel_id,...(!row?{admin_name,admin_phone}:{}),profile:next},...(row?{clinic_id:row.id,version:row.version}:{})},key);
+        if (joint)
+          return C.api(
+            base + 'clinic-onboarding',
+            'POST',
+            {
+              ...jointData,
+              clinic: {
+                channel_id: channel_id || row.channel_id,
+                ...(!row ? { admin_name, admin_phone } : {}),
+                profile: next,
+              },
+              ...(row ? { clinic_id: row.id, version: row.version } : {}),
+            },
+            key,
+          );
         return row
           ? C.api(base + 'clinics/' + row.id + '/profile-changes', 'POST', {
               profile: next,
               version: row.version,
             })
-          : C.api(base + 'clinics', 'POST', { channel_id, ...(cooperation_id ? {cooperation_id} : {}), admin_name, admin_phone, profile: next });
+          : C.api(base + 'clinics', 'POST', {
+              channel_id,
+              ...(cooperation_id ? { cooperation_id } : {}),
+              admin_name,
+              admin_phone,
+              profile: next,
+            });
       },
     });
   };

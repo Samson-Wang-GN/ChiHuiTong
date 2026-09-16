@@ -417,7 +417,8 @@
                     '确认合同资料与全部附件完整后提交。',
                   ),
                 ),
-              canManage && C.role === 'platform' &&
+              canManage &&
+                C.role === 'platform' &&
                 r.status === 'pending' &&
                 C.button('审核合同', () =>
                   C.action(
@@ -428,7 +429,8 @@
                     C.reviewFields,
                   ),
                 ),
-              canManage && C.role === 'platform' &&
+              canManage &&
+                C.role === 'platform' &&
                 r.status === 'approved' &&
                 C.button('终止合同', () =>
                   C.action(
@@ -489,7 +491,8 @@
   };
   function Terms({ contract, canManage = false }) {
     const edit = (row) => C.open('termForm', { contract, row });
-    const editable = canManage && C.role === 'platform' && ['draft', 'approved'].includes(contract.status);
+    const editable =
+      canManage && C.role === 'platform' && ['draft', 'approved'].includes(contract.status);
     return h(C.List, {
       path: base + 'contract-versions/' + contract.id + '/products',
       toolbar: editable && h(A.Button, { type: 'primary', onClick: () => edit() }, '添加推广产品'),

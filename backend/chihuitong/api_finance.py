@@ -61,7 +61,7 @@ def clinic_bill_detail(request, bill_id):
                 }
                 for item in (
                     bill.revisions.order_by("revision")
-                    if finance.full_bill_access(actor, bill)
+                    if not bill.cooperation_id or finance.full_bill_access(actor, bill)
                     else []
                 )
             ],
@@ -69,7 +69,7 @@ def clinic_bill_detail(request, bill_id):
                 queries.feedback_projection(item)
                 for item in (
                     bill.feedback.order_by("created_at")
-                    if finance.full_bill_access(actor, bill)
+                    if not bill.cooperation_id or finance.full_bill_access(actor, bill)
                     else []
                 )
             ],

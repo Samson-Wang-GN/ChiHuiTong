@@ -151,6 +151,9 @@ def seed():
             admin_phone=ACCOUNTS["clinic"][0],
             admin_name=ACCOUNTS["clinic"][1],
         )
+        # Preserve the historical demo scenarios; new bilateral onboarding has separate fixtures.
+        clinic.contract_policy = "legacy"
+        clinic.save(update_fields=["contract_policy"])
         change = clinics.submit_profile(channel, clinic.id, profile=profile, version=clinic.version)
         clinics.review_profile(
             platform,

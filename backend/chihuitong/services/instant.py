@@ -127,11 +127,11 @@ def create(actor, appointment_id, *, credential, confirmed, version, quote, key)
             snapshot=snapshot,
             appointment_version=appointment.version,
         )
-        require(
-            order.amount_cents > 0,
-            "invalid_instant_fee",
-            "现付获客费必须大于零，请平台核对产品计费配置",
-        )
+        if order.amount_cents == 0:
+            order.status, order.paid_at = "paid", timezone.now()
+            advance(order, "status", "paid_at")
+            audit(actor, order, "instant.no_payment_required", amount_cents=0)
+            return complete(order.id)
         attempt = PaymentAttempt.objects.create(
             instant_order=order,
             bill_version=order.version,
@@ -234,7 +234,7 @@ def observe(attempt_id, data):
         Outbox.objects.get_or_create(
             kind="instant.complete",
             dedup_key=f"instant:{order.id}",
-            defaults={"payload": {"order_id": str(order.id)}},
+            defaults={"payload": {"order_id": str(order.id)}, "available_at": timezone.now()},
         )
         transaction.on_commit(lambda: try_complete(order.id))
     elif attempt.status == "success":
@@ -265,7 +265,7 @@ def complete(order_id):
     if item.status == "completed":
         return item
     require(
-        item.status == "paid" and item.paid_at and item.receipts.exists(),
+        item.status == "paid" and item.paid_at and (item.amount_cents == 0 or item.receipts.exists()),
         "payment_pending",
         "尚未确认实际收款",
     )

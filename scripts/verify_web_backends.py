@@ -122,6 +122,8 @@ def check_browser(report, release, worker, fixture, headed=False, imports_only=F
             exercise(pages, report, worker, fixture)
             from web_location_views import exercise as exercise_maps
             exercise_maps(pages, report)
+            from web_contract_flow import exercise as exercise_contracts
+            exercise_contracts(pages, report)
         from web_import_flow import exercise as exercise_imports
         exercise_imports(pages['resource'], worker, report)
         if headed:

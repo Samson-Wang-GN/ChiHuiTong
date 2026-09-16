@@ -275,10 +275,10 @@ def exercise(pages, report, worker, fixture):
         assert abs(float(restored['longitude'])-116.3) < 0.000002
 
         # Platform configures another product on the same partner contract; rejected input survives.
-        menu(platform, '机构管理')
-        platform.locator('.arco-table-tr').filter(has_text='演示客户资源机构').get_by_role('button', name='详情', exact=True).click()
-        platform.get_by_role('tab', name='合作合同', exact=True).click()
-        dialog(platform).get_by_role('button', name='详情', exact=True).first.click()
+        menu(platform, '合同管理')
+        platform.locator('.workspace .arco-select').first.click()
+        platform.locator('.arco-select-popup:visible .arco-select-option').filter(has_text='客户资源方合同').click()
+        platform.locator('.workspace .arco-table-tr').filter(has_text='演示客户资源机构').get_by_role('button', name='详情', exact=True).click()
         dialog(platform).get_by_role('tab', name='推广产品配置', exact=True).click()
         platform.get_by_role('button', name='添加推广产品', exact=True).click()
         select(platform, '推广产品', '自动回归专用产品 · 60.00 元')

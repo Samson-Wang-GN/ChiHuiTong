@@ -33,7 +33,7 @@
       );
       const r = d.record;
       const routes = {
-        agreement_review: ['agreement', {id:r.id}],
+        agreement_review: ['agreement', { id: r.id }],
         organization_review: ['institution', { id: r.id }],
         clinic_profile: ['clinic', { id: r.clinic_id, tab: 'review' }],
         profile_resubmission: ['clinic', { id: r.clinic_id, tab: 'review' }],

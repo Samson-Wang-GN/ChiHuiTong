@@ -228,7 +228,8 @@
             h(
               A.Space,
               { wrap: true, className: 'detail-actions' },
-              C.role === 'clinic' && r.can_pay &&
+              C.role === 'clinic' &&
+                r.can_pay &&
                 ['pending_payment', 'overdue', 'disputed'].includes(r.status) &&
                 h(
                   A.Button,
@@ -243,7 +244,8 @@
                   },
                   '上传付款凭证',
                 ),
-              C.role === 'clinic' && r.can_pay &&
+              C.role === 'clinic' &&
+                r.can_pay &&
                 !['settled', 'cancelled', 'no_payment'].includes(r.status) &&
                 h(A.Button, { onClick: () => C.open('payment', { bill: r }) }, '微信扫码支付'),
               ['clinic', 'channel'].includes(C.role) &&
@@ -268,32 +270,35 @@
                 h(BillLines, { path: base + 'clinic-bills/' + id + '/lines' }),
               ),
               h(A.Tabs.TabPane, { key: 'info', title: '账单信息' }, h(C.Facts, { data: r })),
-              (!r.cooperation_id || r.full_access) && h(
-                A.Tabs.TabPane,
-                { key: 'receipts', title: '收款凭证' },
-                h(C.List, {
-                  path: base + 'clinic-bills/' + id + '/receipts',
-                  columns: ['amount_cents', 'payer', 'paid_at', 'reference', 'status'].map((k) =>
-                    C.column(k),
-                  ),
-                  actions: (v) => C.button('凭证详情', () => C.open('clinicReceipt', { row: v })),
-                }),
-              ),
-              (!r.cooperation_id || r.full_access) && h(
-                A.Tabs.TabPane,
-                { key: 'payments', title: '微信支付记录' },
-                h(PaymentList, { bill: r }),
-              ),
+              (!r.cooperation_id || r.full_access) &&
+                h(
+                  A.Tabs.TabPane,
+                  { key: 'receipts', title: '收款凭证' },
+                  h(C.List, {
+                    path: base + 'clinic-bills/' + id + '/receipts',
+                    columns: ['amount_cents', 'payer', 'paid_at', 'reference', 'status'].map((k) =>
+                      C.column(k),
+                    ),
+                    actions: (v) => C.button('凭证详情', () => C.open('clinicReceipt', { row: v })),
+                  }),
+                ),
+              (!r.cooperation_id || r.full_access) &&
+                h(
+                  A.Tabs.TabPane,
+                  { key: 'payments', title: '微信支付记录' },
+                  h(PaymentList, { bill: r }),
+                ),
               h(
                 A.Tabs.TabPane,
                 { key: 'feedback', title: '账单异议' },
                 h(FeedbackList, { rows: r.feedback }),
               ),
-              (!r.cooperation_id || r.full_access) && h(
-                A.Tabs.TabPane,
-                { key: 'logs', title: '操作记录' },
-                h(C.Logs, { type: 'clinicbill', id }),
-              ),
+              (!r.cooperation_id || r.full_access) &&
+                h(
+                  A.Tabs.TabPane,
+                  { key: 'logs', title: '操作记录' },
+                  h(C.Logs, { type: 'clinicbill', id }),
+                ),
             ),
           ),
       ),

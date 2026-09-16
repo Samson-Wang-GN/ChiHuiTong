@@ -75,7 +75,7 @@ class CooperationTests(TestCase):
                 confirmed=True,
                 version=appointment.version,
             )
-        self.assertEqual(record.cooperation_id, self.subject.id)
+        self.assertEqual(str(record.cooperation_id), str(self.subject.id))
         date = timezone.localdate(self.scheduled)
         issue = (date.replace(day=28) + timedelta(days=4)).replace(day=1)
         bill = finance.generate_cooperation_bill(self.subject.id, issued_on=issue)
