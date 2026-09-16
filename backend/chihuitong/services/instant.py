@@ -186,7 +186,9 @@ def prepare(attempt_id):
 @transaction.atomic
 def observe(attempt_id, data):
     ref = PaymentAttempt.objects.select_related("instant_order").get(pk=attempt_id)
-    appointment, _ = appointments.locked_appointment(ref.instant_order.appointment_id, allow_payment=True)
+    appointment, _ = appointments.locked_appointment(
+        ref.instant_order.appointment_id, allow_payment=True
+    )
     order = InstantRedemptionOrder.objects.select_for_update().get(pk=ref.instant_order_id)
     attempt = PaymentAttempt.objects.select_for_update().get(pk=attempt_id)
     state = payments.validate_observation(attempt, data)
@@ -269,9 +271,17 @@ def complete(order_id):
     )
     if item.status == "completed":
         return item
-    require(not appointment.instant_orders.exclude(pk=item.id).filter(status__in=["pending", "paid", "completed"]).exists(), "payment_conflict", "存在其他待核对付款，请平台核对收款事实；不要重复支付")
     require(
-        item.status == "paid" and item.paid_at and (item.amount_cents == 0 or item.receipts.exists()),
+        not appointment.instant_orders.exclude(pk=item.id)
+        .filter(status__in=["pending", "paid", "completed"])
+        .exists(),
+        "payment_conflict",
+        "存在其他待核对付款，请平台核对收款事实；不要重复支付",
+    )
+    require(
+        item.status == "paid"
+        and item.paid_at
+        and (item.amount_cents == 0 or item.receipts.exists()),
         "payment_pending",
         "尚未确认实际收款",
     )

@@ -22,6 +22,7 @@ from chihuitong.models import (
 
 from .common import advisory_lock
 from .contracts import current_contract
+from .cooperations import current_agreement
 from .notifications import notify_members
 
 
@@ -84,8 +85,6 @@ def tick():
                     f"clinic-bill:{clinic.id}:{day}",
                     {"clinic_id": str(clinic.id), "issued_on": day.isoformat()},
                 )
-        from .cooperations import current_agreement
-
         for subject in ClinicCooperation.objects.filter(
             redemptions__status="active",
             redemptions__payment_mode="postpaid",
@@ -220,6 +219,27 @@ def tick():
             obj=version.contract,
             title="合作合同将于30天内到期，请办理续签",
             key=f"contract-expiry:{version.id}:{day}",
+        )
+    for agreement in ClinicAgreement.objects.filter(
+        status="approved", starts_at__lte=now, ends_at__gte=now,
+        ends_at__lte=now + timedelta(days=30),
+    ).select_related("cooperation"):
+        try:
+            selected = current_agreement(agreement.cooperation, stock=True)
+        except BusinessError:
+            continue
+        if selected.id != agreement.id:
+            continue
+        stores = Clinic.objects.filter(agreement_coverage__agreement=agreement)
+        members = Membership.objects.filter(
+            Q(organization_id=agreement.cooperation.organization_id, role="admin")
+            | Q(organization_id__in=stores.values("organization_id"), role="admin")
+            | Q(pk__in=stores.values("responsible_id"))
+        )
+        notify_members(
+            members, kind="contract.expiring", obj=agreement,
+            title="门诊合同将于30天内到期，请办理续签",
+            key=f"agreement-expiry:{agreement.id}:{day}",
         )
     return {"queued": created, "at": now.isoformat()}
 

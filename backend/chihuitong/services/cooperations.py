@@ -477,7 +477,9 @@ def review_agreement(actor, agreement_id, *, version, approved, reason, final=Fa
     actor.require_platform()
     ref = get_agreement(actor, agreement_id)
     ClinicCooperation.objects.select_for_update().get(pk=ref.cooperation_id)
-    list(Clinic.objects.select_for_update().filter(cooperation_id=ref.cooperation_id).order_by("id"))
+    list(
+        Clinic.objects.select_for_update().filter(cooperation_id=ref.cooperation_id).order_by("id")
+    )
     item = get_agreement(actor, agreement_id, lock=True)
     check_version(item, version)
     require(
@@ -546,7 +548,9 @@ def terminate_agreement(actor, agreement_id, *, version, reason):
     actor.require_platform()
     ref = get_agreement(actor, agreement_id)
     ClinicCooperation.objects.select_for_update().get(pk=ref.cooperation_id)
-    list(Clinic.objects.select_for_update().filter(cooperation_id=ref.cooperation_id).order_by("id"))
+    list(
+        Clinic.objects.select_for_update().filter(cooperation_id=ref.cooperation_id).order_by("id")
+    )
     item = get_agreement(actor, agreement_id, lock=True)
     check_version(item, version)
     require(

@@ -340,6 +340,25 @@
     const q = C.useChoices(base + 'clinic-agreements/' + id),
       r = q.data;
     const edit = r?.can_manage && !readOnly;
+    function batchOnline() {
+      C.form({
+        title: '批量上线已审核门店',
+        fields: [
+          multi('clinic_ids', '选择门店', r.coverage.map((x) => ({ value: x.id, label: x.name }))),
+          C.Reason,
+        ],
+        onSubmit: async (v, key) => {
+          const result = await C.api(base + 'clinics/batch-online', 'POST', v, key);
+          A.Modal.info({
+            title: '逐店上线结果',
+            content: h('div', null, result.results.map((x) => h('p', { key: x.id },
+              (r.coverage.find((s) => s.id === x.id)?.name || x.id) + '：' +
+              (x.status === 'online' ? '已上线' : x.message)))),
+          });
+          return result;
+        },
+      });
+    }
     async function correct() {
       try {
         const row = await C.api(base + 'clinics/' + r.onboarding_clinic_id);
@@ -431,6 +450,10 @@
             edit &&
               C.role === 'platform' &&
               r.status === 'approved' &&
+              !r.onboarding && C.button('批量上线门店', batchOnline),
+            edit &&
+              C.role === 'platform' &&
+              r.status === 'approved' &&
               C.button('终止合同', () =>
                 C.action(
                   '终止合同',
@@ -468,6 +491,12 @@
                 reviewStatus: r.status,
               }),
             ),
+          h(
+            C.Panel,
+            { title: '合同推广产品' },
+            h(A.Space, { wrap: true },
+              (r.products || []).map((x) => h(A.Tag, { key: x.id }, x.internal_name))),
+          ),
           h(
             C.Panel,
             { title: '覆盖门店' },

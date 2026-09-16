@@ -387,7 +387,7 @@
                 { key: 'contracts', title: '签约主体与合同' },
                 r.cooperation_id && C.Agreements
                   ? h(C.Agreements, { id: r.cooperation_id })
-                  : h(C.Contracts, { orgId: r.organization_id, canManage: C.role !== 'clinic' }),
+                  : h(C.Contracts, { orgId: r.organization_id, canManage: false }),
               ),
               h(
                 A.Tabs.TabPane,

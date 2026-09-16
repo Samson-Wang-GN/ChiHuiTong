@@ -56,19 +56,30 @@ def product_choices(request):
     from .services import catalog, clinics, contracts
 
     actor = request_actor(request)
-    require(actor.platform or actor.organization.kind in {"channel", "clinic"}, "forbidden", "无权查看门诊合同产品", 403)
+    require(
+        actor.platform or actor.organization.kind in {"channel", "clinic"},
+        "forbidden",
+        "无权查看门诊合同产品",
+        403,
+    )
     if actor.organization.kind == "clinic":
         actor.require_admin()
     qs = Product.objects.filter(status="active")
     if not actor.platform:
-        channels = [actor.organization.id] if actor.organization.kind == "channel" else clinics.visible_clinics(actor).values_list("channel_id", flat=True).distinct()
+        channels = (
+            [actor.organization.id]
+            if actor.organization.kind == "channel"
+            else clinics.visible_clinics(actor).values_list("channel_id", flat=True).distinct()
+        )
         ids = set()
         for channel_id in channels:
             try:
                 contract = contracts.current_contract(channel_id)
             except BusinessError:
                 continue
-            ids.update(contract.products.filter(status="active").values_list("product_id", flat=True))
+            ids.update(
+                contract.products.filter(status="active").values_list("product_id", flat=True)
+            )
         qs = qs.filter(pk__in=ids)
     return paginated(request, qs, catalog.product_snapshot, states=["active"])
 
@@ -232,6 +243,7 @@ def subject_projection(actor, item):
 
 
 def agreement_projection(actor, item):
+    from .models import Product
     from .services.clinics import visible_clinics
 
     full = cooperations.full_access(actor, item.cooperation, item)
@@ -261,6 +273,10 @@ def agreement_projection(actor, item):
         "payment_mode": item.payment_mode,
         "settlement_cycle": item.settlement_cycle,
         "product_ids": item.product_ids,
+        "products": [
+            {"id": str(product.id), "internal_name": product.internal_name}
+            for product in Product.objects.filter(pk__in=item.product_ids)
+        ],
         "contact": item.contact if full else {},
         "attachment_ids": item.attachment_ids if full else [],
         "signed_attachment_ids": item.signed_attachment_ids if full else [],
