@@ -222,6 +222,56 @@ class PreparationTests(TestCase):
         self.assertNotIn("**重点**", text)
         self.assertIn("- 项目", text)
 
+    def test_markdown_in_plain_template_has_no_duplicate_and_signatures_share_page(self):
+        service.template(
+            self.platform,
+            kind="single",
+            title="合成合同排版测试",
+            body=(
+                "合同编号：{{number}}\n甲方：{{platform_name}}\n乙方：{{subject_name}}\n"
+                "合作期限：{{starts_at}}至{{ends_at}}\n付款方式：{{payment_mode}}\n"
+                "合作产品：{{products}}\n合作门店：{{stores}}\n"
+                + "\n## 测试条款\n\n"
+                + "1. 这是合成测试条款，内容仅用于分页排版检查。\n" * 47
+                + "\n甲方：{{platform_name}}\n甲方签字／盖章区\n\n乙方：{{subject_name}}\n乙方签字／盖章区"
+            ),
+            platform_name="合成平台",
+            platform_credit_code="91110000123456789B",
+            confirmed=True,
+            body_format="plain",
+        )
+        item = self.draft()
+        item = service.generate(self.channel, item.id, version=item.version)
+        printed = item.prints.get(revision=1)
+        self.assertEqual(printed.snapshot["body_format"], "markdown")
+        raw = files.file_bytes(printed.asset)
+        Path("contract-layout-test-sample.pdf").write_bytes(raw)
+        reader = PdfReader(io.BytesIO(raw))
+        pages = [page.extract_text() for page in reader.pages]
+        text = "".join(pages)
+        self.assertEqual(text.count("付款方式：核销现付"), 1)
+        self.assertEqual(text.count("合作产品："), 1)
+        self.assertNotIn("## 测试条款", text)
+        self.assertTrue(any("甲方签字／盖章区" in page and "乙方签字／盖章区" in page for page in pages))
+        self.assertTrue(any("甲方：合成平台\n乙方：" in page for page in pages))
+        self.assertGreater(len(pages), 1)
+
+    def test_existing_signed_contract_keeps_old_layout_and_fingerprint(self):
+        tpl = self.template()
+        item = self.draft()
+        item = service.generate(self.channel, item.id, version=item.version)
+        printed = item.prints.get(revision=1)
+        legacy = service.snapshot(self.channel, item, tpl, frozen={})
+        printed.snapshot = legacy
+        printed.fingerprint = service.fingerprint(legacy)
+        printed.save(update_fields=["snapshot", "fingerprint"])
+        item = service.sign(self.channel, item.id, version=item.version, generation=1,
+                            attachment_ids=[str(self.asset.id)])
+        item = service.generate(self.channel, item.id, version=item.version)
+        self.assertEqual(item.generation, 1)
+        self.assertEqual(item.signed_generation, 1)
+        self.assertEqual(service.current_print(self.channel, item).id, printed.id)
+
     def test_financial_profile_and_generated_date_are_frozen_per_print(self):
         client = api_client(self.platform)
         url = "/api/v1/contract-financial-profile"

@@ -121,7 +121,7 @@ def markdown_blocks(source):
 
     def flush():
         if pending:
-            blocks.append(("paragraph", " ".join(pending)))
+            blocks.append(("paragraph", "\n".join(pending)))
             pending.clear()
 
     for line in source.splitlines():
@@ -509,9 +509,16 @@ def snapshot(actor, item, tpl, frozen=None):
         "template_id": str(tpl.id),
         "input": contract_input(item.payload),
     }
-    # Preserve the exact old fingerprint for templates created before format versioning.
-    if tpl.body_format == "markdown":
+    # Existing snapshots must reproduce their original fingerprints exactly.
+    legacy_layout = frozen is not None and frozen.get("layout_version") != 2
+    is_markdown = tpl.body_format == "markdown" or (
+        not legacy_layout and bool(re.search(r"(?m)^#{1,2}\s+\S", tpl.body))
+    )
+    if is_markdown:
         result["body_format"] = "markdown"
+        result["template_body"] = tpl.body
+    if not legacy_layout:
+        result["layout_version"] = 2
         result["template_body"] = tpl.body
     return result
 
@@ -530,7 +537,7 @@ def pdf_bytes(data, revision):
     from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.pdfgen.canvas import Canvas
     from reportlab.pdfgen.textobject import PDFTextObject
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+    from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer
 
     font = Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc")
     require(font.is_file(), "pdf_font_unavailable", "合同生成字体未配置，请联系平台", 503)
@@ -567,9 +574,21 @@ def pdf_bytes(data, revision):
         ("业务联系人", "contact_name"),
         ("联系电话", "contact_phone"),
     ]
-    for label, key in labels:
+    represented = (
+        set(PATTERN.findall(data["template_body"]))
+        if data.get("layout_version") == 2
+        else set()
+    )
+    summary = [
+        (label, key)
+        for label, key in labels
+        if key not in represented
+        and not (key == "settlement_cycle" and data["values"][key] == "不适用" and represented)
+    ]
+    for label, key in summary:
         story.append(Paragraph(escape(f"{label}：{data['values'][key]}"), normal))
-    story.append(Spacer(1, 12))
+    if summary:
+        story.append(Spacer(1, 12))
     if data.get("body_format") == "markdown":
         heading1 = ParagraphStyle("heading1", parent=title, keepWithNext=True)
         heading2 = ParagraphStyle(
@@ -577,11 +596,44 @@ def pdf_bytes(data, revision):
         )
         listed = ParagraphStyle("list", parent=normal, leftIndent=18, firstLineIndent=-12)
         styles = {"paragraph": normal, "heading1": heading1, "heading2": heading2, "list": listed}
-        for kind, content in markdown_blocks(data["template_body"]):
-            story.append(Paragraph(markdown_inline(content, data["values"]), styles[kind]))
+        blocks = markdown_blocks(data["template_body"])
+        paragraphs = [
+            Paragraph(
+                "<br/>".join(markdown_inline(line, data["values"]) for line in content.split("\n")),
+                styles[kind],
+            )
+            for kind, content in blocks
+        ]
+        signature_start = len(blocks)
+        while signature_start and re.search(r"签字|签名|盖章|签章", blocks[signature_start - 1][1]):
+            signature_start -= 1
+        signature_count = sum(
+            len(re.findall(r"签字|签名|盖章|签章", content))
+            for _, content in blocks[signature_start:]
+        )
+        if signature_count >= 2:
+            story.extend(paragraphs[:signature_start])
+            signature = []
+            for paragraph in paragraphs[signature_start:]:
+                signature.extend([paragraph, Spacer(1, 32)])
+            story.append(KeepTogether(signature))
+        else:
+            story.extend(paragraphs)
     else:
-        for line in data["body"].splitlines():
-            story.append(Paragraph(escape(line), normal) if line.strip() else Spacer(1, 10))
+        lines = data["body"].splitlines()
+        tail = len(lines)
+        while tail and (not lines[tail - 1].strip() or re.search(r"签字|签名|盖章|签章", lines[tail - 1])):
+            tail -= 1
+        def plain_flow(line):
+            return Paragraph(escape(line), normal) if line.strip() else Spacer(1, 10)
+
+        if data.get("layout_version") == 2 and sum(
+            bool(re.search(r"签字|签名|盖章|签章", line)) for line in lines[tail:]
+        ) >= 2:
+            story.extend(plain_flow(line) for line in lines[:tail])
+            story.append(KeepTogether([plain_flow(line) for line in lines[tail:]]))
+        else:
+            story.extend(plain_flow(line) for line in lines)
 
     def footer(canvas, document):
         canvas.setFont("ContractCJK", 8)
@@ -630,6 +682,7 @@ def generate(actor, pk, *, version):
         old
         and old.template_id == tpl.id
         and old.fingerprint == fingerprint(snapshot(actor, item, tpl, frozen=old.snapshot))
+        and (old.snapshot.get("layout_version") == 2 or item.signed_generation == old.revision)
     ):
         return item
     data = snapshot(actor, item, tpl)
