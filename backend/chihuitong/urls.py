@@ -20,6 +20,7 @@ urlpatterns = [
     path("contract-preparations/<uuid:preparation_id>", preparation.detail),
     path("contract-preparations/<uuid:preparation_id>/<str:action>", preparation.action),
     path("contract-templates", preparation.templates),
+    path("contract-financial-profile", preparation.financial_profile),
     path("health", api.health),
     path("auth/code", api.send_code),
     path("auth/login", api.login),

@@ -5,6 +5,11 @@ from chihuitong.crypto import EncryptedJSONField, EncryptedTextField
 from .core import Entity, Membership
 
 
+class ContractFinancialProfile(Entity):
+    details = EncryptedJSONField(default=dict)
+    created_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
+
+
 class ContractTemplate(Entity):
     kind = models.CharField(max_length=16, choices=[("single", "单店"), ("chain", "连锁")])
     title = models.CharField(max_length=160)

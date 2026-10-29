@@ -15,6 +15,7 @@ from django.utils import timezone
 from chihuitong.errors import require
 from chihuitong.models import (
     ContractPreparation,
+    ContractFinancialProfile,
     ContractPrint,
     ContractTemplate,
     FileAsset,
@@ -38,8 +39,32 @@ FIELDS = {
     "stores",
     "contact_name",
     "contact_phone",
+    "contract_date",
+    "receiving_name",
+    "receiving_info",
+    "tax_terms",
+    "invoice_terms",
 }
 PATTERN = re.compile(r"\{\{([a-z_]+)\}\}")
+FINANCIAL_FIELDS = {"receiving_name", "receiving_info", "tax_terms", "invoice_terms"}
+
+
+@transaction.atomic
+def publish_financial_profile(actor, details):
+    actor.require_platform()
+    require(
+        set(details) == FINANCIAL_FIELDS
+        and all(isinstance(v, str) and 0 < len(v.strip()) <= 1000 for v in details.values()),
+        "invalid_financial_profile",
+        "请完整填写收款主体、收款信息、含税说明及开票安排",
+        400,
+    )
+    advisory_lock("contract_financial_profile", "platform")
+    item = ContractFinancialProfile.objects.create(
+        details={key: value.strip() for key, value in details.items()}, created_by=actor.membership
+    )
+    audit(actor, item, "contract_financial_profile.published")
+    return item
 
 
 def markdown_blocks(source):
@@ -275,7 +300,7 @@ def contract_input(payload):
     }
 
 
-def snapshot(actor, item, tpl):
+def snapshot(actor, item, tpl, frozen=None):
     from chihuitong.api_cooperations import AgreementInput
 
     from .clinics import visible_clinics
@@ -367,6 +392,20 @@ def snapshot(actor, item, tpl):
         "contact_name": data["contact"]["name"],
         "contact_phone": data["contact"]["phone"],
     }
+    used_fields = set(PATTERN.findall(tpl.body))
+    if "contract_date" in used_fields:
+        values["contract_date"] = (
+            frozen["values"]["contract_date"]
+            if frozen and "contract_date" in frozen.get("values", {})
+            else timezone.localdate().isoformat()
+        )
+    if used_fields & FINANCIAL_FIELDS:
+        if frozen and FINANCIAL_FIELDS <= set(frozen.get("values", {})):
+            values.update({key: frozen["values"][key] for key in FINANCIAL_FIELDS})
+        else:
+            profile = ContractFinancialProfile.objects.order_by("-created_at", "-id").first()
+            require(profile, "financial_profile_missing", "平台尚未配置合同收款和开票信息", 409)
+            values.update(profile.details)
     body = PATTERN.sub(lambda match: values[match.group(1)], tpl.body)
     result = {
         "values": values,
@@ -491,11 +530,13 @@ def generate(actor, pk, *, version):
     require(
         tpl, "template_missing", "平台尚未配置正式合同模板；草稿已保留，请联系平台配置后再生成", 409
     )
+    old = item.prints.filter(revision=item.generation).first()
+    if old and old.template_id == tpl.id and old.fingerprint == fingerprint(
+        snapshot(actor, item, tpl, frozen=old.snapshot)
+    ):
+        return item
     data = snapshot(actor, item, tpl)
     checksum = fingerprint(data)
-    old = item.prints.filter(revision=item.generation).first()
-    if old and old.fingerprint == checksum:
-        return item
     revision = item.generation + 1
     asset = files.upload_file(
         actor,
@@ -522,7 +563,7 @@ def current_print(actor, item):
     printed = item.prints.select_related("template").filter(revision=item.generation).first()
     require(printed, "print_required", "请先生成并下载待签合同", 409)
     require(
-        printed.fingerprint == fingerprint(snapshot(actor, item, printed.template)),
+        printed.fingerprint == fingerprint(snapshot(actor, item, printed.template, frozen=printed.snapshot)),
         "print_stale",
         "合同内容或产品费用已变化，请重新生成、打印并签署",
         409,

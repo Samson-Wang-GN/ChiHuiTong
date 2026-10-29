@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from .api import StrictSerializer, paginated, validated
 from .api_sales import command
 from .identity import request_actor
-from .models import ContractTemplate
+from .models import ContractFinancialProfile, ContractTemplate
 from .services import contract_preparation as service
 
 
@@ -34,6 +34,33 @@ class TemplateInput(StrictSerializer):
     platform_name = serializers.CharField(max_length=160)
     platform_credit_code = serializers.RegexField(r"^[0-9A-HJ-NPQRTUWXY]{18}$")
     confirmed = serializers.BooleanField()
+
+
+class FinancialProfileInput(StrictSerializer):
+    receiving_name = serializers.CharField(max_length=1000)
+    receiving_info = serializers.CharField(max_length=1000)
+    tax_terms = serializers.CharField(max_length=1000)
+    invoice_terms = serializers.CharField(max_length=1000)
+
+
+@api_view(["GET", "POST"])
+def financial_profile(request):
+    actor = request_actor(request)
+    actor.require_platform()
+    if request.method == "POST":
+        data = validated(FinancialProfileInput, request)
+        return Response(
+            command(
+                request,
+                actor,
+                "contract_financial_profile.publish",
+                data,
+                lambda: {"id": str(service.publish_financial_profile(actor, data).id)},
+            ),
+            status=201,
+        )
+    item = ContractFinancialProfile.objects.order_by("-created_at", "-id").first()
+    return Response({"id": str(item.id), **item.details} if item else {})
 
 
 def projection(item):

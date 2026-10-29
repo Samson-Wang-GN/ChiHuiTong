@@ -10,6 +10,25 @@
     title: '模板名称',
   });
   Object.assign(C.labels, { submitted: '已提交审核', retired: '已被替代' });
+  C.editFinancialProfile = async function () {
+    try {
+      const current = await C.request(base + 'contract-financial-profile');
+      C.form({
+        title: '合同收款及开票信息',
+        initial: current,
+        hint: '仅用于合同文本；不会开通或修改支付商户，也不会自动开票。请勿填写密钥。修改只影响之后新生成的合同。',
+        fields: [
+          { name: 'receiving_name', label: '收款主体' },
+          { name: 'receiving_info', label: '收款信息', type: 'textarea', max: 1000 },
+          { name: 'tax_terms', label: '含税说明', type: 'textarea', max: 1000 },
+          { name: 'invoice_terms', label: '开票安排', type: 'textarea', max: 1000 },
+        ],
+        onSubmit: (v, key) => C.api(base + 'contract-financial-profile', 'POST', v, key),
+      });
+    } catch (error) {
+      A.Message.error(error.message || '无法读取合同收款配置');
+    }
+  };
   C.dialogs.preparations = ({ onClose }) =>
     h(
       C.Drawer,
@@ -152,7 +171,7 @@
     C.form({
       title: '发布正式合同模板',
       initial: { body_format: 'markdown', ...row },
-      hint: '仅填写已获平台认可的正文。Markdown 支持 # 和 ## 标题、空行分段、**加粗**、- 列表和数字列表；纯文本保持原排版。占位符示例：{{number}}、{{platform_name}}、{{subject_name}}；还支持platform_credit_code、subject_credit_code、starts_at、ends_at、payment_mode、settlement_cycle、products、stores、contact_name、contact_phone。签字/盖章位置应写入正文。发布新版本不改写已经生成的合同。',
+      hint: '仅填写已获平台认可的正文。Markdown 支持标题、段落、加粗和列表。除既有合同字段外，可使用 {{contract_date}}、{{receiving_name}}、{{receiving_info}}、{{tax_terms}}、{{invoice_terms}}；签署日按本版本生成日期填充。签字/盖章位置应写入正文。',
       fields: [
         {
           name: 'kind',
@@ -179,6 +198,7 @@
         content: '尚无默认合同正文。请先取得认可的正式范本再发布；不要将测试内容用于实际签署。',
       }),
       C.button('发布新模板版本', () => templateForm()),
+      C.button('配置合同收款及开票信息', () => C.editFinancialProfile()),
       h(C.List, {
         path: base + 'contract-templates',
         columns: [C.column('title'), C.column('kind'), C.column('status'), C.column('created_at')],

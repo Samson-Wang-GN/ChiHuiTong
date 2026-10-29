@@ -220,6 +220,37 @@ class PreparationTests(TestCase):
         self.assertNotIn("**重点**", text)
         self.assertIn("- 项目", text)
 
+    def test_financial_profile_and_generated_date_are_frozen_per_print(self):
+        client = api_client(self.platform)
+        url = "/api/v1/contract-financial-profile"
+        data = {
+            "receiving_name": "合成收款主体",
+            "receiving_info": "合成收款信息",
+            "tax_terms": "费用含税",
+            "invoice_terms": "合成开票安排",
+        }
+        self.assertEqual(api_client(self.channel).get(url).status_code, 403)
+        self.assertEqual(api_client(self.channel).post(url, data, format="json").status_code, 403)
+        self.assertEqual(client.post(url, data, format="json", HTTP_IDEMPOTENCY_KEY="profile-one").status_code, 201)
+        tpl = service.template(
+            self.platform,
+            kind="single",
+            title="合成合同",
+            body="{{number}} {{platform_name}} {{subject_name}} {{contract_date}} {{receiving_name}} {{receiving_info}} {{tax_terms}} {{invoice_terms}}",
+            platform_name="合成平台",
+            platform_credit_code="91110000123456789B",
+            confirmed=True,
+        )
+        item = self.draft()
+        item = service.generate(self.channel, item.id, version=item.version)
+        printed = item.prints.get(revision=1)
+        self.assertEqual(printed.snapshot["values"]["receiving_name"], data["receiving_name"])
+        service.publish_financial_profile(self.platform, {**data, "receiving_name": "新收款主体"})
+        service.current_print(self.channel, item)
+        item = service.generate(self.channel, item.id, version=item.version)
+        self.assertEqual(item.generation, 1)
+        self.assertEqual(printed.template_id, tpl.id)
+
     def finish_draft(self, item):
         item = service.generate(self.channel, item.id, version=item.version)
         item = service.sign(
