@@ -27,6 +27,18 @@
     'business_contact',
     'business_phone',
   ];
+  C.copyBusinessContact = function (form, nameField, phoneField) {
+    const name = (form.getFieldValue('business_contact') || '').trim();
+    const phone = (form.getFieldValue('business_phone') || '').trim();
+    if (!name) {
+      A.Message.warning('请先填写业务联系人姓名');
+      return;
+    }
+    const values = { [nameField]: name };
+    if (/^1[3-9]\d{9}$/.test(phone)) values[phoneField] = phone;
+    else A.Message.warning('管理员需要手机号，请单独填写管理员手机号');
+    form.setFieldsValue(values);
+  };
   function SavedLocationMap({
     clinicId,
     changeId,
@@ -583,7 +595,21 @@
       },
       ...(!row
         ? [
-            { name: 'admin_name', label: '门诊管理员姓名' },
+            {
+              name: 'admin_name',
+              label: '门诊管理员姓名',
+              render: (form) =>
+                h(A.Input, {
+                  suffix: h(
+                    A.Button,
+                    {
+                      type: 'text',
+                      onClick: () => C.copyBusinessContact(form, 'admin_name', 'admin_phone'),
+                    },
+                    '与业务联系人相同',
+                  ),
+                }),
+            },
             { name: 'admin_phone', label: '门诊管理员手机号' },
           ]
         : []),

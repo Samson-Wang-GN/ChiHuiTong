@@ -43,7 +43,26 @@
     admin_phone: v.subject_phone,
   });
   C.jointFields = (products, existing) => [
-    ...(!existing ? subjectFields : []),
+    ...(!existing
+      ? subjectFields.map((field) =>
+          field.name === 'subject_admin'
+            ? {
+                ...field,
+                render: (form) =>
+                  h(A.Input, {
+                    suffix: h(
+                      A.Button,
+                      {
+                        type: 'text',
+                        onClick: () => C.copyBusinessContact(form, 'subject_admin', 'subject_phone'),
+                      },
+                      '与业务联系人相同',
+                    ),
+                  }),
+              }
+            : field,
+        )
+      : []),
     { name: 'contract_starts', label: '合同生效时间', type: 'date', time: true },
     { name: 'contract_ends', label: '合同到期时间', type: 'date', time: true },
     multi('contract_products', '申请上线的推广产品', productOptions(products)),
