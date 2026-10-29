@@ -252,7 +252,9 @@ class PreparationTests(TestCase):
         self.assertEqual(text.count("付款方式：核销现付"), 1)
         self.assertEqual(text.count("合作产品："), 1)
         self.assertNotIn("## 测试条款", text)
-        self.assertTrue(any("甲方签字／盖章区" in page and "乙方签字／盖章区" in page for page in pages))
+        self.assertTrue(
+            any("甲方签字／盖章区" in page and "乙方签字／盖章区" in page for page in pages)
+        )
         self.assertTrue(any("甲方：合成平台\n乙方：" in page for page in pages))
         self.assertGreater(len(pages), 1)
         self.assertGreater(text.index("补充信息"), text.index("测试条款"))
@@ -281,12 +283,37 @@ class PreparationTests(TestCase):
         printed.snapshot = legacy
         printed.fingerprint = service.fingerprint(legacy)
         printed.save(update_fields=["snapshot", "fingerprint"])
-        item = service.sign(self.channel, item.id, version=item.version, generation=1,
-                            attachment_ids=[str(self.asset.id)])
+        item = service.sign(
+            self.channel,
+            item.id,
+            version=item.version,
+            generation=1,
+            attachment_ids=[str(self.asset.id)],
+        )
         item = service.generate(self.channel, item.id, version=item.version)
         self.assertEqual(item.generation, 1)
         self.assertEqual(item.signed_generation, 1)
         self.assertEqual(service.current_print(self.channel, item).id, printed.id)
+
+    def test_oversized_signature_area_fails_instead_of_splitting(self):
+        service.template(
+            self.platform,
+            kind="single",
+            title="合成合同",
+            body=(
+                "合同{{number}} 甲方{{platform_name}} 乙方{{subject_name}}\n\n## 条款\n\n"
+                "甲方签字" + "合成签署内容" * 400 + "\n\n乙方盖章" + "合成签署内容" * 400
+            ),
+            platform_name="合成平台",
+            platform_credit_code="91110000123456789B",
+            confirmed=True,
+            body_format="markdown",
+        )
+        item = self.draft()
+        with self.assertRaises(BusinessError) as error:
+            service.generate(self.channel, item.id, version=item.version)
+        self.assertEqual(error.exception.code, "signature_area_too_long")
+        self.assertFalse(item.prints.exists())
 
     def test_financial_profile_and_generated_date_are_frozen_per_print(self):
         client = api_client(self.platform)

@@ -575,9 +575,7 @@ def pdf_bytes(data, revision):
         ("联系电话", "contact_phone"),
     ]
     represented = (
-        set(PATTERN.findall(data["template_body"]))
-        if data.get("layout_version") == 2
-        else set()
+        set(PATTERN.findall(data["template_body"])) if data.get("layout_version") == 2 else set()
     )
     summary = [
         (label, key)
@@ -594,6 +592,16 @@ def pdf_bytes(data, revision):
         summary_flow = []
     elif summary_flow:
         summary_flow = [Paragraph("补充信息", normal), *summary_flow]
+
+    def keep_signature(flowables):
+        height = sum(
+            flowable.wrap(doc.width, doc.height)[1]
+            + flowable.getSpaceBefore()
+            + flowable.getSpaceAfter()
+            for flowable in flowables
+        )
+        require(height <= doc.height, "signature_area_too_long", "签章区内容过长，请调整模板后重新生成", 400)
+        return KeepTogether(flowables)
     if data.get("body_format") == "markdown":
         heading1 = ParagraphStyle("heading1", parent=title, keepWithNext=True)
         heading2 = ParagraphStyle(
@@ -622,28 +630,34 @@ def pdf_bytes(data, revision):
             signature = []
             for paragraph in paragraphs[signature_start:]:
                 signature.extend([paragraph, Spacer(1, 32)])
-            story.append(KeepTogether(signature))
+            story.append(keep_signature(signature))
         else:
             story.extend(paragraphs)
             story.extend(summary_flow)
     else:
         lines = data["body"].splitlines()
         tail = len(lines)
-        while tail and len(lines) - tail < 12 and (
-            not lines[tail - 1].strip()
-            or re.search(r"签字|签名|盖章|签章", lines[tail - 1])
-            or re.match(r"^\s*[甲乙]方[（(:：]", lines[tail - 1])
+        while (
+            tail
+            and len(lines) - tail < 12
+            and (
+                not lines[tail - 1].strip()
+                or re.search(r"签字|签名|盖章|签章", lines[tail - 1])
+                or re.match(r"^\s*[甲乙]方[（(:：]", lines[tail - 1])
+            )
         ):
             tail -= 1
+
         def plain_flow(line):
             return Paragraph(escape(line), normal) if line.strip() else Spacer(1, 10)
 
-        if data.get("layout_version") == 2 and sum(
-            bool(re.search(r"签字|签名|盖章|签章", line)) for line in lines[tail:]
-        ) >= 2:
+        if (
+            data.get("layout_version") == 2
+            and sum(bool(re.search(r"签字|签名|盖章|签章", line)) for line in lines[tail:]) >= 2
+        ):
             story.extend(plain_flow(line) for line in lines[:tail])
             story.extend(summary_flow)
-            story.append(KeepTogether([plain_flow(line) for line in lines[tail:]]))
+            story.append(keep_signature([plain_flow(line) for line in lines[tail:]]))
         else:
             story.extend(plain_flow(line) for line in lines)
             story.extend(summary_flow)
