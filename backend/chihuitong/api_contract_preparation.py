@@ -30,6 +30,7 @@ class TemplateInput(StrictSerializer):
     kind = serializers.ChoiceField(choices=["single", "chain"])
     title = serializers.CharField(max_length=160)
     body = serializers.CharField(max_length=30000)
+    body_format = serializers.ChoiceField(choices=["plain", "markdown"], default="plain")
     platform_name = serializers.CharField(max_length=160)
     platform_credit_code = serializers.RegexField(r"^[0-9A-HJ-NPQRTUWXY]{18}$")
     confirmed = serializers.BooleanField()
@@ -136,6 +137,7 @@ def templates(request):
             "kind": x.kind,
             "title": x.title,
             "body": x.body,
+            "body_format": x.body_format,
             "platform_name": x.platform_name,
             "platform_credit_code": x.platform_credit_code,
             "status": x.status,

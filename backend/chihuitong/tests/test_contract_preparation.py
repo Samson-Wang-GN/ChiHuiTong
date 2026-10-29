@@ -177,6 +177,38 @@ class PreparationTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(ContractTemplate.objects.count(), 0)
 
+    def test_markdown_pdf_literal_fields_and_legacy_snapshot(self):
+        old = self.template()
+        item = self.draft()
+        item = service.generate(self.channel, item.id, version=item.version)
+        old_print = item.prints.get(revision=1)
+        self.assertNotIn("body_format", old_print.snapshot)
+        service.current_print(self.channel, item)
+        tpl = service.template(
+            self.platform,
+            kind="single",
+            title="合成测试",
+            body="# 标题\n\n合同{{number}} {{platform_name}} {{subject_name}}\n\n"
+            "## 条款\n\n普通段落\n续行\n\n**重点**\n\n- 项目\n1. 第二项",
+            platform_name="合成**平台**<b>文字</b>",
+            platform_credit_code="91110000123456789B",
+            confirmed=True,
+            body_format="markdown",
+        )
+        old.refresh_from_db()
+        self.assertEqual(old.body_format, "plain")
+        service.current_print(self.channel, item)
+        data = service.snapshot(self.channel, item, tpl)
+        self.assertEqual(data["body_format"], "markdown")
+        raw = service.pdf_bytes(data, 2)
+        reader = PdfReader(io.BytesIO(raw))
+        text = "".join(page.extract_text() for page in reader.pages)
+        for expected in ("标题", "条款", "普通段落", "续行", "重点", "项目", "第二项", "**平台**<b>文字</b>"):
+            self.assertIn(expected, text)
+        content = b"".join(page.get_contents().get_data() for page in reader.pages)
+        self.assertIn(b"2 Tr", content)
+        self.assertNotIn("**重点**", text)
+
     def finish_draft(self, item):
         item = service.generate(self.channel, item.id, version=item.version)
         item = service.sign(

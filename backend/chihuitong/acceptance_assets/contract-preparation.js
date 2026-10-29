@@ -151,8 +151,8 @@
   function templateForm(row = {}) {
     C.form({
       title: '发布正式合同模板',
-      initial: row,
-      hint: '仅填写已获平台认可的正文。占位符示例：{{number}}、{{platform_name}}、{{subject_name}}；还支持platform_credit_code、subject_credit_code、starts_at、ends_at、payment_mode、settlement_cycle、products、stores、contact_name、contact_phone。签字/盖章位置应写入正文。发布新版本不改写已经生成的合同。',
+      initial: { body_format: 'markdown', ...row },
+      hint: '仅填写已获平台认可的正文。Markdown 支持 # 和 ## 标题、空行分段、**加粗**、- 列表和数字列表；纯文本保持原排版。占位符示例：{{number}}、{{platform_name}}、{{subject_name}}；还支持platform_credit_code、subject_credit_code、starts_at、ends_at、payment_mode、settlement_cycle、products、stores、contact_name、contact_phone。签字/盖章位置应写入正文。发布新版本不改写已经生成的合同。',
       fields: [
         {
           name: 'kind',
@@ -161,6 +161,7 @@
           options: C.options({ single: '单店现付', chain: '连锁后付' }),
         },
         { name: 'title', label: '合同标题' },
+        { name: 'body_format', label: '正文格式', type: 'select', options: C.options({ plain: '纯文本', markdown: 'Markdown' }) },
         { name: 'platform_name', label: '平台法定签约名称' },
         { name: 'platform_credit_code', label: '平台统一社会信用代码' },
         { name: 'body', label: '认可的完整合同正文', type: 'textarea', max: 30000 },

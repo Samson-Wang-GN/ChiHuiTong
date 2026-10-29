@@ -42,6 +42,54 @@ FIELDS = {
 PATTERN = re.compile(r"\{\{([a-z_]+)\}\}")
 
 
+def markdown_blocks(source):
+    """Parse a deliberately small, non-HTML subset before inserting field values."""
+    blocks = []
+    pending = []
+
+    def flush():
+        if pending:
+            blocks.append(("paragraph", " ".join(pending)))
+            pending.clear()
+
+    for line in source.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            flush()
+            continue
+        heading = re.match(r"^(#{1,2})\s+(.+)$", stripped)
+        listing = re.match(r"^(-|\d+\.)\s+(.+)$", stripped)
+        if heading:
+            flush()
+            blocks.append(("heading" + str(len(heading.group(1))), heading.group(2)))
+        elif listing:
+            flush()
+            prefix = "•" if listing.group(1) == "-" else listing.group(1)
+            blocks.append(("list", prefix + " " + listing.group(2)))
+        else:
+            pending.append(stripped)
+    flush()
+    return blocks
+
+
+def markdown_inline(source, values):
+    """Only template-authored bold markers are interpreted; fields remain literal."""
+    def literal(fragment):
+        parts = PATTERN.split(fragment)
+        return "".join(
+            escape(values[part]) if index % 2 else escape(part)
+            for index, part in enumerate(parts)
+        )
+
+    pieces = re.split(r"(\*\*[^*\n]+\*\*)", source)
+    return "".join(
+        '<font name="ContractBold">' + literal(part[2:-2]) + "</font>"
+        if part.startswith("**") and part.endswith("**") and len(part) > 4
+        else literal(part)
+        for part in pieces
+    )
+
+
 def visible(actor):
     require(
         actor.platform or actor.organization.kind == "channel",
@@ -71,8 +119,9 @@ def editable(item, version):
 
 
 @transaction.atomic
-def template(actor, *, kind, title, body, platform_name, platform_credit_code, confirmed):
+def template(actor, *, kind, title, body, platform_name, platform_credit_code, confirmed, body_format="plain"):
     actor.require_platform()
+    require(body_format in {"plain", "markdown"}, "invalid_template", "不支持的正文格式", 400)
     require(
         confirmed is True, "confirmation_required", "请确认范本已获平台认可，可用于实际签署", 400
     )
@@ -95,6 +144,7 @@ def template(actor, *, kind, title, body, platform_name, platform_credit_code, c
         kind=kind,
         title=title,
         body=body,
+        body_format=body_format,
         platform_name=platform_name,
         platform_credit_code=platform_credit_code,
         created_by=actor.membership,
@@ -316,13 +366,18 @@ def snapshot(actor, item, tpl):
         "contact_phone": data["contact"]["phone"],
     }
     body = PATTERN.sub(lambda match: values[match.group(1)], tpl.body)
-    return {
+    result = {
         "values": values,
         "body": body,
         "title": tpl.title,
         "template_id": str(tpl.id),
         "input": contract_input(item.payload),
     }
+    # Preserve the exact old fingerprint for templates created before format versioning.
+    if tpl.body_format == "markdown":
+        result["body_format"] = "markdown"
+        result["template_body"] = tpl.body
+    return result
 
 
 def fingerprint(data):
@@ -337,12 +392,16 @@ def pdf_bytes(data, revision):
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfgen.canvas import Canvas
+    from reportlab.pdfgen.textobject import PDFTextObject
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
     font = Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc")
     require(font.is_file(), "pdf_font_unavailable", "合同生成字体未配置，请联系平台", 503)
     if "ContractCJK" not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(TTFont("ContractCJK", str(font), subfontIndex=0))
+    if data.get("body_format") == "markdown" and "ContractBold" not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont("ContractBold", str(font), subfontIndex=0))
     output = io.BytesIO()
     doc = SimpleDocTemplate(
         output, pagesize=A4, rightMargin=48, leftMargin=48, topMargin=58, bottomMargin=54
@@ -372,8 +431,16 @@ def pdf_bytes(data, revision):
     for label, key in labels:
         story.append(Paragraph(escape(f"{label}：{data['values'][key]}"), normal))
     story.append(Spacer(1, 12))
-    for line in data["body"].splitlines():
-        story.append(Paragraph(escape(line), normal) if line.strip() else Spacer(1, 10))
+    if data.get("body_format") == "markdown":
+        heading1 = ParagraphStyle("heading1", parent=title, keepWithNext=True)
+        heading2 = ParagraphStyle("heading2", parent=normal, fontSize=13, leading=21, keepWithNext=True)
+        listed = ParagraphStyle("list", parent=normal, leftIndent=18, firstLineIndent=-12)
+        styles = {"paragraph": normal, "heading1": heading1, "heading2": heading2, "list": listed}
+        for kind, content in markdown_blocks(data["template_body"]):
+            story.append(Paragraph(markdown_inline(content, data["values"]), styles[kind]))
+    else:
+        for line in data["body"].splitlines():
+            story.append(Paragraph(escape(line), normal) if line.strip() else Spacer(1, 10))
 
     def footer(canvas, document):
         canvas.setFont("ContractCJK", 8)
@@ -381,7 +448,27 @@ def pdf_bytes(data, revision):
         canvas.drawString(48, 30, f"{data['values']['number']} / 生成版 {revision} / 待线下签署")
         canvas.drawRightString(A4[0] - 48, 30, f"第 {document.page} 页")
 
-    doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    class ContractText(PDFTextObject):
+        # The installed Chinese font has no bold face. PDF fill-and-stroke creates
+        # a visible bold face without distributing another font or interpreting HTML.
+        def _weight(self, font_name):
+            self.setTextRenderMode(2 if font_name == "ContractBold" else 0)
+            if font_name == "ContractBold":
+                self._code.append("0.3 w")
+
+        def _setFont(self, name, size):
+            super()._setFont(name, size)
+            self._weight(name)
+
+        def setFont(self, name, size, leading=None):
+            super().setFont(name, size, leading)
+            self._weight(name)
+
+    class ContractCanvas(Canvas):
+        def beginText(self, x=0, y=0, direction=None):
+            return ContractText(self, x, y, direction=direction)
+
+    doc.build(story, onFirstPage=footer, onLaterPages=footer, canvasmaker=ContractCanvas)
     return output.getvalue()
 
 

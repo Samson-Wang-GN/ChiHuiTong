@@ -9,6 +9,7 @@ class ContractTemplate(Entity):
     kind = models.CharField(max_length=16, choices=[("single", "单店"), ("chain", "连锁")])
     title = models.CharField(max_length=160)
     body = EncryptedTextField()
+    body_format = models.CharField(max_length=16, default="plain")
     platform_name = models.CharField(max_length=160)
     platform_credit_code = models.CharField(max_length=18)
     created_by = models.ForeignKey(Membership, on_delete=models.PROTECT)
