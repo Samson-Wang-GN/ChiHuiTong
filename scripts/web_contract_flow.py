@@ -30,6 +30,10 @@ def exercise(pages, report):
             assert field(channel, label).locator('input').input_value() == '合成联系人'
         for label in ['签约主体管理员手机号', '门诊管理员手机号']:
             assert field(channel, label).locator('input').input_value() == '13800000692'
+        fill(channel, '业务联系人电话', '010-88888888')
+        field(channel, '门诊管理员姓名').get_by_role('button', name='与业务联系人相同').click()
+        assert field(channel, '门诊管理员手机号').locator('input').input_value() == '13800000692'
+        fill(channel, '业务联系人电话', values['业务联系人电话'])
         for label in ['签约主体管理员姓名', '签约主体管理员手机号', '门诊管理员姓名', '门诊管理员手机号']:
             fill(channel, label, values[label])
         date_field(channel,'合同生效时间',(datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d %H:%M'))
