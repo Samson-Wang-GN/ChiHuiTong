@@ -141,7 +141,9 @@ class OnboardingTests(TestCase):
                 final=True,
             )
         self.assertEqual(raised.exception.code, "contract_unavailable")
-        self.assertIn(timezone.localtime(item.starts_at).strftime("%Y-%m-%d %H:%M"), raised.exception.message)
+        self.assertIn(
+            timezone.localtime(item.starts_at).strftime("%Y-%m-%d %H:%M"), raised.exception.message
+        )
         self.assertIn("尚未生效", raised.exception.message)
         item.refresh_from_db()
         clinic.refresh_from_db()

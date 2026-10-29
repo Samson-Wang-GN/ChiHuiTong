@@ -72,7 +72,10 @@ class CooperationTests(TestCase):
         with self.assertRaises(BusinessError) as raised:
             cooperations.current_agreement(self.subject, at=now)
         self.assertEqual(raised.exception.code, "contract_unavailable")
-        self.assertIn(timezone.localtime(self.agreement.starts_at).strftime("%Y-%m-%d %H:%M"), raised.exception.message)
+        self.assertIn(
+            timezone.localtime(self.agreement.starts_at).strftime("%Y-%m-%d %H:%M"),
+            raised.exception.message,
+        )
         self.agreement.status = "pending"
         self.agreement.save(update_fields=["status"])
         with self.assertRaises(BusinessError) as raised:
