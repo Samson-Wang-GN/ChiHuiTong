@@ -39,6 +39,24 @@
     else A.Message.warning('管理员需要手机号，请单独填写管理员手机号');
     form.setFieldsValue(values);
   };
+  function BusinessHours({ value = '', onChange }) {
+    const parts = (value || '').split('-');
+    const start = parts[0] || '';
+    const end = parts[1] || '';
+    return h(
+      A.Space,
+      { wrap: true },
+      h(A.TimePicker, {
+        format: 'HH:mm', value: start || undefined, 'aria-label': '营业开始时间',
+        onChange: (v) => onChange((v || '') + '-' + end),
+      }),
+      h('span', null, '至'),
+      h(A.TimePicker, {
+        format: 'HH:mm', value: end || undefined, 'aria-label': '营业结束时间',
+        onChange: (v) => onChange(start + '-' + (v || '')),
+      }),
+    );
+  }
   function SavedLocationMap({
     clinicId,
     changeId,
@@ -529,6 +547,41 @@
         : null,
     );
     const profile = draft || preparation?.payload.clinic?.profile || row?.profile || {};
+    const [regions, setRegions] = React.useState([]);
+    const [regionProvince, setRegionProvince] = React.useState(profile.province || '');
+    const [regionCity, setRegionCity] = React.useState(profile.city || '');
+    React.useEffect(() => {
+      if (row || C.role !== 'channel') return;
+      C.request(base + 'administrative-regions')
+        .then((result) => setRegions(result.provinces || []))
+        .catch(() => A.Message.error('行政区划数据加载失败，请刷新后重试'));
+    }, [!!row]);
+    const province = regions.find((r) => r.name === regionProvince);
+    const city = province?.cities.find((r) => r.name === regionCity);
+    function regionField(name) {
+      const values = name === 'province' ? regions.map((r) => r.name)
+        : name === 'city' ? (province?.cities || []).map((r) => r.name)
+        : city?.districts || [];
+      return {
+        name,
+        label: C.names[name],
+        render: (form) => h(A.Select, {
+          showSearch: true,
+          options: values.map((v) => ({ value: v, label: v })),
+          placeholder: values.length ? '请选择' : '请先选择上级行政区',
+          onChange: (value) => {
+            if (name === 'province' && value !== regionProvince) {
+              setRegionProvince(value || '');
+              setRegionCity('');
+              form.setFieldsValue({ city: undefined, district: undefined });
+            } else if (name === 'city' && value !== regionCity) {
+              setRegionCity(value || '');
+              form.setFieldsValue({ district: undefined });
+            }
+          },
+        }),
+      };
+    }
     const jointProducts = C.useChoices(joint ? base + 'contracts/products?page_size=100' : null);
     const subjects = C.useChoices(!row ? base + 'clinic-cooperations?page_size=100' : null);
     const fields = [
@@ -564,7 +617,13 @@
             },
           ]
         : []),
-      ...keys.map((name) => ({ name, label: name === 'name' ? '门诊名称' : C.names[name] })),
+      ...keys.map((name) =>
+        !row && C.role === 'channel' && ['province', 'city', 'district'].includes(name)
+          ? regionField(name)
+          : !row && joint && name === 'business_hours' && (!preparation || preparation.payload.term)
+            ? { name, label: '营业时间', render: () => h(BusinessHours), hint: '仅支持当天结束' }
+          : { name, label: name === 'name' ? '门诊名称' : C.names[name] },
+      ),
       ...(joint && C.jointFields
         ? C.jointFields(jointProducts.data?.results || [], !!row, !!preparation && !preparation.payload.term)
         : []),

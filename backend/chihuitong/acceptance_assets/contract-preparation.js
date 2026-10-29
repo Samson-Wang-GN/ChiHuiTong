@@ -15,12 +15,12 @@
       const current = await C.request(base + 'contract-financial-profile');
       C.form({
         title: '合同收款及开票信息',
-        initial: current,
+        initial: { tax_terms: '费用含税', ...current },
         hint: '仅用于合同文本；不会开通或修改支付商户，也不会自动开票。请勿填写密钥。修改只影响之后新生成的合同。',
         fields: [
           { name: 'receiving_name', label: '收款主体' },
           { name: 'receiving_info', label: '收款信息', type: 'textarea', max: 1000 },
-          { name: 'tax_terms', label: '含税说明', type: 'textarea', max: 1000 },
+          { name: 'tax_terms', label: '含税说明', type: 'select', options: C.options({ '费用含税': '费用含税' }) },
           { name: 'invoice_terms', label: '开票安排', type: 'textarea', max: 1000 },
         ],
         onSubmit: (v, key) => C.api(base + 'contract-financial-profile', 'POST', v, key),

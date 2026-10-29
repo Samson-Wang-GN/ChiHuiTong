@@ -266,6 +266,28 @@ class PreparationTests(TestCase):
         with self.assertRaises(BusinessError):
             service.apply_term({"term": {"starts_on": "2026-11-01", "years": 0}})
 
+    def test_mainland_regions_and_new_contract_profile_validation(self):
+        from chihuitong.api_regions import region_tree
+
+        regions = region_tree()
+        self.assertEqual(len(regions), 31)
+        beijing = next(x for x in regions if x["name"] == "北京市")
+        self.assertIn("海淀区", beijing["cities"][0]["districts"])
+        xinjiang = next(x for x in regions if x["name"] == "新疆维吾尔自治区")
+        self.assertTrue(any("石河子市" in x["districts"] for x in xinjiang["cities"]))
+        payload = json.loads(json.dumps(self.payload))
+        payload["term"] = {"starts_on": "2026-11-01", "years": 1}
+        payload["clinic"]["profile"].update(
+            province="北京市", city="北京市", district="海淀区", business_hours="09:00-18:00"
+        )
+        self.template()
+        item = service.save(self.channel, kind="single", payload=payload)
+        item = service.generate(self.channel, item.id, version=item.version)
+        self.assertEqual(item.prints.get().snapshot["values"]["ends_at"], "2027-10-31")
+        payload["clinic"]["profile"]["district"] = "无效区"
+        with self.assertRaises(BusinessError):
+            service.save(self.channel, kind="single", payload=payload)
+
     def finish_draft(self, item):
         item = service.generate(self.channel, item.id, version=item.version)
         item = service.sign(

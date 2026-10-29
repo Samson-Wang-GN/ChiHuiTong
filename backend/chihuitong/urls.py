@@ -12,6 +12,7 @@ from . import api_metrics as metrics
 from . import api_mini as mini
 from . import api_notifications as notifications
 from . import api_payments as payments
+from . import api_regions as regions
 from . import api_sales as sales
 from . import api_workbench as workbench
 
@@ -21,6 +22,7 @@ urlpatterns = [
     path("contract-preparations/<uuid:preparation_id>/<str:action>", preparation.action),
     path("contract-templates", preparation.templates),
     path("contract-financial-profile", preparation.financial_profile),
+    path("administrative-regions", regions.regions),
     path("health", api.health),
     path("auth/code", api.send_code),
     path("auth/login", api.login),

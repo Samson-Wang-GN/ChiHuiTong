@@ -274,7 +274,9 @@
           ]
         : []),
       ...(row ? [{ name: 'number', label: '合同编号' }] : []),
-      ...dates,
+      ...(row || (preparation && !preparation.payload.term)
+        ? dates
+        : [{ name: 'contract_term', label: '合同期限', render: () => h(TermPicker) }]),
       { name: 'contact_name', label: '业务联系人' },
       { name: 'contact_phone', label: '业务联系人电话' },
       ...(actualKind === 'chain'
@@ -323,6 +325,7 @@
         ...(preparation
           ? {
               ...preparation.payload.agreement,
+              contract_term: preparation.payload.term,
               subject_name: preparation.payload.subject?.name,
               subject_credit: preparation.payload.subject?.credit_code,
               subject_admin: preparation.payload.subject?.admin_name,
@@ -367,6 +370,7 @@
             kind: actualKind,
             payload: {
               agreement: data,
+              ...(v.contract_term ? { term: v.contract_term } : {}),
               ...(selected === 'new'
                 ? { subject: subjectData(v, actualKind) }
                 : { cooperation_id: selected }),

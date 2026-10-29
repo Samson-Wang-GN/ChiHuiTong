@@ -15,8 +15,7 @@ def exercise(pages, report):
         channel.get_by_role('button', name='单店入驻申请', exact=True).click()
         values = {
             '门诊名称':'联合入驻合成门诊', '经营主体':'联合入驻合成主体',
-            '省 / 直辖市':'北京市', '城市':'北京市', '区 / 县':'海淀区',
-            '经营地址':'合成测试路8号', '营业时间':'09:00-18:00',
+            '经营地址':'合成测试路8号',
             '前台预约手机号':'13800000691', '业务联系人':'合成联系人', '业务联系人电话':'13800000692',
             '法定签约主体全称':'联合入驻合成主体', '统一社会信用代码':'91110000123456789A',
             '签约主体管理员姓名':'合成主体管理员', '签约主体管理员手机号':'13800000693',
@@ -24,6 +23,13 @@ def exercise(pages, report):
         }
         for label, value in values.items():
             fill(channel,label,value)
+        select(channel, '省 / 直辖市', '北京市')
+        select(channel, '城市', '北京市')
+        select(channel, '区 / 县', '海淀区')
+        for index, value in enumerate(('09:00', '18:00')):
+            time_input = field(channel, '营业时间').locator('input').nth(index)
+            time_input.fill(value)
+            time_input.press('Enter')
         field(channel, '签约主体管理员姓名').get_by_role('button', name='与业务联系人相同').click()
         field(channel, '门诊管理员姓名').get_by_role('button', name='与业务联系人相同').click()
         for label in ['签约主体管理员姓名', '门诊管理员姓名']:

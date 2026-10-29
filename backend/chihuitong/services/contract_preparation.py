@@ -56,12 +56,22 @@ def apply_term(payload):
     if "term" not in payload:
         return payload
     term = payload["term"]
-    require(isinstance(term, dict) and set(term) <= {"starts_on", "years"}, "invalid_term", "合同期限格式不正确", 400)
+    require(
+        isinstance(term, dict) and set(term) <= {"starts_on", "years"},
+        "invalid_term",
+        "合同期限格式不正确",
+        400,
+    )
     start, years = term.get("starts_on"), term.get("years")
     if not start or years is None:
         payload.setdefault("agreement", {}).update(starts_at="", ends_at="")
         return payload
-    require(isinstance(years, int) and not isinstance(years, bool) and 1 <= years <= 30, "invalid_term", "合同年限须为1至30年", 400)
+    require(
+        isinstance(years, int) and not isinstance(years, bool) and 1 <= years <= 30,
+        "invalid_term",
+        "合同年限须为1至30年",
+        400,
+    )
     try:
         start_date = date.fromisoformat(start)
         target_year = start_date.year + years
@@ -95,6 +105,7 @@ def publish_financial_profile(actor, details):
         "请完整填写收款主体、收款信息、含税说明及开票安排",
         400,
     )
+    require(details["tax_terms"] == "费用含税", "invalid_tax_terms", "合同费用须为含税金额", 400)
     advisory_lock("contract_financial_profile", "platform")
     item = ContractFinancialProfile.objects.create(
         details={key: value.strip() for key, value in details.items()}, created_by=actor.membership
@@ -228,6 +239,12 @@ def payload_files(payload):
         "资质附件必须为列表",
         400,
     )
+    if "term" in payload and all(profile.get(k) for k in ("province", "city", "district")):
+        from chihuitong.api_regions import region_tree
+
+        province = next((x for x in region_tree() if x["name"] == profile["province"]), None)
+        city = next((x for x in province["cities"] if x["name"] == profile["city"]), None) if province else None
+        require(city and profile["district"] in city["districts"], "invalid_region", "请选择有效的省、市和区县", 400)
     ids = (
         profile.get("business_license_ids", [])
         + profile.get("medical_license_ids", [])
@@ -344,6 +361,17 @@ def snapshot(actor, item, tpl, frozen=None):
 
     from .clinics import visible_clinics
 
+    if "term" in item.payload and "clinic" in item.payload:
+        from chihuitong.api_regions import region_tree
+
+        profile = item.payload["clinic"].get("profile", {})
+        province = next((x for x in region_tree() if x["name"] == profile.get("province")), None)
+        city = next((x for x in province["cities"] if x["name"] == profile.get("city")), None) if province else None
+        require(city and profile.get("district") in city["districts"], "invalid_region", "请选择有效的省、市和区县", 400)
+        hours = profile.get("business_hours", "")
+        valid = re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d", hours)
+        require(valid and hours[:5] < hours[6:], "invalid_business_hours", "请选择当天有效的营业起止时间", 400)
+
     canonical = apply_term(json.loads(json.dumps(item.payload)))
     data = {**canonical.get("agreement", {}), "number": item.number, "attachment_ids": []}
     serializer = AgreementInput(data=data)
@@ -419,8 +447,12 @@ def snapshot(actor, item, tpl, frozen=None):
         "platform_credit_code": tpl.platform_credit_code,
         "subject_name": subject_name,
         "subject_credit_code": credit,
-        "starts_at": timezone.localtime(data["starts_at"]).strftime("%Y-%m-%d" if "term" in item.payload else "%Y-%m-%d %H:%M"),
-        "ends_at": timezone.localtime(data["ends_at"]).strftime("%Y-%m-%d" if "term" in item.payload else "%Y-%m-%d %H:%M"),
+        "starts_at": timezone.localtime(data["starts_at"]).strftime(
+            "%Y-%m-%d" if "term" in item.payload else "%Y-%m-%d %H:%M"
+        ),
+        "ends_at": timezone.localtime(data["ends_at"]).strftime(
+            "%Y-%m-%d" if "term" in item.payload else "%Y-%m-%d %H:%M"
+        ),
         "payment_mode": "核销现付" if item.kind == "single" else "账单后付",
         "settlement_cycle": {"": "不适用", "weekly": "周结", "monthly": "月结"}[
             data["settlement_cycle"]

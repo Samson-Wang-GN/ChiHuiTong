@@ -39,7 +39,7 @@ class TemplateInput(StrictSerializer):
 class FinancialProfileInput(StrictSerializer):
     receiving_name = serializers.CharField(max_length=1000)
     receiving_info = serializers.CharField(max_length=1000)
-    tax_terms = serializers.CharField(max_length=1000)
+    tax_terms = serializers.ChoiceField(choices=["费用含税"])
     invoice_terms = serializers.CharField(max_length=1000)
 
 
