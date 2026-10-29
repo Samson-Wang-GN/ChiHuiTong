@@ -585,10 +585,15 @@ def pdf_bytes(data, revision):
         if key not in represented
         and not (key == "settlement_cycle" and data["values"][key] == "不适用" and represented)
     ]
-    for label, key in summary:
-        story.append(Paragraph(escape(f"{label}：{data['values'][key]}"), normal))
-    if summary:
+    summary_flow = [
+        Paragraph(escape(f"{label}：{data['values'][key]}"), normal) for label, key in summary
+    ]
+    if summary_flow and data.get("layout_version") != 2:
+        story.extend(summary_flow)
         story.append(Spacer(1, 12))
+        summary_flow = []
+    elif summary_flow:
+        summary_flow = [Paragraph("补充信息", normal), *summary_flow]
     if data.get("body_format") == "markdown":
         heading1 = ParagraphStyle("heading1", parent=title, keepWithNext=True)
         heading2 = ParagraphStyle(
@@ -613,16 +618,22 @@ def pdf_bytes(data, revision):
         )
         if signature_count >= 2:
             story.extend(paragraphs[:signature_start])
+            story.extend(summary_flow)
             signature = []
             for paragraph in paragraphs[signature_start:]:
                 signature.extend([paragraph, Spacer(1, 32)])
             story.append(KeepTogether(signature))
         else:
             story.extend(paragraphs)
+            story.extend(summary_flow)
     else:
         lines = data["body"].splitlines()
         tail = len(lines)
-        while tail and (not lines[tail - 1].strip() or re.search(r"签字|签名|盖章|签章", lines[tail - 1])):
+        while tail and len(lines) - tail < 12 and (
+            not lines[tail - 1].strip()
+            or re.search(r"签字|签名|盖章|签章", lines[tail - 1])
+            or re.match(r"^\s*[甲乙]方[（(:：]", lines[tail - 1])
+        ):
             tail -= 1
         def plain_flow(line):
             return Paragraph(escape(line), normal) if line.strip() else Spacer(1, 10)
@@ -631,9 +642,11 @@ def pdf_bytes(data, revision):
             bool(re.search(r"签字|签名|盖章|签章", line)) for line in lines[tail:]
         ) >= 2:
             story.extend(plain_flow(line) for line in lines[:tail])
+            story.extend(summary_flow)
             story.append(KeepTogether([plain_flow(line) for line in lines[tail:]]))
         else:
             story.extend(plain_flow(line) for line in lines)
+            story.extend(summary_flow)
 
     def footer(canvas, document):
         canvas.setFont("ContractCJK", 8)

@@ -255,6 +255,22 @@ class PreparationTests(TestCase):
         self.assertTrue(any("甲方签字／盖章区" in page and "乙方签字／盖章区" in page for page in pages))
         self.assertTrue(any("甲方：合成平台\n乙方：" in page for page in pages))
         self.assertGreater(len(pages), 1)
+        self.assertGreater(text.index("补充信息"), text.index("测试条款"))
+        self.assertLess(text.index("补充信息"), text.index("甲方签字／盖章区"))
+
+    def test_unsigned_legacy_draft_gets_new_layout_without_overwriting_old_print(self):
+        tpl = self.template()
+        item = self.draft()
+        item = service.generate(self.channel, item.id, version=item.version)
+        old = item.prints.get(revision=1)
+        old.snapshot = service.snapshot(self.channel, item, tpl, frozen={})
+        old.fingerprint = service.fingerprint(old.snapshot)
+        old.save(update_fields=["snapshot", "fingerprint"])
+        old_asset = old.asset_id
+        item = service.generate(self.channel, item.id, version=item.version)
+        self.assertEqual(item.generation, 2)
+        self.assertEqual(item.prints.get(revision=1).asset_id, old_asset)
+        self.assertEqual(item.prints.get(revision=2).snapshot["layout_version"], 2)
 
     def test_existing_signed_contract_keeps_old_layout_and_fingerprint(self):
         tpl = self.template()
