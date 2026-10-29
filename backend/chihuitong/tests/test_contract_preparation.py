@@ -201,6 +201,7 @@ class PreparationTests(TestCase):
         data = service.snapshot(self.channel, item, tpl)
         self.assertEqual(data["body_format"], "markdown")
         raw = service.pdf_bytes(data, 2)
+        Path("contract-markdown-test-sample.pdf").write_bytes(raw)
         reader = PdfReader(io.BytesIO(raw))
         text = "".join(page.extract_text() for page in reader.pages)
         for expected in (
