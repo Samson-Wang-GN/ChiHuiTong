@@ -600,8 +600,14 @@ def pdf_bytes(data, revision):
             + flowable.getSpaceAfter()
             for flowable in flowables
         )
-        require(height <= doc.height, "signature_area_too_long", "签章区内容过长，请调整模板后重新生成", 400)
+        require(
+            height <= doc.height,
+            "signature_area_too_long",
+            "签章区内容过长，请调整模板后重新生成",
+            400,
+        )
         return KeepTogether(flowables)
+
     if data.get("body_format") == "markdown":
         heading1 = ParagraphStyle("heading1", parent=title, keepWithNext=True)
         heading2 = ParagraphStyle(
