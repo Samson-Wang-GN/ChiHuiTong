@@ -24,7 +24,9 @@ def exercise(pages, report):
         for label, value in values.items():
             fill(channel,label,value)
         select(channel, '省 / 直辖市', '北京市')
+        channel.wait_for_timeout(350)
         select(channel, '城市', '北京市')
+        channel.wait_for_timeout(350)
         select(channel, '区 / 县', '海淀区')
         for index, value in enumerate(('09:00', '18:00')):
             time_input = field(channel, '营业时间').locator('input').nth(index)

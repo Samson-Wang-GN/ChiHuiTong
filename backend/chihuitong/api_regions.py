@@ -12,7 +12,11 @@ from .identity import request_actor
 @lru_cache(maxsize=1)
 def region_tree():
     path = Path(__file__).resolve().parent / "data" / "administrative-divisions-2025.txt"
-    rows = [line.strip().split(maxsplit=1) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rows = [
+        line.strip().split(maxsplit=1)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     provinces = {}
     cities = {}
     for code, name in rows:

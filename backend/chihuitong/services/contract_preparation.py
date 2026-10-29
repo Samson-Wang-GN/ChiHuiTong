@@ -243,8 +243,17 @@ def payload_files(payload):
         from chihuitong.api_regions import region_tree
 
         province = next((x for x in region_tree() if x["name"] == profile["province"]), None)
-        city = next((x for x in province["cities"] if x["name"] == profile["city"]), None) if province else None
-        require(city and profile["district"] in city["districts"], "invalid_region", "请选择有效的省、市和区县", 400)
+        city = (
+            next((x for x in province["cities"] if x["name"] == profile["city"]), None)
+            if province
+            else None
+        )
+        require(
+            city and profile["district"] in city["districts"],
+            "invalid_region",
+            "请选择有效的省、市和区县",
+            400,
+        )
     ids = (
         profile.get("business_license_ids", [])
         + profile.get("medical_license_ids", [])
@@ -366,11 +375,25 @@ def snapshot(actor, item, tpl, frozen=None):
 
         profile = item.payload["clinic"].get("profile", {})
         province = next((x for x in region_tree() if x["name"] == profile.get("province")), None)
-        city = next((x for x in province["cities"] if x["name"] == profile.get("city")), None) if province else None
-        require(city and profile.get("district") in city["districts"], "invalid_region", "请选择有效的省、市和区县", 400)
+        city = (
+            next((x for x in province["cities"] if x["name"] == profile.get("city")), None)
+            if province
+            else None
+        )
+        require(
+            city and profile.get("district") in city["districts"],
+            "invalid_region",
+            "请选择有效的省、市和区县",
+            400,
+        )
         hours = profile.get("business_hours", "")
         valid = re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d", hours)
-        require(valid and hours[:5] < hours[6:], "invalid_business_hours", "请选择当天有效的营业起止时间", 400)
+        require(
+            valid and hours[:5] < hours[6:],
+            "invalid_business_hours",
+            "请选择当天有效的营业起止时间",
+            400,
+        )
 
     canonical = apply_term(json.loads(json.dumps(item.payload)))
     data = {**canonical.get("agreement", {}), "number": item.number, "attachment_ids": []}
