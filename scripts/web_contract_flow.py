@@ -1,6 +1,7 @@
 """Server browser regression: single submission and atomic joint activation."""
 
 import json
+import subprocess
 from datetime import datetime, timedelta
 
 from web_workflows import close, date_field, dialog, field, fill, menu, read, select
@@ -63,12 +64,19 @@ def exercise(pages, report):
         # Missing real template must fail closed; synthetic template only in this disposable DB.
         menu(platform,'合同管理')
         platform.get_by_role('button',name='合同模板配置',exact=True).click()
+        platform.get_by_role('button',name='配置合同收款及开票信息',exact=True).click()
+        fill(platform, '收款主体', '合成收款主体')
+        fill(platform, '收款信息', '合成收款方式')
+        fill(platform, '开票安排', '合成开票说明')
+        with platform.expect_response(lambda r:r.url.endswith('/contract-financial-profile') and r.request.method=='POST') as response:
+            dialog(platform).get_by_role('button',name='保存',exact=True).click()
+        assert response.value.status == 201, response.value.text()
         platform.get_by_role('button',name='发布新模板版本',exact=True).click()
         select(platform,'适用类型','单店现付')
         fill(platform,'合同标题','自动测试合成合同（禁止实际签署）')
         fill(platform,'平台法定签约名称','合成平台主体')
         fill(platform,'平台统一社会信用代码','91110000123456789B')
-        fill(platform,'认可的完整合同正文','合同编号：{{number}}\n甲方：{{platform_name}}\n乙方：{{subject_name}}\n门店：{{stores}}\n产品：{{products}}\n期限：{{starts_at}}至{{ends_at}}\n付款方式：{{payment_mode}}\n本文件仅为自动测试。\n甲方盖章：________\n乙方签字：________')
+        fill(platform,'认可的完整合同正文','合同编号：{{number}}\n甲方：{{platform_name}}\n乙方：{{subject_name}}\n门店：{{stores}}\n产品：{{products}}\n期限：{{starts_at}}至{{ends_at}}\n付款方式：{{payment_mode}}\n生成日期：{{contract_date}}\n收款：{{receiving_name}} {{receiving_info}}\n税费：{{tax_terms}}\n开票：{{invoice_terms}}\n本文件仅为自动测试。\n甲方盖章：________\n乙方签字：________')
         select(platform,'确认范本已获平台认可，可用于实际签署','是')
         with platform.expect_response(lambda r:r.url.endswith('/contract-templates') and r.request.method=='POST') as response:
             dialog(platform).get_by_role('button',name='保存',exact=True).click()
@@ -84,6 +92,8 @@ def exercise(pages, report):
         with channel.expect_download() as download:
             channel.get_by_role('button',name='下载打印合同',exact=True).click()
         download.value.save_as(report/'generated-contract.pdf')
+        pdf_text = subprocess.check_output(['pdftotext', str(report/'generated-contract.pdf'), '-'], text=True)
+        assert '合成收款主体' in pdf_text and '合成开票说明' in pdf_text and '费用含税' in pdf_text
         channel.get_by_role('button',name='上传门诊签署件',exact=True).click()
         with channel.expect_response(lambda r:r.url.endswith('/api/v1/files') and r.request.method=='POST') as response:
             field(channel,'签署照片 / 扫描件').locator('input[type=file]').set_input_files(report/'synthetic-proof.png')

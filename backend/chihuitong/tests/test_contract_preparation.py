@@ -275,6 +275,9 @@ class PreparationTests(TestCase):
         self.assertIn("海淀区", beijing["cities"][0]["districts"])
         xinjiang = next(x for x in regions if x["name"] == "新疆维吾尔自治区")
         self.assertTrue(any("石河子市" in x["districts"] for x in xinjiang["cities"]))
+        guangdong = next(x for x in regions if x["name"] == "广东省")
+        dongguan = next(x for x in guangdong["cities"] if x["name"] == "东莞市")
+        self.assertEqual(dongguan["districts"], ["东莞市"])
         payload = json.loads(json.dumps(self.payload))
         payload["term"] = {"starts_on": "2026-11-01", "years": 1}
         payload["clinic"]["profile"].update(
@@ -287,6 +290,10 @@ class PreparationTests(TestCase):
         payload["clinic"]["profile"]["district"] = "无效区"
         with self.assertRaises(BusinessError):
             service.save(self.channel, kind="single", payload=payload)
+        payload["clinic"]["profile"].update(district="海淀区", business_hours="18:00-09:00")
+        item = service.save(self.channel, kind="single", payload=payload)
+        with self.assertRaises(BusinessError):
+            service.generate(self.channel, item.id, version=item.version)
 
     def finish_draft(self, item):
         item = service.generate(self.channel, item.id, version=item.version)

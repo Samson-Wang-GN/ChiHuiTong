@@ -40,6 +40,12 @@ def region_tree():
                 cities[code[:2] + "_direct"] = city
                 province["cities"].append(city)
         city["districts"].append(name)
+    # Some prefecture-level cities have no county-level division (e.g. 东莞).
+    # Repeat the city name as the final choice rather than inventing a district.
+    for province in provinces.values():
+        for city in province["cities"]:
+            if not city["districts"]:
+                city["districts"] = [city["name"]]
     return list(provinces.values())
 
 
