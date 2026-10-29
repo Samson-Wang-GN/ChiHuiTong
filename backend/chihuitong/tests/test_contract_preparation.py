@@ -1,6 +1,8 @@
 import io
 import json
+from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from pypdf import PdfReader
@@ -231,10 +233,6 @@ class PreparationTests(TestCase):
         }
         self.assertEqual(api_client(self.channel).get(url).status_code, 403)
         self.assertEqual(api_client(self.channel).post(url, data, format="json").status_code, 403)
-        self.assertEqual(
-            client.post(url, data, format="json", HTTP_IDEMPOTENCY_KEY="profile-one").status_code,
-            201,
-        )
         tpl = service.template(
             self.platform,
             kind="single",
@@ -245,12 +243,28 @@ class PreparationTests(TestCase):
             confirmed=True,
         )
         item = self.draft()
-        item = service.generate(self.channel, item.id, version=item.version)
+        with self.assertRaises(BusinessError) as missing:
+            service.generate(self.channel, item.id, version=item.version)
+        self.assertEqual(missing.exception.code, "financial_profile_missing")
+        self.assertEqual(
+            client.post(url, data, format="json", HTTP_IDEMPOTENCY_KEY="profile-one").status_code,
+            201,
+        )
+        with patch(
+            "chihuitong.services.contract_preparation.timezone.localdate",
+            return_value=date(2026, 10, 29),
+        ):
+            item = service.generate(self.channel, item.id, version=item.version)
         printed = item.prints.get(revision=1)
         self.assertEqual(printed.snapshot["values"]["receiving_name"], data["receiving_name"])
+        self.assertEqual(printed.snapshot["values"]["contract_date"], "2026-10-29")
         service.publish_financial_profile(self.platform, {**data, "receiving_name": "新收款主体"})
-        service.current_print(self.channel, item)
-        item = service.generate(self.channel, item.id, version=item.version)
+        with patch(
+            "chihuitong.services.contract_preparation.timezone.localdate",
+            return_value=date(2026, 10, 30),
+        ):
+            service.current_print(self.channel, item)
+            item = service.generate(self.channel, item.id, version=item.version)
         self.assertEqual(item.generation, 1)
         self.assertEqual(printed.template_id, tpl.id)
 
