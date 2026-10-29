@@ -144,6 +144,29 @@ def exercise(pages, report):
         assert read(platform,'/api/v1/clinic-agreements/'+item['id'])['status']=='approved'
         platform.screenshot(path=str(report/'joint-approved.png'),full_page=True)
         close(platform)
+        menu(channel, '合同管理')
+        channel.locator('.detail-actions .arco-select').first.click()
+        channel.locator('.arco-select-popup:visible .arco-select-option').filter(has_text='门诊合同').last.click()
+        channel.get_by_role('button', name='新增合同', exact=True).click()
+        for label, value in {
+            '法定签约主体全称': '合成连锁主体',
+            '统一社会信用代码': '91110000123456789B',
+            '签约主体管理员姓名': '合成管理员',
+            '签约主体管理员手机号': '13800000695',
+            '业务联系人': '合成联系人',
+            '业务联系人电话': '13800000695',
+        }.items():
+            fill(channel, label, value)
+        date_field(channel, '合同期限', (datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d'))
+        select(channel, '合同期限', '1年')
+        select(channel, '推广产品', '演示·洁牙推广产品')
+        with channel.expect_response(lambda r:r.url.endswith('/api/v1/contract-preparations') and r.request.method=='POST') as response:
+            dialog(channel).get_by_role('button',name='保存待签草稿',exact=True).click()
+        assert response.value.status == 201, response.value.text()
+        chain = response.value.json()
+        chain = chain.get('data', chain)
+        assert chain['payload']['term']['years'] == 1
+        close(channel)
         (report/'joint-contract.json').write_text(json.dumps({'passed':True,'clinic_id':clinic_id,'agreement_id':item['id']},indent=2))
     except Exception:
         platform.screenshot(path=str(report/'joint-platform-failure.png'),full_page=True)
