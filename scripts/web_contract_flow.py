@@ -92,7 +92,7 @@ def exercise(pages, report):
         with channel.expect_download() as download:
             channel.get_by_role('button',name='下载打印合同',exact=True).click()
         download.value.save_as(report/'generated-contract.pdf')
-        pdf_text = subprocess.check_output(['pdftotext', str(report/'generated-contract.pdf'), '-'], text=True)
+        pdf_text = ''.join(subprocess.check_output(['pdftotext', str(report/'generated-contract.pdf'), '-'], text=True).split())
         assert '合成收款主体' in pdf_text and '合成开票说明' in pdf_text and '费用含税' in pdf_text
         channel.get_by_role('button',name='上传门诊签署件',exact=True).click()
         with channel.expect_response(lambda r:r.url.endswith('/api/v1/files') and r.request.method=='POST') as response:
