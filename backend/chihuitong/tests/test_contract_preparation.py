@@ -218,6 +218,7 @@ class PreparationTests(TestCase):
         content = b"".join(page.get_contents().get_data() for page in reader.pages)
         self.assertIn(b"2 Tr", content)
         self.assertNotIn("**重点**", text)
+        self.assertIn("- 项目", text)
 
     def finish_draft(self, item):
         item = service.generate(self.channel, item.id, version=item.version)

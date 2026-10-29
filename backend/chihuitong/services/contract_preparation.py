@@ -64,7 +64,7 @@ def markdown_blocks(source):
             blocks.append(("heading" + str(len(heading.group(1))), heading.group(2)))
         elif listing:
             flush()
-            prefix = "•" if listing.group(1) == "-" else listing.group(1)
+            prefix = "-" if listing.group(1) == "-" else listing.group(1)
             blocks.append(("list", prefix + " " + listing.group(2)))
         else:
             pending.append(stripped)
