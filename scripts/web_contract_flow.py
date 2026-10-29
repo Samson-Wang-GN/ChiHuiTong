@@ -65,11 +65,11 @@ def exercise(pages, report):
         menu(platform,'合同管理')
         platform.get_by_role('button',name='合同模板配置',exact=True).click()
         platform.get_by_role('button',name='配置合同收款及开票信息',exact=True).click()
-        fill(platform, '收款主体', '合成收款主体')
-        fill(platform, '收款信息', '合成收款方式')
-        fill(platform, '开票安排', '合成开票说明')
+        config_modal = platform.locator('.arco-modal:visible').last
+        for label, value in [('收款主体', '合成收款主体'), ('收款信息', '合成收款方式'), ('开票安排', '合成开票说明')]:
+            config_modal.locator('.arco-form-item').filter(has=platform.locator('.arco-form-label-item', has_text=label)).locator('input,textarea').first.fill(value)
         with platform.expect_response(lambda r:r.url.endswith('/contract-financial-profile') and r.request.method=='POST') as response:
-            dialog(platform).get_by_role('button',name='保存',exact=True).click()
+            config_modal.get_by_role('button',name='保存',exact=True).click()
         assert response.value.status == 201, response.value.text()
         platform.get_by_role('button',name='发布新模板版本',exact=True).click()
         select(platform,'适用类型','单店现付')
