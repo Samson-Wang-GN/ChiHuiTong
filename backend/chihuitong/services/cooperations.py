@@ -529,6 +529,12 @@ def review_agreement(actor, agreement_id, *, version, approved, reason, final=Fa
                 "signature_required",
                 "请先登记原件收件及平台签署时间",
             )
+            require(
+                item.signed_attachment_ids,
+                "invalid_attachments",
+                "请先在原件收签记录中上传双方签署完整合同，再进行最终审核。",
+                400,
+            )
             validate_attachment_ids(actor, item.signed_attachment_ids, purposes={"contract"})
             require(
                 item.cooperation.kind == "chain" or item.coverage.exists(),

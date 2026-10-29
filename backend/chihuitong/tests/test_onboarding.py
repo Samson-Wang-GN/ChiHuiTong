@@ -158,6 +158,24 @@ class OnboardingTests(TestCase):
         )
         self.assertEqual(item.status, "pending")
 
+    def test_final_review_identifies_missing_signed_contract(self):
+        item = self.apply()
+        stamp = timezone.now().isoformat()
+        item = cooperations.record_paper(
+            self.platform,
+            item.id,
+            version=item.version,
+            data={"received_at": stamp, "platform_signed_at": stamp},
+        )
+        with self.assertRaises(BusinessError) as raised:
+            onboarding.review(
+                self.platform, item.id, version=item.version, approved=True, reason="审核", final=True
+            )
+        self.assertEqual(raised.exception.code, "invalid_attachments")
+        self.assertIn("上传双方签署完整合同", raised.exception.message)
+        item.refresh_from_db()
+        self.assertEqual(item.status, "pending")
+
     def test_precheck_rejection_and_resubmission_reuses_subject_and_store(self):
         item = self.apply()
         item = onboarding.review(
