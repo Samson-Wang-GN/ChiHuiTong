@@ -74,11 +74,11 @@ def markdown_blocks(source):
 
 def markdown_inline(source, values):
     """Only template-authored bold markers are interpreted; fields remain literal."""
+
     def literal(fragment):
         parts = PATTERN.split(fragment)
         return "".join(
-            escape(values[part]) if index % 2 else escape(part)
-            for index, part in enumerate(parts)
+            escape(values[part]) if index % 2 else escape(part) for index, part in enumerate(parts)
         )
 
     pieces = re.split(r"(\*\*[^*\n]+\*\*)", source)
@@ -119,7 +119,9 @@ def editable(item, version):
 
 
 @transaction.atomic
-def template(actor, *, kind, title, body, platform_name, platform_credit_code, confirmed, body_format="plain"):
+def template(
+    actor, *, kind, title, body, platform_name, platform_credit_code, confirmed, body_format="plain"
+):
     actor.require_platform()
     require(body_format in {"plain", "markdown"}, "invalid_template", "不支持的正文格式", 400)
     require(
@@ -400,7 +402,10 @@ def pdf_bytes(data, revision):
     require(font.is_file(), "pdf_font_unavailable", "合同生成字体未配置，请联系平台", 503)
     if "ContractCJK" not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(TTFont("ContractCJK", str(font), subfontIndex=0))
-    if data.get("body_format") == "markdown" and "ContractBold" not in pdfmetrics.getRegisteredFontNames():
+    if (
+        data.get("body_format") == "markdown"
+        and "ContractBold" not in pdfmetrics.getRegisteredFontNames()
+    ):
         pdfmetrics.registerFont(TTFont("ContractBold", str(font), subfontIndex=0))
     output = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -433,7 +438,9 @@ def pdf_bytes(data, revision):
     story.append(Spacer(1, 12))
     if data.get("body_format") == "markdown":
         heading1 = ParagraphStyle("heading1", parent=title, keepWithNext=True)
-        heading2 = ParagraphStyle("heading2", parent=normal, fontSize=13, leading=21, keepWithNext=True)
+        heading2 = ParagraphStyle(
+            "heading2", parent=normal, fontSize=13, leading=21, keepWithNext=True
+        )
         listed = ParagraphStyle("list", parent=normal, leftIndent=18, firstLineIndent=-12)
         styles = {"paragraph": normal, "heading1": heading1, "heading2": heading2, "list": listed}
         for kind, content in markdown_blocks(data["template_body"]):

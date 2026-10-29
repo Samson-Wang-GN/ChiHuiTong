@@ -203,7 +203,16 @@ class PreparationTests(TestCase):
         raw = service.pdf_bytes(data, 2)
         reader = PdfReader(io.BytesIO(raw))
         text = "".join(page.extract_text() for page in reader.pages)
-        for expected in ("标题", "条款", "普通段落", "续行", "重点", "项目", "第二项", "**平台**<b>文字</b>"):
+        for expected in (
+            "标题",
+            "条款",
+            "普通段落",
+            "续行",
+            "重点",
+            "项目",
+            "第二项",
+            "**平台**<b>文字</b>",
+        ):
             self.assertIn(expected, text)
         content = b"".join(page.get_contents().get_data() for page in reader.pages)
         self.assertIn(b"2 Tr", content)
