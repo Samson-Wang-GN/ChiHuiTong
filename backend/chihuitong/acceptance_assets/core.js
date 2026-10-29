@@ -544,6 +544,7 @@
     onSubmit,
     onClose,
     submitText = '保存',
+    successText = '操作已完成',
     width = 760,
   }) {
     const [form] = A.Form.useForm(),
@@ -577,7 +578,7 @@
         const result = await onSubmit(values, retry.current.key);
         if (result === false) return;
         C.refresh();
-        A.Message.success('操作已完成');
+        A.Message.success(successText);
         onClose();
       } catch (e) {
         setError(e);

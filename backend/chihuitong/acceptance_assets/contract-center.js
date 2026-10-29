@@ -435,6 +435,7 @@
     function batchOnline() {
       C.form({
         title: '批量上线已审核门店',
+        successText: '已处理，请查看逐店上线结果',
         fields: [
           multi(
             'clinic_ids',
@@ -486,8 +487,8 @@
             content:
               r.scope_notice ||
               (r.onboarding
-                ? '资料与合同一次审核。原件收到、平台签署及完整附件齐备后，才能审核通过并上线。'
-                : '合同内容可先预审；收到原件并签署上传后才能最终生效。'),
+                ? '资料与合同可先进行内容预审。最终审核并上线须收到原件、完成平台签署、上传双方完整签署件，且合同已到生效时间；如上线失败，本次最终审核也不会保存。'
+                : '合同内容可先预审；收到原件、完成平台签署并上传双方签署件后可进行最终审核，合同到约定时间后生效。'),
           }),
           h(
             A.Space,
@@ -546,7 +547,7 @@
                     { name: 'approved', label: '审核通过', type: 'boolean' },
                     {
                       name: 'final',
-                      label: r.onboarding ? '完成最终审核并上线' : '完成最终审核并生效',
+                      label: r.onboarding ? '完成最终审核并上线' : '完成最终审核',
                       type: 'boolean',
                     },
                     C.Reason,

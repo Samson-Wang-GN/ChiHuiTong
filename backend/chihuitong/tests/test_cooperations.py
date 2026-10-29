@@ -65,6 +65,41 @@ class CooperationTests(TestCase):
             [],
         )
 
+    def test_contract_block_reasons_reflect_actual_state(self):
+        now = timezone.now()
+        self.agreement.starts_at = now + timedelta(days=1)
+        self.agreement.save(update_fields=["starts_at"])
+        with self.assertRaises(BusinessError) as raised:
+            cooperations.current_agreement(self.subject, at=now)
+        self.assertEqual(raised.exception.code, "contract_unavailable")
+        self.assertIn(timezone.localtime(self.agreement.starts_at).strftime("%Y-%m-%d %H:%M"), raised.exception.message)
+        self.agreement.status = "pending"
+        self.agreement.save(update_fields=["status"])
+        with self.assertRaises(BusinessError) as raised:
+            cooperations.current_agreement(self.subject, at=now)
+        self.assertIn("核对合同审核状态和生效时间", raised.exception.message)
+        self.agreement.status = "approved"
+        self.agreement.starts_at = now - timedelta(days=2)
+        self.agreement.ends_at = now - timedelta(days=1)
+        self.agreement.save(update_fields=["status", "starts_at", "ends_at"])
+        with self.assertRaises(BusinessError) as raised:
+            cooperations.current_agreement(self.subject, at=now)
+        self.assertEqual(raised.exception.code, "contract_inactive")
+        self.assertIn("已到期", raised.exception.message)
+        self.agreement.status = "terminated"
+        self.agreement.save(update_fields=["status"])
+        with self.assertRaises(BusinessError) as raised:
+            cooperations.current_agreement(self.subject, at=now)
+        self.assertIn("已终止", raised.exception.message)
+        self.agreement.status = "approved"
+        self.agreement.ends_at = now + timedelta(days=1)
+        self.agreement.save(update_fields=["status", "ends_at"])
+        self.subject.status = "disabled"
+        self.subject.save(update_fields=["status"])
+        with self.assertRaises(BusinessError) as raised:
+            cooperations.current_agreement(self.subject, at=now)
+        self.assertIn("未启用", raised.exception.message)
+
     def test_agreement_expiry_reminders_are_scoped_and_deduplicated(self):
         from chihuitong.models import Notification
         from chihuitong.services.scheduler import tick

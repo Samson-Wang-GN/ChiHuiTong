@@ -127,6 +127,35 @@ class OnboardingTests(TestCase):
                 final=True,
             )
 
+    def test_future_contract_explains_block_and_rolls_back_final_review(self):
+        self.data["starts_at"] = timezone.now() + timedelta(days=3)
+        item = self.signed(self.apply())
+        clinic = item.onboarding_change.clinic
+        with self.assertRaises(BusinessError) as raised:
+            onboarding.review(
+                self.platform,
+                item.id,
+                version=item.version,
+                approved=True,
+                reason="资料齐全",
+                final=True,
+            )
+        self.assertEqual(raised.exception.code, "contract_unavailable")
+        self.assertIn(timezone.localtime(item.starts_at).strftime("%Y-%m-%d %H:%M"), raised.exception.message)
+        self.assertIn("尚未生效", raised.exception.message)
+        item.refresh_from_db()
+        clinic.refresh_from_db()
+        item.onboarding_change.refresh_from_db()
+        self.assertEqual(item.status, "pending")
+        self.assertEqual(item.onboarding_change.status, "pending")
+        self.assertEqual(clinic.profile_version, 0)
+        self.assertNotEqual(clinic.service_status, "online")
+        self.assertFalse(clinic.products.filter(status="online").exists())
+        item = onboarding.review(
+            self.platform, item.id, version=item.version, approved=True, reason="预审", final=False
+        )
+        self.assertEqual(item.status, "pending")
+
     def test_precheck_rejection_and_resubmission_reuses_subject_and_store(self):
         item = self.apply()
         item = onboarding.review(

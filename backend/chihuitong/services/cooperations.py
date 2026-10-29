@@ -173,15 +173,39 @@ def current_agreement(item, *, at=None, stock=False):
         .order_by("-starts_at", "-revision")
         .first()
     )
-    require(agreement, "contract_unavailable", "缺少已生效的双方合同，请完成签署及审核")
+    if not agreement:
+        future = (
+            item.agreements.filter(status="approved", starts_at__gt=at, reviewed_at__lte=at)
+            .order_by("starts_at", "-revision")
+            .first()
+        )
+        if future:
+            starts = timezone.localtime(future.starts_at).strftime("%Y-%m-%d %H:%M")
+            require(
+                False,
+                "contract_unavailable",
+                f"合同将于 {starts} 生效，当前尚未生效。请核对审核状态，并在生效后再办理上线或新业务。",
+            )
+        require(
+            False,
+            "contract_unavailable",
+            "当前没有生效的双方合同，请核对合同审核状态和生效时间后再操作。",
+        )
     if not stock:
         require(
-            agreement.status == "approved"
-            and agreement.ends_at >= at
-            and item.status == "active"
-            and item.organization.status == "active",
+            agreement.status == "approved",
             "contract_inactive",
-            "双方合同未生效、已到期或已终止",
+            "双方合同已终止，暂不能开展新业务，请联系平台核实。",
+        )
+        require(
+            agreement.ends_at >= at,
+            "contract_inactive",
+            "双方合同已到期，暂不能开展新业务，请先完成续签和审核。",
+        )
+        require(
+            item.status == "active" and item.organization.status == "active",
+            "contract_inactive",
+            "签约主体或所属机构未启用，暂不能开展新业务，请联系平台核实。",
         )
     return agreement
 
