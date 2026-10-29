@@ -169,7 +169,12 @@ class OnboardingTests(TestCase):
         )
         with self.assertRaises(BusinessError) as raised:
             onboarding.review(
-                self.platform, item.id, version=item.version, approved=True, reason="审核", final=True
+                self.platform,
+                item.id,
+                version=item.version,
+                approved=True,
+                reason="审核",
+                final=True,
             )
         self.assertEqual(raised.exception.code, "invalid_attachments")
         self.assertIn("上传双方签署完整合同", raised.exception.message)
