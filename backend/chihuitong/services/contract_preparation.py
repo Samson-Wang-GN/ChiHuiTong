@@ -5,17 +5,19 @@ import io
 import json
 import re
 import uuid
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
 from xml.sax.saxutils import escape
+from zoneinfo import ZoneInfo
 
 from django.db import transaction
 from django.utils import timezone
 
 from chihuitong.errors import require
 from chihuitong.models import (
-    ContractPreparation,
     ContractFinancialProfile,
+    ContractPreparation,
     ContractPrint,
     ContractTemplate,
     FileAsset,
@@ -47,6 +49,40 @@ FIELDS = {
 }
 PATTERN = re.compile(r"\{\{([a-z_]+)\}\}")
 FINANCIAL_FIELDS = {"receiving_name", "receiving_info", "tax_terms", "invoice_terms"}
+
+
+def apply_term(payload):
+    """New date-only terms are inclusive; legacy timestamp payloads stay unchanged."""
+    if "term" not in payload:
+        return payload
+    term = payload["term"]
+    require(isinstance(term, dict) and set(term) <= {"starts_on", "years"}, "invalid_term", "合同期限格式不正确", 400)
+    start, years = term.get("starts_on"), term.get("years")
+    if not start or years is None:
+        payload.setdefault("agreement", {}).update(starts_at="", ends_at="")
+        return payload
+    require(isinstance(years, int) and not isinstance(years, bool) and 1 <= years <= 30, "invalid_term", "合同年限须为1至30年", 400)
+    try:
+        start_date = date.fromisoformat(start)
+        target_year = start_date.year + years
+        if start_date.month == 2 and start_date.day == 29:
+            try:
+                anniversary = start_date.replace(year=target_year)
+                end_date = anniversary - timedelta(days=1)
+            except ValueError:
+                end_date = date(target_year, 2, 28)
+        else:
+            end_date = start_date.replace(year=target_year) - timedelta(days=1)
+    except (ValueError, TypeError, OverflowError) as exc:
+        from chihuitong.errors import BusinessError
+
+        raise BusinessError("invalid_term", "合同生效日期或年限不合法", 400) from exc
+    tz = ZoneInfo("Asia/Shanghai")
+    payload.setdefault("agreement", {}).update(
+        starts_at=datetime.combine(start_date, time.min, tzinfo=tz).isoformat(),
+        ends_at=datetime.combine(end_date, time.max, tzinfo=tz).isoformat(),
+    )
+    return payload
 
 
 @transaction.atomic
@@ -212,7 +248,7 @@ def save(actor, *, kind, payload, pk=None, version=None):
     )
     require(
         set(payload)
-        <= {"clinic", "agreement", "subject", "clinic_id", "version", "cooperation_id"},
+        <= {"clinic", "agreement", "subject", "clinic_id", "version", "cooperation_id", "term"},
         "invalid_fields",
         "草稿包含未知字段",
         400,
@@ -257,7 +293,7 @@ def save(actor, *, kind, payload, pk=None, version=None):
     )
     if ids:
         files.validate_attachment_ids(actor, ids, purposes={"cover", "license"})
-    payload = json.loads(json.dumps(payload, default=str))
+    payload = apply_term(json.loads(json.dumps(payload, default=str)))
     payload.setdefault("agreement", {})["attachment_ids"] = []
     if pk:
         item = get(actor, pk, lock=True)
@@ -289,7 +325,7 @@ def contract_input(payload):
     }
     profile = payload.get("clinic", {}).get("profile", {})
     subject = payload.get("subject", {})
-    return {
+    result = {
         "agreement": agreement,
         "subject": {k: subject.get(k) for k in ("name", "credit_code")},
         "cooperation_id": payload.get("cooperation_id"),
@@ -298,6 +334,9 @@ def contract_input(payload):
             for k in ("name", "legal_entity", "province", "city", "district", "address")
         },
     }
+    if "term" in payload:
+        result["term"] = payload["term"]
+    return result
 
 
 def snapshot(actor, item, tpl, frozen=None):
@@ -305,7 +344,8 @@ def snapshot(actor, item, tpl, frozen=None):
 
     from .clinics import visible_clinics
 
-    data = {**item.payload.get("agreement", {}), "number": item.number, "attachment_ids": []}
+    canonical = apply_term(json.loads(json.dumps(item.payload)))
+    data = {**canonical.get("agreement", {}), "number": item.number, "attachment_ids": []}
     serializer = AgreementInput(data=data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -379,8 +419,8 @@ def snapshot(actor, item, tpl, frozen=None):
         "platform_credit_code": tpl.platform_credit_code,
         "subject_name": subject_name,
         "subject_credit_code": credit,
-        "starts_at": timezone.localtime(data["starts_at"]).strftime("%Y-%m-%d %H:%M"),
-        "ends_at": timezone.localtime(data["ends_at"]).strftime("%Y-%m-%d %H:%M"),
+        "starts_at": timezone.localtime(data["starts_at"]).strftime("%Y-%m-%d" if "term" in item.payload else "%Y-%m-%d %H:%M"),
+        "ends_at": timezone.localtime(data["ends_at"]).strftime("%Y-%m-%d" if "term" in item.payload else "%Y-%m-%d %H:%M"),
         "payment_mode": "核销现付" if item.kind == "single" else "账单后付",
         "settlement_cycle": {"": "不适用", "weekly": "周结", "monthly": "月结"}[
             data["settlement_cycle"]
@@ -531,8 +571,10 @@ def generate(actor, pk, *, version):
         tpl, "template_missing", "平台尚未配置正式合同模板；草稿已保留，请联系平台配置后再生成", 409
     )
     old = item.prints.filter(revision=item.generation).first()
-    if old and old.template_id == tpl.id and old.fingerprint == fingerprint(
-        snapshot(actor, item, tpl, frozen=old.snapshot)
+    if (
+        old
+        and old.template_id == tpl.id
+        and old.fingerprint == fingerprint(snapshot(actor, item, tpl, frozen=old.snapshot))
     ):
         return item
     data = snapshot(actor, item, tpl)
@@ -563,7 +605,8 @@ def current_print(actor, item):
     printed = item.prints.select_related("template").filter(revision=item.generation).first()
     require(printed, "print_required", "请先生成并下载待签合同", 409)
     require(
-        printed.fingerprint == fingerprint(snapshot(actor, item, printed.template, frozen=printed.snapshot)),
+        printed.fingerprint
+        == fingerprint(snapshot(actor, item, printed.template, frozen=printed.snapshot)),
         "print_stale",
         "合同内容或产品费用已变化，请重新生成、打印并签署",
         409,
@@ -614,10 +657,11 @@ def submit(actor, pk, *, version):
         "请先上传当前生成版本对应的门诊签署件",
         409,
     )
+    canonical = apply_term(json.loads(json.dumps(item.payload)))
     payload = {
-        **item.payload,
+        **{key: value for key, value in canonical.items() if key != "term"},
         "agreement": {
-            **item.payload["agreement"],
+            **canonical["agreement"],
             "number": item.number,
             "attachment_ids": item.signed_ids,
         },

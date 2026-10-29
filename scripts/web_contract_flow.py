@@ -36,10 +36,10 @@ def exercise(pages, report):
         fill(channel, '业务联系人电话', values['业务联系人电话'])
         for label in ['签约主体管理员姓名', '签约主体管理员手机号', '门诊管理员姓名', '门诊管理员手机号']:
             fill(channel, label, values[label])
-        date_field(channel,'合同生效时间',(datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d %H:%M'))
-        date_field(channel,'合同到期时间',(datetime.now()+timedelta(days=365)).strftime('%Y-%m-%d %H:%M'))
+        date_field(channel,'合同期限',(datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d'))
+        select(channel,'合同期限','1年')
         select(channel,'申请上线的推广产品','演示·洁牙推广产品')
-        dialog(channel).get_by_text('合同到期时间',exact=True).click()
+        dialog(channel).get_by_text('合同期限',exact=True).click()
         for label in ['营业执照','医疗执业许可证']:
             with channel.expect_response(lambda r:r.url.endswith('/api/v1/files') and r.request.method=='POST') as response:
                 field(channel,label).locator('input[type=file]').set_input_files(report/'synthetic-proof.png')

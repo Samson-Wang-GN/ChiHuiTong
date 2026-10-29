@@ -565,7 +565,9 @@
           ]
         : []),
       ...keys.map((name) => ({ name, label: name === 'name' ? '门诊名称' : C.names[name] })),
-      ...(joint && C.jointFields ? C.jointFields(jointProducts.data?.results || [], !!row) : []),
+      ...(joint && C.jointFields
+        ? C.jointFields(jointProducts.data?.results || [], !!row, !!preparation && !preparation.payload.term)
+        : []),
       {
         name: 'responsible_id',
         label: '负责业务员',
@@ -623,6 +625,7 @@
           ? {
               contract_starts: preparation.payload.agreement?.starts_at,
               contract_ends: preparation.payload.agreement?.ends_at,
+              contract_term: preparation.payload.term,
               contract_products: preparation.payload.agreement?.product_ids,
               subject_name: preparation.payload.subject?.name,
               subject_credit: preparation.payload.subject?.credit_code,

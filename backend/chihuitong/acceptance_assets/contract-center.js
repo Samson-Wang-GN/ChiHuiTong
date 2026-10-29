@@ -42,7 +42,38 @@
     admin_name: v.subject_admin,
     admin_phone: v.subject_phone,
   });
-  C.jointFields = (products, existing) => [
+  function termEnd(start, years) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !years) return '';
+    const [year, month, day] = start.split('-').map(Number);
+    const target = year + Number(years);
+    let end;
+    if (month === 2 && day === 29 && new Date(Date.UTC(target, 1, 29)).getUTCMonth() !== 1)
+      end = new Date(Date.UTC(target, 1, 28));
+    else end = new Date(Date.UTC(target, month - 1, day - 1));
+    return end.toISOString().slice(0, 10);
+  }
+  function TermPicker({ value = {}, onChange }) {
+    const end = termEnd(value.starts_on, value.years);
+    return h(
+      A.Space,
+      { wrap: true },
+      h(A.DatePicker, {
+        value: value.starts_on || undefined,
+        format: 'YYYY-MM-DD',
+        'aria-label': '合同生效日期',
+        onChange: (starts_on) => onChange({ ...value, starts_on }),
+      }),
+      h(A.Select, {
+        value: value.years || undefined,
+        options: Array.from({ length: 30 }, (_, n) => ({ value: n + 1, label: n + 1 + '年' })),
+        style: { width: 120 },
+        'aria-label': '合同年限',
+        onChange: (years) => onChange({ ...value, years }),
+      }),
+      h('span', null, end ? '截止日期：' + end + '（含当日）' : '请选择生效日期和年限'),
+    );
+  }
+  C.jointFields = (products, existing, legacyTerm) => [
     ...(!existing
       ? subjectFields.map((field) =>
           field.name === 'subject_admin'
@@ -63,12 +94,17 @@
             : field,
         )
       : []),
-    { name: 'contract_starts', label: '合同生效时间', type: 'date', time: true },
-    { name: 'contract_ends', label: '合同到期时间', type: 'date', time: true },
+    ...(legacyTerm
+      ? [
+          { name: 'contract_starts', label: '合同生效时间', type: 'date', time: true },
+          { name: 'contract_ends', label: '合同到期时间', type: 'date', time: true },
+        ]
+      : [{ name: 'contract_term', label: '合同期限', render: () => h(TermPicker) }]),
     multi('contract_products', '申请上线的推广产品', productOptions(products)),
   ];
   C.jointData = (v, row) => ({
     ...(!row ? { subject: subjectData(v, 'single') } : {}),
+    ...(v.contract_term ? { term: v.contract_term } : {}),
     agreement: {
       number: v.contract_number || '',
       starts_at: v.contract_starts ? C.iso(v.contract_starts) : '',

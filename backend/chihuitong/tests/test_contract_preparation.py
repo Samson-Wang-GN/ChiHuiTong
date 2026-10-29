@@ -231,7 +231,10 @@ class PreparationTests(TestCase):
         }
         self.assertEqual(api_client(self.channel).get(url).status_code, 403)
         self.assertEqual(api_client(self.channel).post(url, data, format="json").status_code, 403)
-        self.assertEqual(client.post(url, data, format="json", HTTP_IDEMPOTENCY_KEY="profile-one").status_code, 201)
+        self.assertEqual(
+            client.post(url, data, format="json", HTTP_IDEMPOTENCY_KEY="profile-one").status_code,
+            201,
+        )
         tpl = service.template(
             self.platform,
             kind="single",
@@ -250,6 +253,18 @@ class PreparationTests(TestCase):
         item = service.generate(self.channel, item.id, version=item.version)
         self.assertEqual(item.generation, 1)
         self.assertEqual(printed.template_id, tpl.id)
+
+    def test_date_only_term_inclusive_and_leap_boundaries(self):
+        for start, years, end in (
+            ("2026-11-01", 1, "2027-10-31"),
+            ("2028-02-29", 1, "2029-02-28"),
+            ("2028-02-29", 4, "2032-02-28"),
+        ):
+            value = service.apply_term({"term": {"starts_on": start, "years": years}})
+            self.assertTrue(value["agreement"]["starts_at"].startswith(start + "T00:00:00"))
+            self.assertTrue(value["agreement"]["ends_at"].startswith(end + "T23:59:59.999999"))
+        with self.assertRaises(BusinessError):
+            service.apply_term({"term": {"starts_on": "2026-11-01", "years": 0}})
 
     def finish_draft(self, item):
         item = service.generate(self.channel, item.id, version=item.version)
