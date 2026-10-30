@@ -217,7 +217,12 @@ for (const audience of ['customer', 'clinic'])
         assert.equal(typeof instance[binding[1]], 'function', binding[1]);
       assert.ok(!wxml.includes('web-view'));
       assert.ok(wxml.includes('view.qr'));
+      for (const condition of wxml.matchAll(/wx:(?:if|elif)="([^"]*)"/g))
+        assert.match(condition[1], /^\{\{.+\}\}$/, 'WXML condition must be an expression');
     }
+    const qrMarkup = fs.readFileSync(path.join(folder, 'components/qr/index.wxml'), 'utf8');
+    for (const condition of qrMarkup.matchAll(/wx:(?:if|elif)="([^"]*)"/g))
+      assert.match(condition[1], /^\{\{.+\}\}$/, 'QR WXML condition must be an expression');
     const sources = fs
       .readdirSync(folder, { recursive: true })
       .filter((f) => f.endsWith('.js'))
