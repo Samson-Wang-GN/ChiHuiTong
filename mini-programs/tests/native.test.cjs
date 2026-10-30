@@ -87,6 +87,9 @@ function harness(audience = 'customer', role = 'admin') {
     getAccountInfoSync() {
       return { miniProgram: { appId: 'wx1111111111111111' } };
     },
+    arrayBufferToBase64(value) {
+      return Buffer.from(value).toString('base64');
+    },
     showModal(o) {
       o.success({ confirm: true });
     },
@@ -230,7 +233,7 @@ for (const audience of ['customer', 'clinic'])
       .join('\n');
     assert.ok(!sources.includes('synthetic-session'));
     assert.ok(!sources.includes('setStorageSync'));
-    assert.ok(!sources.includes('Basic '));
+    assert.ok(!sources.includes('synthetic-test-access-secret'));
     assert.ok(!sources.includes('appSecret'));
     assert.ok(!sources.includes('localhost'));
     assert.equal(h.load('shared/config').config.audience, audience);
@@ -252,6 +255,21 @@ test('unconfigured app cannot attempt network authorization', async () => {
   h.config.appid = 'touristappid';
   await assert.rejects(h.login(), /账号尚未配置/);
   assert.equal(h.calls.length, 0);
+});
+test('acceptance access stays in memory and retains the existing Basic gate', async () => {
+  const h = harness();
+  h.config.acceptanceBasic = true;
+  h.config.apiBase = 'https://dev-public.chihui-ai.com/chihuitong';
+  await assert.rejects(h.runtime.request('/me'), /验收入口/);
+  h.runtime.setAcceptanceAccess('synthetic-user', 'synthetic-test-access-secret');
+  await h.login();
+  const headers = h.runtime.headers();
+  assert.ok(headers.Authorization.startsWith('Basic '));
+  assert.equal(headers['X-CHT-Authorization'], 'Bearer synthetic-session');
+  await h.runtime.logout();
+  await assert.rejects(h.runtime.request('/me'), /验收入口/);
+  h.config.apiBase = 'https://untrusted.example';
+  assert.throws(() => h.runtime.setAcceptanceAccess('user', 'password'), /不支持/);
 });
 test('phone authorization does not accept a self-reported phone or openid', async () => {
   const h = harness();

@@ -22,9 +22,15 @@
     </view>
   </view>
   <view wx:if="{{isLogin}}" class="card">
+    <view wx:if="{{acceptanceRequired&&!acceptanceReady}}">
+      <view class="muted">开发验收环境：请输入后台验收入口账号和口令，本次运行期间保存在内存中。</view>
+      <input class="input" placeholder="验收入口账号" data-key="account" bindinput="acceptanceInput" maxlength="256"/>
+      <input class="input" placeholder="验收入口口令" password="{{true}}" data-key="password" bindinput="acceptanceInput" maxlength="256"/>
+      <button class="secondary" bindtap="acceptanceConfirm">确认测试入口信息</button>
+    </view>
     <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{privacyAgreed}}" color="#165dff"/>我已阅读并同意隐私保护指引</label></checkbox-group>
     <button wx:if="{{privacyReady}}" open-type="agreePrivacyAuthorization" class="secondary">确认微信隐私授权</button>
-    <button class="primary" open-type="getPhoneNumber" bindgetphonenumber="authorize" disabled="{{busy||!privacyReady||!privacyAgreed}}">手机号授权登录</button>
+    <button class="primary" open-type="getPhoneNumber" bindgetphonenumber="authorize" disabled="{{busy||!privacyReady||!privacyAgreed||!acceptanceReady}}">手机号授权登录</button>
     <view wx:if="{{!privacyReady}}" class="muted">账号及隐私配置待就绪，当前不能真实登录。</view>
   </view>
   <view class="actions"><button wx:for="{{view.actions}}" wx:key="key" class="{{item.danger?'danger':'secondary'}}" data-key="{{item.key}}" data-id="{{item.id}}" bindtap="act" disabled="{{busy}}">{{item.label}}</button></view>

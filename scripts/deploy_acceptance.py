@@ -83,32 +83,8 @@ def main():
     creds=json.loads(creds_path.read_text())
     hashed=run(['openssl','passwd','-6','-stdin'],input=creds['password']+'\n',capture_output=True).stdout.strip()
     install(creds['username']+':'+hashed+'\n','/etc/nginx/chihuitong-acceptance.htpasswd',mode='0640',group='www-data')
-    mini_location = ''
-    if cfg.get('CHT_ACCEPTANCE_MINI_CUSTOMER_ENABLED', 'false').lower() == 'true':
-        import re
-        if (not re.fullmatch(r'wx[a-fA-F0-9]{16}', cfg.get('CHT_MINI_CUSTOMER_APPID', ''))
-            or len(cfg.get('CHT_MINI_CUSTOMER_SECRET', '')) < 16
-            or not re.fullmatch(r'[a-f0-9]{64}(?:,[a-f0-9]{64})*', cfg.get('CHT_ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES', ''))):
-            raise SystemExit('患者端验收配置不完整，拒绝开放入口')
-        mini_location = '''location ^~ /chihuitong/api/v1/mini/customer/ {
-    proxy_pass http://127.0.0.1:18243/api/v1/mini/customer/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto https;
-    proxy_set_header X-CHT-Acceptance "PROXY_TOKEN";
-    proxy_set_header Authorization $http_authorization;
-    proxy_connect_timeout 5s;
-    proxy_read_timeout 60s;
-    client_max_body_size 2m;
-    access_log off;
-    add_header Cache-Control "no-store" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header Referrer-Policy no-referrer always;
-    add_header X-Robots-Tag "noindex, nofollow" always;
-}
-'''
-    location_text=('''# Dedicated synthetic acceptance route. Existing routes are unchanged.
+    location_text='''# Dedicated synthetic acceptance route. Existing routes are unchanged.
 location = /chihuitong { return 302 /chihuitong/; }
-''' + mini_location + '''
 location ^~ /chihuitong/ {
     auth_basic "ChiHuiTong acceptance";
     auth_basic_user_file /etc/nginx/chihuitong-acceptance.htpasswd;
@@ -127,7 +103,7 @@ location ^~ /chihuitong/ {
     add_header X-Robots-Tag "noindex, nofollow" always;
     add_header Content-Security-Policy "{CSP}" always;
 }
-''').replace('PROXY_TOKEN',cfg['CHT_ACCEPTANCE_PROXY_TOKEN']).replace('{CSP}', CSP)
+'''.replace('PROXY_TOKEN',cfg['CHT_ACCEPTANCE_PROXY_TOKEN']).replace('{CSP}', CSP)
     old_site=run(['sudo','-n','cat',SITE],capture_output=True).stdout
     needle='    server_name dev-public.chihui-ai.com;'
     directive=f'    include {INCLUDE};'

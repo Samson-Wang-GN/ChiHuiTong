@@ -82,6 +82,8 @@ export function createPage(name: string, registry: Record<string, Screen>): Enti
       isLogin: name === 'login',
       privacyReady: config.privacyReady,
       privacyAgreed: false,
+      acceptanceRequired: config.acceptanceBasic,
+      acceptanceReady: !config.acceptanceBasic,
     },
     ctx: {
       params: {},
@@ -116,6 +118,7 @@ export function createPage(name: string, registry: Record<string, Screen>): Enti
       await this.reload(true);
     },
     onHide(this: Entity) {
+      this.acceptancePassword = '';
       this.visible = false;
       this.sequence++;
       this.setData({ view: { title: '加载中' }, form: {} });
@@ -201,6 +204,20 @@ export function createPage(name: string, registry: Record<string, Screen>): Enti
     },
     consent(this: Entity, e: Entity) {
       this.setData({ privacyAgreed: e.detail.value.includes('yes') });
+    },
+    acceptanceInput(this: Entity, e: Entity) {
+      if (e.currentTarget.dataset.key === 'account') this.acceptanceAccount = e.detail.value;
+      if (e.currentTarget.dataset.key === 'password') this.acceptancePassword = e.detail.value;
+    },
+    acceptanceConfirm(this: Entity) {
+      try {
+        R.setAcceptanceAccess(this.acceptanceAccount || '', this.acceptancePassword || '');
+        this.acceptancePassword = '';
+        this.setData({ acceptanceReady: true, error: '' });
+      } catch (error) {
+        this.acceptancePassword = '';
+        this.showError(error);
+      }
     },
     async authorize(this: Entity, e: Entity) {
       if (this.data.busy) return;

@@ -4,4 +4,5 @@ export const config = {
   apiBase: '',
   appid: 'touristappid',
   privacyReady: false,
+  acceptanceBasic: false,
 };

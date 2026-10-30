@@ -30,13 +30,14 @@ for (const audience of ['customer', 'clinic']) {
   fs.mkdirSync(folder, { recursive: true });
   const input = publicConfig[audience] || {};
   for (const key of Object.keys(input))
-    if (!['appid', 'apiBase', 'privacyReady'].includes(key))
+    if (!['appid', 'apiBase', 'privacyReady', 'acceptanceBasic'].includes(key))
       throw new Error('构建配置含非公开字段');
   const config = {
     audience,
     appid: input.appid || 'touristappid',
     apiBase: input.apiBase || '',
     privacyReady: input.privacyReady === true,
+    acceptanceBasic: input.acceptanceBasic === true,
   };
   if (
     config.apiBase &&
@@ -47,6 +48,11 @@ for (const audience of ['customer', 'clinic']) {
     throw new Error('AppID格式错误');
   if (config.privacyReady && (config.appid === 'touristappid' || !config.apiBase))
     throw new Error('正式隐私授权须同时配置AppID和HTTPS地址');
+  if (
+    config.acceptanceBasic &&
+    (audience !== 'customer' || config.apiBase !== 'https://dev-public.chihui-ai.com/chihuitong')
+  )
+    throw new Error('验收入口口令仅可用于指定患者端开发验收地址');
   const write = (name, value) => {
     const target = path.join(folder, name);
     fs.mkdirSync(path.dirname(target), { recursive: true });

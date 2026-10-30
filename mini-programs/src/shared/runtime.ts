@@ -2,6 +2,7 @@ import { config } from './config';
 import { Entity, Session } from './model';
 
 let session: Session | null = null;
+let acceptanceAccess = '';
 let generation = 0;
 let navigationContext: Entity = {};
 export function consumeNavigation(): Entity {
@@ -56,9 +57,29 @@ export function endpoint(path: string): string {
 export function headers(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
-    ...(session ? { Authorization: 'Bearer ' + session.token } : {}),
+    ...(config.acceptanceBasic
+      ? {
+          Authorization: acceptanceAccess,
+          ...(session ? { 'X-CHT-Authorization': 'Bearer ' + session.token } : {}),
+        }
+      : session
+        ? { Authorization: 'Bearer ' + session.token }
+        : {}),
     ...(session?.membership ? { 'X-Membership-ID': session.membership.id } : {}),
   };
+}
+export function setAcceptanceAccess(user: string, password: string): void {
+  if (!config.acceptanceBasic || config.apiBase !== 'https://dev-public.chihui-ai.com/chihuitong')
+    throw new Error('当前不支持验收入口口令');
+  if (!/^[\x21-\x7e]+$/.test(user) || user.includes(':') || !/^[\x21-\x7e]+$/.test(password))
+    throw new Error('请填写有效的验收入口账号和口令');
+  const input = user + ':' + password;
+  const bytes = new Uint8Array(input.length);
+  for (let i = 0; i < input.length; i++) bytes[i] = input.charCodeAt(i);
+  acceptanceAccess = 'Basic ' + wx.arrayBufferToBase64(bytes.buffer);
+}
+export function clearAcceptanceAccess(): void {
+  acceptanceAccess = '';
 }
 function safeError(data: any, status: number): Error {
   const error = new Error(
@@ -79,6 +100,7 @@ export async function request(
   write = false,
 ): Promise<any> {
   configured();
+  if (config.acceptanceBasic && !acceptanceAccess) throw new Error('请先填写验收入口账号和口令');
   const revision = generation;
   const signature = method + path + JSON.stringify(data || {});
   const header = headers();
@@ -110,8 +132,17 @@ export async function request(
           retries.delete(signature);
           resolve(result.data);
         } else {
-          if (result.statusCode === 401) clearSession();
+          if (result.statusCode === 401) {
+            clearSession();
+            clearAcceptanceAccess();
+          }
           if (result.statusCode >= 400 && result.statusCode < 500) retries.delete(signature);
+          if (result.statusCode === 401 && config.acceptanceBasic && typeof result.data === 'string') {
+            const error = new Error('验收入口账号或口令不正确，请重新输入') as Error & { status: number };
+            error.status = 401;
+            reject(error);
+            return;
+          }
           reject(safeError(result.data, result.statusCode));
         }
       },
@@ -157,6 +188,7 @@ export async function logout(): Promise<void> {
     if (session) await request('/logout', 'POST', {}, true);
   } finally {
     clearSession();
+    clearAcceptanceAccess();
   }
 }
 export function confirm(content: string): Promise<boolean> {
