@@ -173,6 +173,7 @@ function harness(audience = 'customer', role = 'admin') {
     appid: 'wx1111111111111111',
     apiBase: 'https://synthetic.example',
     privacyReady: true,
+    acceptanceBasic: false,
   });
   const runtime = load('shared/runtime');
   const screens = load('domain/screens').screens;
