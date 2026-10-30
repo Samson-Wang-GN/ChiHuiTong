@@ -93,7 +93,21 @@ class DiscoveryTests(TestCase):
         agreement.status = "terminated"
         agreement.save(update_fields=["starts_at", "status"])
         self.assertEqual(self.search().data["total"], 0)
-        coverage.delete()
+        agreement.status = "approved"
+        agreement.save(update_fields=["status"])
+        response = self.client.post(
+            "/api/v1/mini/customer/appointments",
+            {
+                "benefit_id": str(self.benefit.id),
+                "clinic_id": str(self.clinic.id),
+                "requested_at": self.scheduled.isoformat(),
+            },
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="synthetic-bilateral-booking",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertNotIn("clinic_settled", response.data)
+        self.assertTrue(AgreementClinic.objects.filter(pk=coverage.pk).exists())
 
     def test_distance_order_pagination_and_unconfirmed_last(self):
         actor = actor_fixture("clinic", "13900000882")
