@@ -138,7 +138,12 @@ class OnboardingTests(TestCase):
         self.assertEqual(item.status, "pending")
         self.assertEqual(clinic.profile_version, 0)
         item = onboarding.review(
-            self.platform, item.id, version=item.version, approved=True, reason="审核", sync_online=True
+            self.platform,
+            item.id,
+            version=item.version,
+            approved=True,
+            reason="审核",
+            sync_online=True,
         )
         clinic.refresh_from_db()
         self.assertEqual((item.status, clinic.service_status), ("approved", "online"))
@@ -149,10 +154,19 @@ class OnboardingTests(TestCase):
     def test_failed_online_preserves_review_and_rolls_back_product_changes(self):
         item = self.signed(self.apply())
         clinic = item.onboarding_change.clinic
-        with patch.object(clinics, "set_service_status", side_effect=BusinessError("blocked", "门诊不可上线")):
-            self.assertEqual(onboarding.online_check(self.platform, item.id)["message"], "门诊不可上线")
+        with patch.object(
+            clinics, "set_service_status", side_effect=BusinessError("blocked", "门诊不可上线")
+        ):
+            self.assertEqual(
+                onboarding.online_check(self.platform, item.id)["message"], "门诊不可上线"
+            )
             item = onboarding.review(
-                self.platform, item.id, version=item.version, approved=True, reason="审核", sync_online=True
+                self.platform,
+                item.id,
+                version=item.version,
+                approved=True,
+                reason="审核",
+                sync_online=True,
             )
         clinic.refresh_from_db()
         self.assertEqual(item.status, "approved")
@@ -166,7 +180,12 @@ class OnboardingTests(TestCase):
         with self.assertRaises(BusinessError):
             onboarding.online_check(self.channel, item.id)
         item = onboarding.review(
-            self.platform, item.id, version=item.version, approved=True, reason="审核", sync_online=False
+            self.platform,
+            item.id,
+            version=item.version,
+            approved=True,
+            reason="审核",
+            sync_online=False,
         )
         item.onboarding_change.clinic.refresh_from_db()
         self.assertEqual(item.status, "approved")

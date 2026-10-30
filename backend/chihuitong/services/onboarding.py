@@ -93,7 +93,9 @@ def review(actor, agreement_id, *, version, approved, reason, final=False, sync_
                 clinic.refresh_from_db()
                 for product_id in contract.product_ids:
                     clinics.assert_new_business(clinic, product_id, allow_future=True)
-                    link, _ = ClinicProduct.objects.get_or_create(clinic=clinic, product_id=product_id)
+                    link, _ = ClinicProduct.objects.get_or_create(
+                        clinic=clinic, product_id=product_id
+                    )
                     link.status = "online"
                     advance(link, "status")
                 clinics.set_service_status(
@@ -117,7 +119,12 @@ def online_check(actor, agreement_id):
     with transaction.atomic():
         try:
             result = review(
-                actor, item.id, version=item.version, approved=True, reason="上线条件检查", sync_online=True
+                actor,
+                item.id,
+                version=item.version,
+                approved=True,
+                reason="上线条件检查",
+                sync_online=True,
             )
             outcome = result.online_result
         except BusinessError as exc:
