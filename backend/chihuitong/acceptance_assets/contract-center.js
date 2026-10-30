@@ -428,6 +428,60 @@
       },
     });
   }
+  C.dialogs.onboardingReview = function ({ row, onClose }) {
+    const check = C.useChoices(base + 'clinic-agreements/' + row.id + '/online-check'),
+      [approved, setApproved] = React.useState(true);
+    const canOnline = check.data?.status === 'online';
+    const hint = check.loading
+      ? '正在检查门诊上线条件。'
+      : check.error
+        ? '无法检查上线条件，请关闭后重试；仍可提交审核。'
+        : canOnline
+          ? '已通过上线条件检查。合同生效前，预约等新业务仍受合同生效时间限制。'
+          : '当前不能同步上线：' + (check.data?.message || '请核对上线条件。');
+    return h(C.FormDialog, {
+      title: '审核门诊资料与合同',
+      onClose,
+      hint,
+      submitText: '提交审核',
+      successText: '审核结果已保存',
+      initial: { approved: true, sync_online: false },
+      onValuesChange: (changed) => {
+        if (changed.approved !== undefined) setApproved(changed.approved);
+      },
+      fields: [
+        {
+          name: 'approved',
+          label: '审核结果',
+          type: 'select',
+          options: [
+            { label: '审核通过', value: true },
+            { label: '退回', value: false },
+          ],
+        },
+        {
+          name: 'sync_online',
+          label: '同步上线',
+          text: '门诊同步上线',
+          type: 'checkbox',
+          optional: true,
+          disabled: !approved || !canOnline,
+        },
+        C.Reason,
+      ],
+      onSubmit: async (v, key) => {
+        const result = await C.api(
+          base + 'clinic-agreements/' + row.id + '/onboarding-review',
+          'POST',
+          { version: row.version, approved: v.approved, reason: v.reason, sync_online: !!(v.approved && v.sync_online) },
+          key,
+        );
+        if (result.online_result?.status === 'blocked')
+          A.Modal.info({ title: '审核已通过，门诊未上线', content: result.online_result.message });
+        return result;
+      },
+    });
+  };
   C.dialogs.agreement = function ({ id, onClose, readOnly = false }) {
     const q = C.useChoices(base + 'clinic-agreements/' + id),
       r = q.data;
@@ -487,8 +541,8 @@
             content:
               r.scope_notice ||
               (r.onboarding
-                ? '资料与合同可先进行内容预审。最终审核并上线须收到原件、完成平台签署、上传双方完整签署件，且合同已到生效时间；如上线失败，本次最终审核也不会保存。'
-                : '合同内容可先预审；收到原件、完成平台签署并上传双方签署件后可进行最终审核，合同到约定时间后生效。'),
+                ? '审核通过须收到原件、完成平台签署并上传双方完整签署件。可选择同步上线；上线条件不满足时仍可审核，合同生效前预约等新业务受生效时间限制。'
+                : '收到原件、完成平台签署并上传双方签署件后可审核通过，合同到约定时间后生效。'),
           }),
           h(
             A.Space,
@@ -535,20 +589,20 @@
               C.role === 'platform' &&
               r.status === 'pending' &&
               C.button(r.onboarding ? '审核入驻申请' : '审核合同', () =>
-                C.action(
-                  r.onboarding ? '统一审核门诊资料与合同' : '审核合同',
-                  base +
-                    'clinic-agreements/' +
-                    id +
-                    (r.onboarding ? '/onboarding-review' : '/review'),
+                r.onboarding ? C.open('onboardingReview', { row: r }) : C.action(
+                  '审核合同',
+                  base + 'clinic-agreements/' + id + '/review',
                   r.version,
-                  { approved: true, final: false },
+                  { approved: true, final: true },
                   [
-                    { name: 'approved', label: '审核通过', type: 'boolean' },
                     {
-                      name: 'final',
-                      label: r.onboarding ? '完成最终审核并上线' : '完成最终审核',
-                      type: 'boolean',
+                      name: 'approved',
+                      label: '审核结果',
+                      type: 'select',
+                      options: [
+                        { label: '审核通过', value: true },
+                        { label: '退回', value: false },
+                      ],
                     },
                     C.Reason,
                   ],

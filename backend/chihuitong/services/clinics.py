@@ -399,7 +399,7 @@ def review_profile(actor, change_id, *, approved, version, reason, joint=False):
     return change
 
 
-def assert_new_business(clinic, product_id=None):
+def assert_new_business(clinic, product_id=None, *, allow_future=False):
     require(
         clinic.organization.status == "active" and clinic.channel.status == "active",
         "organization_disabled",
@@ -417,7 +417,7 @@ def assert_new_business(clinic, product_id=None):
     )
     from .cooperations import assert_payment_ready, clinic_agreement
 
-    agreement = clinic_agreement(clinic, product_id=product_id)
+    agreement = clinic_agreement(clinic, product_id=product_id, allow_future=allow_future)
     if clinic.cooperation_id and agreement.payment_mode == "instant":
         assert_payment_ready()
     current_contract(clinic.channel_id, product_id=product_id)
@@ -444,7 +444,7 @@ def set_service_status(actor, clinic_id, *, status, version, reason):
         require(
             clinic.service_status != "exited", "clinic_exited", "已退出门诊需重新建立合作后处理"
         )
-        assert_new_business(clinic)
+        assert_new_business(clinic, allow_future=True)
         if clinic.cooperation_id:
             require(
                 clinic.products.filter(status="online").exists(),
@@ -486,7 +486,7 @@ def set_clinic_product(actor, clinic_id, *, product_id, online, reason):
     product = Product.objects.filter(pk=product_id).first()
     require(product, "not_found", "推广产品不存在", 404)
     if online:
-        assert_new_business(clinic, product.id)
+        assert_new_business(clinic, product.id, allow_future=True)
     link, _ = ClinicProduct.objects.get_or_create(clinic=clinic, product=product)
     link.status = "online" if online else "offline"
     advance(link, "status")

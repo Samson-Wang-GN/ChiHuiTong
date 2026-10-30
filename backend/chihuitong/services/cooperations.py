@@ -164,7 +164,7 @@ def attach_clinic(actor, cooperation_id, clinic_id, *, version, reason):
     return clinic
 
 
-def current_agreement(item, *, at=None, stock=False):
+def current_agreement(item, *, at=None, stock=False, allow_future=False):
     at = at or timezone.now()
     agreement = (
         item.agreements.filter(
@@ -173,6 +173,14 @@ def current_agreement(item, *, at=None, stock=False):
         .order_by("-starts_at", "-revision")
         .first()
     )
+    if allow_future and not stock and (not agreement or agreement.ends_at < at):
+        future = (
+            item.agreements.filter(status="approved", starts_at__gt=at, reviewed_at__lte=at)
+            .order_by("starts_at", "-revision")
+            .first()
+        )
+        if future:
+            agreement = future
     if not agreement:
         future = (
             item.agreements.filter(status="approved", starts_at__gt=at, reviewed_at__lte=at)
@@ -210,7 +218,7 @@ def current_agreement(item, *, at=None, stock=False):
     return agreement
 
 
-def clinic_agreement(clinic, *, stock=False, at=None, product_id=None):
+def clinic_agreement(clinic, *, stock=False, at=None, product_id=None, allow_future=False):
     if not clinic.cooperation_id:
         require(
             clinic.contract_policy == "legacy",
@@ -233,7 +241,9 @@ def clinic_agreement(clinic, *, stock=False, at=None, product_id=None):
         agreement = qs.order_by("-starts_at", "-revision").first()
         require(agreement, "contract_unavailable", "没有覆盖此门店及产品的已签合同")
     else:
-        agreement = current_agreement(clinic.cooperation, at=at, stock=False)
+        agreement = current_agreement(
+            clinic.cooperation, at=at, stock=False, allow_future=allow_future
+        )
     require(
         agreement.coverage.filter(clinic=clinic).exists(),
         "clinic_not_covered",

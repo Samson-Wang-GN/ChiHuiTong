@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -127,36 +128,49 @@ class OnboardingTests(TestCase):
                 final=True,
             )
 
-    def test_future_contract_explains_block_and_rolls_back_final_review(self):
+    def test_future_contract_can_online_without_permitting_new_business(self):
         self.data["starts_at"] = timezone.now() + timedelta(days=3)
         item = self.signed(self.apply())
         clinic = item.onboarding_change.clinic
-        with self.assertRaises(BusinessError) as raised:
-            onboarding.review(
-                self.platform,
-                item.id,
-                version=item.version,
-                approved=True,
-                reason="资料齐全",
-                final=True,
-            )
-        self.assertEqual(raised.exception.code, "contract_unavailable")
-        self.assertIn(
-            timezone.localtime(item.starts_at).strftime("%Y-%m-%d %H:%M"), raised.exception.message
-        )
-        self.assertIn("尚未生效", raised.exception.message)
+        self.assertEqual(onboarding.online_check(self.platform, item.id)["status"], "online")
         item.refresh_from_db()
         clinic.refresh_from_db()
-        item.onboarding_change.refresh_from_db()
         self.assertEqual(item.status, "pending")
-        self.assertEqual(item.onboarding_change.status, "pending")
         self.assertEqual(clinic.profile_version, 0)
+        item = onboarding.review(
+            self.platform, item.id, version=item.version, approved=True, reason="审核", sync_online=True
+        )
+        clinic.refresh_from_db()
+        self.assertEqual((item.status, clinic.service_status), ("approved", "online"))
+        with self.assertRaises(BusinessError) as raised:
+            clinics.assert_new_business(clinic, self.product.id)
+        self.assertEqual(raised.exception.code, "contract_unavailable")
+
+    def test_failed_online_preserves_review_and_rolls_back_product_changes(self):
+        item = self.signed(self.apply())
+        clinic = item.onboarding_change.clinic
+        with patch.object(clinics, "set_service_status", side_effect=BusinessError("blocked", "门诊不可上线")):
+            self.assertEqual(onboarding.online_check(self.platform, item.id)["message"], "门诊不可上线")
+            item = onboarding.review(
+                self.platform, item.id, version=item.version, approved=True, reason="审核", sync_online=True
+            )
+        clinic.refresh_from_db()
+        self.assertEqual(item.status, "approved")
+        self.assertEqual(item.online_result["status"], "blocked")
+        self.assertEqual(clinic.review_status, "approved")
         self.assertNotEqual(clinic.service_status, "online")
         self.assertFalse(clinic.products.filter(status="online").exists())
+
+    def test_review_without_online_and_check_permissions(self):
+        item = self.signed(self.apply())
+        with self.assertRaises(BusinessError):
+            onboarding.online_check(self.channel, item.id)
         item = onboarding.review(
-            self.platform, item.id, version=item.version, approved=True, reason="预审", final=False
+            self.platform, item.id, version=item.version, approved=True, reason="审核", sync_online=False
         )
-        self.assertEqual(item.status, "pending")
+        item.onboarding_change.clinic.refresh_from_db()
+        self.assertEqual(item.status, "approved")
+        self.assertNotEqual(item.onboarding_change.clinic.service_status, "online")
 
     def test_final_review_identifies_missing_signed_contract(self):
         item = self.apply()

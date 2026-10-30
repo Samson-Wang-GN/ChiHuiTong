@@ -190,6 +190,10 @@ class ReviewInput(VersionInput):
     reason = serializers.CharField(max_length=500)
 
 
+class OnboardingReviewInput(ReviewInput):
+    sync_online = serializers.BooleanField(required=False)
+
+
 class ReasonInput(VersionInput):
     reason = serializers.CharField(max_length=500)
 
@@ -334,13 +338,19 @@ def agreement_detail(request, agreement_id):
     return Response(agreement_projection(actor, item))
 
 
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 def agreement_action(request, agreement_id, action):
     actor = request_actor(request)
+    if request.method == "GET":
+        from .errors import require
+        from .services import onboarding
+
+        require(action == "online-check", "not_found", "操作不存在", 404)
+        return Response(onboarding.online_check(actor, agreement_id))
     if action == "onboarding-review":
         from .services import onboarding
 
-        item = onboarding.review(actor, agreement_id, **validated(ReviewInput, request))
+        item = onboarding.review(actor, agreement_id, **validated(OnboardingReviewInput, request))
     elif action == "submit":
         item = cooperations.submit_agreement(
             actor, agreement_id, **validated(VersionInput, request)
@@ -360,7 +370,10 @@ def agreement_action(request, agreement_id, action):
 
         require(action == "review", "not_found", "操作不存在", 404)
         item = cooperations.review_agreement(actor, agreement_id, **validated(ReviewInput, request))
-    return Response(agreement_projection(actor, item))
+    result = agreement_projection(actor, item)
+    if hasattr(item, "online_result"):
+        result["online_result"] = item.online_result
+    return Response(result)
 
 
 @api_view(["POST"])

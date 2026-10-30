@@ -545,6 +545,7 @@
     onClose,
     submitText = '保存',
     successText = '操作已完成',
+    onValuesChange,
     width = 760,
   }) {
     const [form] = A.Form.useForm(),
@@ -632,6 +633,7 @@
             layout: 'vertical',
             initialValues: initial,
             disabled: busy,
+            onValuesChange,
             className: 'business-form',
           },
           fields.map((f) =>
@@ -641,6 +643,7 @@
                 key: f.name,
                 field: f.name,
                 label: f.label || C.names[f.name] || f.name,
+                triggerPropName: f.type === 'checkbox' ? 'checked' : undefined,
                 extra: f.hint,
                 rules: f.rules || [
                   {
@@ -651,7 +654,9 @@
               },
               f.render
                 ? f.render(form)
-                : f.type === 'select'
+                : f.type === 'checkbox'
+                  ? h(A.Checkbox, { disabled: f.disabled }, f.text || f.label)
+                  : f.type === 'select'
                   ? h(A.Select, {
                       options: f.options,
                       allowClear: !!f.optional,
