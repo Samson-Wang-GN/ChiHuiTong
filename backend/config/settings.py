@@ -22,6 +22,16 @@ if ENVIRONMENT not in {"production", "development", "test"}:
     raise ImproperlyConfigured("CHT_ENVIRONMENT不合法")
 ACCEPTANCE_ENABLED = os.environ.get("CHT_ACCEPTANCE_ENABLED", "false").lower() == "true"
 ACCEPTANCE_PROXY_TOKEN = os.environ.get("CHT_ACCEPTANCE_PROXY_TOKEN", "")
+ACCEPTANCE_MINI_CUSTOMER_ENABLED = (
+    os.environ.get("CHT_ACCEPTANCE_MINI_CUSTOMER_ENABLED", "false").lower() == "true"
+)
+ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES = frozenset(
+    filter(None, os.environ.get("CHT_ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES", "").split(","))
+)
+if ACCEPTANCE_MINI_CUSTOMER_ENABLED and (
+    not ACCEPTANCE_ENABLED or not ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES
+):
+    raise ImproperlyConfigured("患者端验收入口需要验收模式和测试账号范围")
 if ACCEPTANCE_ENABLED and (
     ENVIRONMENT == "production"
     or not os.environ.get("CHT_DB_NAME", "").startswith("chihuitong_acceptance")

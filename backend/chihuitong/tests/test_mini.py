@@ -6,6 +6,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
+from chihuitong.crypto import digest
 from chihuitong.errors import BusinessError
 from chihuitong.integrations import wechat_mini
 from chihuitong.models import MiniIdentity, MiniSession
@@ -47,6 +48,24 @@ def mini_client(audience, phone, *, openid=None, name=None):
 class MiniTests(TestCase):
     def setUp(self):
         appointment_setup(self)
+
+    def test_acceptance_customer_login_and_session_require_tester_allowlist(self):
+        from chihuitong.models import Customer
+
+        allowed = digest(self.customer.phone, purpose="phone")
+        with override_settings(
+            ACCEPTANCE_MINI_CUSTOMER_ENABLED=True,
+            ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES={allowed},
+        ):
+            before = Customer.objects.count()
+            _, blocked = mini_client("customer", "13900000774")
+            self.assertEqual(blocked.status_code, 403)
+            self.assertEqual(Customer.objects.count(), before)
+            client, response = mini_client("customer", self.customer.phone)
+            self.assertEqual(response.status_code, 200, response.data)
+            self.assertEqual(client.get("/api/v1/mini/customer/me").status_code, 200)
+            with override_settings(ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES=set()):
+                self.assertEqual(client.get("/api/v1/mini/customer/me").status_code, 401)
 
     def test_phone_authorization_customer_and_clinic_audiences_are_separate(self):
         customer, response = mini_client("customer", self.customer.phone)

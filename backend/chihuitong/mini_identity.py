@@ -33,6 +33,14 @@ def login(audience, *, login_code, phone_code, remote_address, name=None):
             require(created, "code_used", "授权凭证已使用，请重新授权", 409)
     verified = provider.verify(login_code, phone_code)
     require(verified["appid"] == provider.appid, "mini_app_mismatch", "授权应用不一致", 400)
+    if audience == "customer" and settings.ACCEPTANCE_MINI_CUSTOMER_ENABLED:
+        require(
+            digest(verified["phone"], purpose="phone")
+            in settings.ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES,
+            "mini_tester_required",
+            "该手机号不在本次测试范围，请联系测试管理员",
+            403,
+        )
     with transaction.atomic():
         index = digest(verified["openid"], purpose="mini_openid")
         phone_index = digest(verified["phone"], purpose="phone")
@@ -94,6 +102,12 @@ def login(audience, *, login_code, phone_code, remote_address, name=None):
 
 def session_profile(session):
     identity = session.identity
+    if (
+        audience == "customer"
+        and settings.ACCEPTANCE_MINI_CUSTOMER_ENABLED
+        and identity.phone_index not in settings.ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES
+    ):
+        raise AuthenticationFailed("该手机号不在本次测试范围，请联系测试管理员")
     if identity.audience == "customer":
         customer = identity.customer
         return {

@@ -151,9 +151,7 @@ export const screens: Record<string, Screen> = {
         rows: result.results.map((c: Entity) => ({
           id: c.id,
           title: c.name,
-          lines: [
-            [c.province, c.city, c.district, c.address].filter(Boolean).join(''),
-          ],
+          lines: [[c.province, c.city, c.district, c.address].filter(Boolean).join('')],
           actions: [{ key: 'clinic', id: c.id, label: '查看门诊并预约' }],
         })),
         total: result.total,
