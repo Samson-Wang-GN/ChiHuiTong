@@ -147,7 +147,7 @@ export const screens: Record<string, Screen> = {
       return {
         title: '选择门诊',
         notice: ctx.cache.locationError || '仅展示此权益可预约的门诊；距离为直线距离。',
-        fields: [{ key: 'query', label: '城市、区域或门诊名称', value: ctx.form.query || '' }],
+        fields: [{ key: 'query', label: '门诊名称', value: ctx.form.query || '' }],
         actions: [
           { key: 'search', label: '搜索' },
           { key: 'locate', label: '按当前位置查找' },
@@ -302,7 +302,7 @@ export const screens: Record<string, Screen> = {
             : a.pending_reschedule
               ? '改期待门诊确认，原预约时间仍有效。'
               : '请按门诊确认的时间就诊，治疗完成后出示核销码。',
-        facts: appointmentFacts(a).concat([fact('使用规则', a.usage_rules)]),
+        facts: appointmentFacts(a, false).concat([fact('使用规则', a.usage_rules)]),
         qr,
         actions: actions as any,
       };
@@ -324,7 +324,7 @@ export const screens: Record<string, Screen> = {
             'feedback-no': '未到诊申请',
             'feedback-yes': '到诊反馈',
           }[ctx.params.action as string] || '预约处理',
-        facts: appointmentFacts(a),
+        facts: appointmentFacts(a, false),
         fields:
           ctx.params.action === 'reschedule'
             ? timeFields()

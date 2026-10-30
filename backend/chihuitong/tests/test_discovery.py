@@ -4,7 +4,14 @@ from decimal import Decimal
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from chihuitong.models import Clinic, ClinicProduct, ContractVersion
+from chihuitong.models import (
+    AgreementClinic,
+    Clinic,
+    ClinicAgreement,
+    ClinicCooperation,
+    ClinicProduct,
+    ContractVersion,
+)
 from chihuitong.services import files
 
 from .support import actor_fixture
@@ -50,6 +57,43 @@ class DiscoveryTests(TestCase):
         old.ends_at = timezone.now() - timedelta(hours=1)
         old.save()
         self.assertEqual(self.search().data["total"], 0)
+
+    def test_bilateral_contract_coverage_and_effective_dates(self):
+        owner = actor_fixture("clinic", "13900000883")
+        subject = ClinicCooperation.objects.create(
+            organization=owner.organization, kind="chain", created_by=self.channel.membership
+        )
+        self.clinic.cooperation = subject
+        self.clinic.save(update_fields=["cooperation"])
+        now = timezone.now()
+        agreement = ClinicAgreement.objects.create(
+            cooperation=subject,
+            submitted_by=self.channel.membership,
+            number="SYNTH-DISCOVERY",
+            revision=1,
+            status="approved",
+            starts_at=now - timedelta(days=1),
+            ends_at=now + timedelta(days=30),
+            reviewed_at=now,
+            payment_mode="postpaid",
+            settlement_cycle="monthly",
+            product_ids=[str(self.product.id)],
+        )
+        self.assertEqual(self.search().data["total"], 0)
+        coverage = AgreementClinic.objects.create(agreement=agreement, clinic=self.clinic)
+        self.assertEqual(self.search().data["total"], 1)
+        agreement.product_ids = []
+        agreement.save(update_fields=["product_ids"])
+        self.assertEqual(self.search().data["total"], 0)
+        agreement.product_ids = [str(self.product.id)]
+        agreement.starts_at = now + timedelta(days=1)
+        agreement.save(update_fields=["product_ids", "starts_at"])
+        self.assertEqual(self.search().data["total"], 0)
+        agreement.starts_at = now - timedelta(days=1)
+        agreement.status = "terminated"
+        agreement.save(update_fields=["starts_at", "status"])
+        self.assertEqual(self.search().data["total"], 0)
+        coverage.delete()
 
     def test_distance_order_pagination_and_unconfirmed_last(self):
         actor = actor_fixture("clinic", "13900000882")

@@ -1,11 +1,18 @@
 """Customer-visible clinic projection. Selection mirrors new-booking authorization in SQL."""
 
-from django.db.models import Exists, FloatField, OuterRef, Subquery
+from django.db.models import Exists, FloatField, OuterRef, Q, Subquery
 from django.db.models.expressions import RawSQL
 from django.utils import timezone
 
 from chihuitong.errors import require
-from chihuitong.models import Appointment, Benefit, Clinic, ContractProduct, ContractVersion
+from chihuitong.models import (
+    Appointment,
+    Benefit,
+    Clinic,
+    ClinicAgreement,
+    ContractProduct,
+    ContractVersion,
+)
 
 
 def eligible_clinics(product_id):
@@ -17,6 +24,12 @@ def eligible_clinics(product_id):
         contract__organization_id=OuterRef("organization_id"), channel_id=OuterRef("channel_id")
     )
     channel_versions = versions.filter(contract__organization_id=OuterRef("channel_id"))
+    agreements = ClinicAgreement.objects.filter(
+        cooperation_id=OuterRef("cooperation_id"),
+        status__in=["approved", "terminated"],
+        starts_at__lte=now,
+        reviewed_at__lte=now,
+    ).order_by("-starts_at", "-revision")
     qs = (
         Clinic.objects.select_related("organization")
         .filter(
@@ -32,12 +45,34 @@ def eligible_clinics(product_id):
         .annotate(
             clinic_contract=Subquery(clinic_versions.values("id")[:1]),
             channel_contract=Subquery(channel_versions.values("id")[:1]),
+            selected_agreement=Subquery(agreements.values("id")[:1]),
         )
     )
     # Select the latest version BEFORE testing its validity; never fall back to a superseded one.
     valid = ContractVersion.objects.filter(status="approved", ends_at__gte=now)
+    suitable_agreement = ClinicAgreement.objects.filter(
+        pk=OuterRef("selected_agreement"),
+        status="approved",
+        ends_at__gte=now,
+        product_ids__contains=[str(product_id)],
+        coverage__clinic_id=OuterRef("pk"),
+    )
     return (
-        qs.filter(clinic_contract__in=valid.values("id"), channel_contract__in=valid.values("id"))
+        qs.annotate(agreement_authorized=Exists(suitable_agreement))
+        .filter(
+            Q(
+                cooperation__isnull=True,
+                contract_policy="legacy",
+                clinic_contract__in=valid.values("id"),
+            )
+            | Q(
+                cooperation__isnull=False,
+                cooperation__status="active",
+                cooperation__organization__status="active",
+                agreement_authorized=True,
+            ),
+            channel_contract__in=valid.values("id"),
+        )
         .annotate(
             authorized=Exists(
                 ContractProduct.objects.filter(

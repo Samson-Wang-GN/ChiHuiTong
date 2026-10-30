@@ -83,14 +83,16 @@ export async function command(path: string, data: Entity, confirmation: string):
   await R.request(path, 'POST', data, true);
   return true;
 }
-export function appointmentFacts(a: Entity) {
+export function appointmentFacts(a: Entity, includeSettlement = true) {
   return [
     fact('推广产品', a.external_name),
     fact('门诊', a.clinic_name),
     fact('权益来源', a.source_name),
     fact('预约状态', statuses[a.status]),
     fact('预约时间', dateText(a.scheduled_at || a.requested_at)),
-    fact('门诊结算', a.clinic_settled ? '已结清' : '尚未结清或未产生费用'),
+    ...(includeSettlement
+      ? [fact('门诊结算', a.clinic_settled ? '已结清' : '尚未结清或未产生费用')]
+      : []),
   ];
 }
 export function listAppointments(ctx: Context): Promise<View> {

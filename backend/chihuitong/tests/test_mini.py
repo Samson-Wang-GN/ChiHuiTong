@@ -141,6 +141,7 @@ class MiniTests(TestCase):
         self.assertNotIn("internal_name", listing.data["results"][0])
         detail = client.get(f"/api/v1/mini/customer/appointments/{item.id}")
         self.assertEqual(detail.data["redemption_qr"], self.card.credential)
+        self.assertNotIn("clinic_settled", detail.data)
         other, _ = mini_client("customer", "13900000773", name="合成其他客户")
         self.assertEqual(
             other.get(f"/api/v1/mini/customer/appointments/{item.id}").status_code, 404

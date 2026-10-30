@@ -240,7 +240,6 @@ def appointment_projection(item):
         "patient_arrived_at": iso(item.patient_arrived_at),
         "expires_at": iso(item.benefit.expires_at),
         "conflict": item.conflict,
-        "clinic_settled": bool(effective and effective.settled_at),
         "cancellation_reason": item.cancellation_reason,
         "pending_reschedule": {
             "id": str(pending_change.id),
