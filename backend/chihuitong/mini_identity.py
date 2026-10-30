@@ -102,12 +102,6 @@ def login(audience, *, login_code, phone_code, remote_address, name=None):
 
 def session_profile(session):
     identity = session.identity
-    if (
-        audience == "customer"
-        and settings.ACCEPTANCE_MINI_CUSTOMER_ENABLED
-        and identity.phone_index not in settings.ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES
-    ):
-        raise AuthenticationFailed("该手机号不在本次测试范围，请联系测试管理员")
     if identity.audience == "customer":
         customer = identity.customer
         return {
@@ -160,6 +154,12 @@ def authenticate_mini(request, audience):
     if not session:
         raise AuthenticationFailed("小程序会话已失效，请重新授权")
     identity = session.identity
+    if (
+        audience == "customer"
+        and settings.ACCEPTANCE_MINI_CUSTOMER_ENABLED
+        and identity.phone_index not in settings.ACCEPTANCE_MINI_CUSTOMER_ALLOWED_INDEXES
+    ):
+        raise AuthenticationFailed("该手机号不在本次测试范围，请联系测试管理员")
     user = identity.customer if audience == "customer" else identity.account
     if not user or user.phone_index != identity.phone_index:
         raise AuthenticationFailed("身份绑定已失效")
