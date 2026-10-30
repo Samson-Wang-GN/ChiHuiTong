@@ -137,8 +137,14 @@ export async function request(
             clearAcceptanceAccess();
           }
           if (result.statusCode >= 400 && result.statusCode < 500) retries.delete(signature);
-          if (result.statusCode === 401 && config.acceptanceBasic && typeof result.data === 'string') {
-            const error = new Error('验收入口账号或口令不正确，请重新输入') as Error & { status: number };
+          if (
+            result.statusCode === 401 &&
+            config.acceptanceBasic &&
+            typeof result.data === 'string'
+          ) {
+            const error = new Error('验收入口账号或口令不正确，请重新输入') as Error & {
+              status: number;
+            };
             error.status = 401;
             reject(error);
             return;
