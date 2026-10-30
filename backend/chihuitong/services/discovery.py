@@ -111,7 +111,7 @@ def listing(customer, benefit_id, *, longitude=None, latitude=None, query=""):
     benefit = owned_benefit(customer, benefit_id)
     qs = eligible_clinics(benefit.product_id)
     if query:
-        qs = qs.filter(organization__name__icontains=query)
+        qs = qs.filter(Q(organization__name__icontains=query) | Q(public_region__icontains=query))
     if longitude is not None:
         # Bound parameters only; no external map call and no customer location persistence.
         distance = RawSQL(

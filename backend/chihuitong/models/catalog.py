@@ -77,6 +77,7 @@ class Clinic(Entity):
         Membership, on_delete=models.PROTECT, related_name="assigned_clinics"
     )
     profile = EncryptedJSONField(default=dict)
+    public_region = models.TextField(default="", blank=True)
     profile_version = models.PositiveIntegerField(default=0)
     review_status = models.CharField(max_length=16, default="draft")
     service_status = models.CharField(max_length=16, default="offline")

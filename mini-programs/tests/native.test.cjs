@@ -320,8 +320,8 @@ test('location refusal leaves manual search available', async () => {
   const c = ctx({ benefit_id: id });
   await h.screens.clinics.action(c, 'locate');
   const v = await h.screens.clinics.load(c);
-  assert.match(v.notice, /输入门诊名称/);
-  assert.equal(v.fields[0].label, '门诊名称');
+  assert.match(v.notice, /输入城市/);
+  assert.equal(v.fields[0].label, '城市、区域或门诊名称');
   assert.ok(v.fields.some((f) => f.key === 'query'));
 });
 test('customer QR displayed directly, but blocked for pending reschedule', async () => {

@@ -189,7 +189,7 @@ export function pickLocation(): Promise<WechatMiniprogram.GetLocationSuccessCall
     wx.getLocation({
       type: 'gcj02',
       success: resolve,
-      fail: () => reject(new Error('未获取定位，可输入门诊名称继续搜索')),
+      fail: () => reject(new Error('未获取定位，可输入城市、区域或门诊名称继续搜索')),
     }),
   );
 }

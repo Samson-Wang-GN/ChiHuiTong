@@ -147,7 +147,7 @@ export const screens: Record<string, Screen> = {
       return {
         title: '选择门诊',
         notice: ctx.cache.locationError || '仅展示此权益可预约的门诊；距离为直线距离。',
-        fields: [{ key: 'query', label: '门诊名称', value: ctx.form.query || '' }],
+        fields: [{ key: 'query', label: '城市、区域或门诊名称', value: ctx.form.query || '' }],
         actions: [
           { key: 'search', label: '搜索' },
           { key: 'locate', label: '按当前位置查找' },

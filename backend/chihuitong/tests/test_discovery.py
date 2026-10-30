@@ -40,6 +40,13 @@ class DiscoveryTests(TestCase):
         self.assertEqual(self.search(longitude="116.3").status_code, 400)
         self.assertEqual(self.search(longitude="NaN", latitude="30").status_code, 400)
 
+    def test_search_published_region_and_name(self):
+        self.clinic.public_region = "北京市北京市海淀区"
+        self.clinic.save(update_fields=["public_region"])
+        self.assertEqual(self.search(query="海淀区").data["total"], 1)
+        self.assertEqual(self.search(query="不存在区").data["total"], 0)
+        self.assertEqual(self.search(query=self.clinic.organization.name).data["total"], 1)
+
     def test_offline_disabled_product_and_latest_expired_contract_excluded(self):
         for field, value in [("service_status", "offline"), ("review_status", "draft")]:
             Clinic.objects.filter(pk=self.clinic.id).update(**{field: value})

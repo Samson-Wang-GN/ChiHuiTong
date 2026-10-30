@@ -173,6 +173,34 @@ class CatalogTests(TestCase):
         self.clinic.refresh_from_db()
         return self.clinic
 
+    def test_public_region_only_tracks_approved_profile(self):
+        from importlib import import_module
+        from types import SimpleNamespace
+
+        from django.apps import apps
+        from django.db import connection
+
+        self.assertEqual(self.clinic.public_region, "")
+        self.approve_clinic()
+        self.assertEqual(self.clinic.public_region, "北京市北京市海淀区")
+        self.clinic.public_region = ""
+        self.clinic.save(update_fields=["public_region"])
+        migration = import_module("chihuitong.migrations.0023_clinic_public_region")
+        migration.publish_regions(apps, SimpleNamespace(connection=connection))
+        self.clinic.refresh_from_db()
+        self.assertEqual(self.clinic.public_region, "北京市北京市海淀区")
+        changed = {**self.profile, "district": "朝阳区"}
+        change = clinics.submit_profile(
+            self.channel, self.clinic.id, profile=changed, version=self.clinic.version
+        )
+        self.clinic.refresh_from_db()
+        self.assertEqual(self.clinic.public_region, "北京市北京市海淀区")
+        clinics.review_profile(
+            self.platform, change.id, approved=True, version=change.version, reason="资料审核"
+        )
+        self.clinic.refresh_from_db()
+        self.assertEqual(self.clinic.public_region, "北京市北京市朝阳区")
+
     def test_resource_and_channel_cooperation_links_resolve_to_authorized_endpoints(self):
         for actor in [self.resource, self.channel]:
             client = api_client(actor)

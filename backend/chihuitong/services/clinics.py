@@ -361,6 +361,9 @@ def review_profile(actor, change_id, *, approved, version, reason, joint=False):
             }
         _, responsible = validate_profile(actor, data, clinic.channel)
         clinic.profile = change.after
+        clinic.public_region = "".join(
+            change.after.get(k, "") for k in ("province", "city", "district")
+        )
         location = change.after.get("location", {})
         clinic.longitude = (
             location.get("longitude") if location.get("status") == "confirmed" else None
@@ -376,6 +379,7 @@ def review_profile(actor, change_id, *, approved, version, reason, joint=False):
         advance(
             clinic,
             "profile",
+            "public_region",
             "profile_version",
             "responsible",
             "review_status",
