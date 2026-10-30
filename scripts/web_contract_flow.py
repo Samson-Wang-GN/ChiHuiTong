@@ -136,7 +136,7 @@ def exercise(pages, report):
         platform.wait_for_timeout(350)
         platform.get_by_role('button',name='审核入驻申请',exact=True).click()
         dialog(platform).get_by_text('已通过上线条件检查', exact=False).wait_for()
-        field(platform,'同步上线').locator('input[type=checkbox]').check()
+        field(platform,'同步上线').get_by_text('门诊同步上线',exact=True).click()
         fill(platform,'操作原因','合成合同与资料完整，一次审核上线')
         dialog(platform).get_by_role('button',name='提交审核',exact=True).click()
         platform.wait_for_timeout(500)

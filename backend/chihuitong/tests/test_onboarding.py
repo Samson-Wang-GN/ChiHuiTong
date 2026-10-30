@@ -191,6 +191,29 @@ class OnboardingTests(TestCase):
         self.assertEqual(item.status, "approved")
         self.assertNotEqual(item.onboarding_change.clinic.service_status, "online")
 
+    def test_online_check_api_and_rejection_do_not_publish(self):
+        item = self.signed(self.apply())
+        url = f"/api/v1/clinic-agreements/{item.id}/online-check"
+        self.assertEqual(api_client(self.channel).get(url).status_code, 403)
+        response = api_client(self.platform).get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "online")
+        item.refresh_from_db()
+        self.assertEqual(item.status, "pending")
+        item = onboarding.review(
+            self.platform,
+            item.id,
+            version=item.version,
+            approved=False,
+            reason="资料有误",
+            sync_online=True,
+        )
+        clinic = item.onboarding_change.clinic
+        clinic.refresh_from_db()
+        self.assertEqual(item.status, "rejected")
+        self.assertNotEqual(clinic.service_status, "online")
+        self.assertFalse(clinic.products.filter(status="online").exists())
+
     def test_final_review_identifies_missing_signed_contract(self):
         item = self.apply()
         stamp = timezone.now().isoformat()
