@@ -231,7 +231,10 @@ for (const audience of ['customer', 'clinic'])
     assert.equal(h.load('shared/config').config.audience, audience);
     if (audience === 'customer') assert.ok(!sources.includes('/bills/'));
     const realConfig = JSON.parse(fs.readFileSync(path.join(folder, 'project.config.json')));
-    assert.equal(realConfig.appid, 'touristappid');
+    const buildConfig = process.env.CHT_MINI_BUILD_CONFIG
+      ? JSON.parse(fs.readFileSync(process.env.CHT_MINI_BUILD_CONFIG, 'utf8'))
+      : {};
+    assert.equal(realConfig.appid, buildConfig[audience]?.appid || 'touristappid');
     assert.equal(realConfig.setting.urlCheck, true);
   });
 test('unconfigured app cannot attempt network authorization', async () => {
