@@ -103,16 +103,6 @@ for (const audience of ['customer', 'clinic']) {
     },
     style: 'v2',
     lazyCodeLoading: 'requiredComponents',
-    ...(audience === 'customer'
-      ? {
-          permission: {
-            'scope.userLocation': {
-              desc: '仅在您主动查找附近门诊时获取位置，用于计算门诊直线距离',
-            },
-          },
-          requiredPrivateInfos: ['getLocation'],
-        }
-      : {}),
     sitemapLocation: 'sitemap.json',
   });
   json('sitemap.json', {

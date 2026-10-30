@@ -140,26 +140,19 @@ export const screens: Record<string, Screen> = {
             query: ctx.form.query,
             page: ctx.page,
             page_size: 20,
-            ...ctx.cache.coords,
           }),
       );
       ctx.cache.rows = result.results;
       return {
         title: '选择门诊',
-        notice: ctx.cache.locationError || '仅展示此权益可预约的门诊；距离为直线距离。',
+        notice: '仅展示此权益可预约的门诊，可按城市、区域或门诊名称搜索。',
         fields: [{ key: 'query', label: '城市、区域或门诊名称', value: ctx.form.query || '' }],
-        actions: [
-          { key: 'search', label: '搜索' },
-          { key: 'locate', label: '按当前位置查找' },
-        ],
+        actions: [{ key: 'search', label: '搜索' }],
         rows: result.results.map((c: Entity) => ({
           id: c.id,
           title: c.name,
           lines: [
-            c.province + c.city + c.district + c.address,
-            c.distance_m === null
-              ? '未计算距离'
-              : '直线距离 ' + (c.distance_m / 1000).toFixed(1) + ' 公里',
+            [c.province, c.city, c.district, c.address].filter(Boolean).join(''),
           ],
           actions: [{ key: 'clinic', id: c.id, label: '查看门诊并预约' }],
         })),
@@ -168,15 +161,7 @@ export const screens: Record<string, Screen> = {
       };
     },
     async action(ctx, key, id) {
-      if (key === 'locate') {
-        try {
-          const p = await R.pickLocation();
-          ctx.cache.coords = { longitude: p.longitude.toFixed(6), latitude: p.latitude.toFixed(6) };
-          ctx.cache.locationError = '';
-        } catch (e) {
-          ctx.cache.locationError = (e as Error).message;
-        }
-      } else if (key === 'clinic') R.go('clinic', { id, benefit_id: ctx.params.benefit_id });
+      if (key === 'clinic') R.go('clinic', { id, benefit_id: ctx.params.benefit_id });
       ctx.page = 1;
     },
   },

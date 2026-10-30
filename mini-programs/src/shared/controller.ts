@@ -42,7 +42,9 @@ const publicScreens: Record<string, Screen> = {
       return {
         title: '隐私保护',
         notice: config.privacyReady
-          ? '请阅读并同意本小程序经审核的隐私保护指引。手机号用于身份识别，定位仅用于您主动查找门诊，扫码用于激活或核销，付款图片仅用于对账。'
+          ? config.audience === 'customer'
+            ? '请阅读并同意本小程序经审核的隐私保护指引。手机号用于身份识别，扫码用于激活权益。'
+            : '请阅读并同意本小程序经审核的隐私保护指引。手机号用于身份识别，扫码用于核销，付款图片仅用于对账。'
           : '小程序主体及正式隐私保护指引尚待配置。当前禁止手机号授权，不采集真实授权数据。',
         actions: config.privacyReady
           ? [{ key: 'privacy-contract', label: '查看微信隐私保护指引' }]

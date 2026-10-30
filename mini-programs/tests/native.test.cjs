@@ -234,7 +234,12 @@ for (const audience of ['customer', 'clinic'])
     assert.ok(!sources.includes('appSecret'));
     assert.ok(!sources.includes('localhost'));
     assert.equal(h.load('shared/config').config.audience, audience);
-    if (audience === 'customer') assert.ok(!sources.includes('/bills/'));
+    if (audience === 'customer') {
+      assert.ok(!sources.includes('/bills/'));
+      assert.ok(!sources.includes('wx.getLocation'));
+      assert.ok(!app.requiredPrivateInfos?.includes('getLocation'));
+      assert.equal(app.permission?.['scope.userLocation'], undefined);
+    }
     const realConfig = JSON.parse(fs.readFileSync(path.join(folder, 'project.config.json')));
     const buildConfig = process.env.CHT_MINI_BUILD_CONFIG
       ? JSON.parse(fs.readFileSync(process.env.CHT_MINI_BUILD_CONFIG, 'utf8'))
@@ -317,17 +322,17 @@ test('benefit card renders rules and direct appointment action', async () => {
   assert.ok(view.rows[0].lines.some((v) => v.includes('每次一份')));
   assert.equal(view.rows[0].actions[0].label, '预约门诊');
 });
-test('location refusal leaves manual search available', async () => {
+test('clinic search does not request location and supports manual search', async () => {
   const h = harness();
   h.respond((p) =>
     p.startsWith('/benefits') ? { results: [benefit], total: 1 } : { results: [], total: 0 },
   );
   const c = ctx({ benefit_id: id });
-  await h.screens.clinics.action(c, 'locate');
   const v = await h.screens.clinics.load(c);
-  assert.match(v.notice, /输入城市/);
+  assert.match(v.notice, /城市、区域或门诊名称/);
   assert.equal(v.fields[0].label, '城市、区域或门诊名称');
   assert.ok(v.fields.some((f) => f.key === 'query'));
+  assert.ok(!v.actions.some((action) => action.key === 'locate'));
 });
 test('customer QR displayed directly, but blocked for pending reschedule', async () => {
   const h = harness();

@@ -184,15 +184,6 @@ export function go(page: string, values: Entity = {}): void {
     wx.switchTab({ url });
   } else wx.navigateTo({ url: url + (Object.keys(values).length ? '?' + query(values) : '') });
 }
-export function pickLocation(): Promise<WechatMiniprogram.GetLocationSuccessCallbackResult> {
-  return new Promise((resolve, reject) =>
-    wx.getLocation({
-      type: 'gcj02',
-      success: resolve,
-      fail: () => reject(new Error('未获取定位，可输入城市、区域或门诊名称继续搜索')),
-    }),
-  );
-}
 export function scan(): Promise<string> {
   return new Promise((resolve, reject) =>
     wx.scanCode({
